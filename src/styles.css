@@ -1,0 +1,82 @@
+:root {
+  color: #fff;
+  background: #000;
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --panel: #0d0d10;
+  --panel-strong: #151519;
+  --muted: #a8a8b3;
+  --line: rgba(255,255,255,0.12);
+  --red: #ff293d;
+  --red-dark: #7f101b;
+  --radius: 24px;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; min-width: 320px; background: radial-gradient(circle at top right, rgba(255,41,61,.18), transparent 32rem), #000; }
+button, input, textarea { font: inherit; }
+button { border: 1px solid var(--line); background: #111115; color: #fff; border-radius: 999px; padding: .85rem 1.15rem; cursor: pointer; display: inline-flex; align-items: center; gap: .45rem; transition: border-color .2s, transform .2s, background .2s; }
+button:hover { transform: translateY(-1px); border-color: rgba(255,255,255,.35); }
+input[type="checkbox"] { accent-color: var(--red); width: 1.1rem; height: 1.1rem; }
+textarea { width: 100%; min-height: 11rem; resize: vertical; border: 1px solid var(--line); background: #070708; color: #fff; border-radius: 18px; padding: 1rem; outline: none; }
+textarea:focus { border-color: var(--red); }
+
+.app-header { position: sticky; top: 0; z-index: 10; display: grid; grid-template-columns: 1fr auto auto; gap: 1.25rem; align-items: center; padding: 1rem clamp(1rem, 4vw, 3rem); backdrop-filter: blur(18px); background: rgba(0,0,0,.76); border-bottom: 1px solid var(--line); }
+h1, h2, h3, p { margin-top: 0; }
+h1 { margin-bottom: 0; font-size: clamp(1.8rem, 5vw, 3.4rem); letter-spacing: -.06em; }
+h2 { margin-bottom: 0; font-size: clamp(1.35rem, 3vw, 2rem); letter-spacing: -.03em; }
+h3 { margin-bottom: .35rem; }
+.eyebrow { color: var(--red); text-transform: uppercase; letter-spacing: .16em; font-size: .72rem; font-weight: 800; margin-bottom: .35rem; }
+.header-meta { display: flex; align-items: center; gap: .55rem; color: var(--muted); white-space: nowrap; }
+.top-nav { display: flex; gap: .35rem; flex-wrap: wrap; justify-content: flex-end; }
+.top-nav a { color: #fff; text-decoration: none; padding: .7rem .9rem; border: 1px solid var(--line); border-radius: 999px; }
+.top-nav a:hover { border-color: var(--red); }
+main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display: grid; gap: 1.25rem; }
+.panel { background: linear-gradient(145deg, rgba(21,21,25,.96), rgba(8,8,10,.96)); border: 1px solid var(--line); border-radius: var(--radius); padding: clamp(1rem, 3vw, 1.5rem); box-shadow: 0 24px 80px rgba(0,0,0,.35); }
+.section-heading { display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem; }
+.hero-panel { min-height: 34rem; display: grid; align-content: center; gap: 1.5rem; }
+.dashboard-grid, .two-column, .notes-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+.project-card { background: var(--panel-strong); border: 1px solid var(--line); border-radius: 20px; padding: 1.2rem; }
+.active-card, .active-task { border-color: rgba(255,41,61,.9) !important; background: linear-gradient(135deg, rgba(255,41,61,.22), rgba(21,21,25,.95)) !important; box-shadow: 0 0 0 1px rgba(255,41,61,.22), 0 18px 60px rgba(255,41,61,.13); }
+.project-card p:not(.eyebrow), .task-copy small, .day-view p, .review-card p { color: var(--muted); margin-bottom: 0; }
+.timer-shell { text-align: center; border: 1px solid var(--line); border-radius: 28px; padding: clamp(2rem, 7vw, 4rem); background: radial-gradient(circle, rgba(255,41,61,.2), rgba(9,9,11,.9) 62%); }
+.timer-shell span { display: block; font-size: clamp(3rem, 13vw, 8rem); font-weight: 900; letter-spacing: -.08em; line-height: .95; }
+.timer-shell p { color: var(--muted); margin: 1rem 0 0; }
+.actions { display: flex; justify-content: center; gap: .8rem; flex-wrap: wrap; }
+.primary, .active-tab, .add-button { background: var(--red); border-color: var(--red); color: #fff; font-weight: 800; }
+.schedule-list, .project-list { display: grid; gap: .75rem; }
+.time-block, .project-row { display: grid; grid-template-columns: auto auto 1fr; gap: .85rem; align-items: center; border: 1px solid var(--line); border-radius: 18px; padding: .95rem; background: #0a0a0d; }
+.time { color: var(--muted); font-variant-numeric: tabular-nums; }
+.task-copy { display: grid; }
+.project-row { grid-template-columns: 1fr auto; }
+.row-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
+.add-button { margin-top: 1rem; }
+.calendar-tabs { display: flex; gap: .6rem; margin-bottom: 1rem; }
+.calendar-layout { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 1rem; }
+.day-view, .week-view, .month-view { background: #08080a; border: 1px solid var(--line); border-radius: 18px; padding: 1rem; }
+.week-view { display: grid; grid-template-columns: repeat(7, 1fr); gap: .5rem; }
+.week-view div { min-height: 8rem; border: 1px solid var(--line); border-radius: 14px; padding: .6rem; }
+.week-view span { display: block; margin-top: 1rem; height: 2.25rem; border-radius: 10px; background: rgba(255,41,61,.45); }
+.month-view { display: grid; grid-template-columns: repeat(7, 1fr); gap: .45rem; }
+.month-view span { aspect-ratio: 1; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); }
+.today-dot { color: #fff !important; background: var(--red); border-color: var(--red) !important; }
+.notes-grid { grid-template-columns: 1fr 1fr 1fr; }
+.review-card { display: flex; gap: .8rem; padding: 1rem; border: 1px solid var(--line); border-radius: 18px; background: #08080a; margin-bottom: .8rem; }
+.review-card svg { color: var(--red); flex: none; }
+
+@media (max-width: 900px) {
+  .app-header { grid-template-columns: 1fr; }
+  .header-meta, .top-nav { justify-content: flex-start; }
+  .dashboard-grid, .two-column, .notes-grid, .calendar-layout { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  main { width: min(100% - 1rem, 1220px); margin-top: .5rem; }
+  .app-header { padding: .85rem; position: static; }
+  .top-nav a { flex: 1; text-align: center; }
+  .time-block, .project-row { grid-template-columns: auto 1fr; }
+  .time { grid-column: 2; }
+  .row-actions { grid-column: 1 / -1; }
+  .row-actions button { flex: 1; justify-content: center; }
+  .week-view { grid-template-columns: repeat(2, 1fr); }
+}
