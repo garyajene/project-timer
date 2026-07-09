@@ -4,8 +4,12 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "python3 -m http.server 5173",
+    "dev": "node server.js",
     "build": "rm -rf dist && mkdir -p dist/src && cp index.html dist/ && cp src/main.js src/styles.css dist/src/",
-    "preview": "python3 -m http.server 4173 -d dist"
+    "start": "node server.js",
+    "preview": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }
