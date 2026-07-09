@@ -90,11 +90,11 @@ function section({ id, title, eyebrow, className = '', content }) {
 }
 
 function projectCard(label, title, meta, active = false) {
-  return `<article class="project-card ${active ? 'active-card' : ''}"><p class="eyebrow">${label}</p><h3>${escapeHtml(title)}</h3><p>${escapeHtml(meta)}</p></article>`;
+  return `<article class="project-card ${active ? 'active-card' : ''}"><p class="eyebrow">${label}</p><h3 data-card-title>${escapeHtml(title)}</h3><p data-card-meta>${escapeHtml(meta)}</p></article>`;
 }
 
 function header() {
-  return `<header class="app-header"><div><p class="eyebrow">Personal workspace</p><h1>Project Timer</h1></div><div class="header-meta" aria-label="Current date and time"><span>${icon.clock}</span><span>${formatDate()}</span></div><nav class="top-nav" aria-label="Primary navigation">${['Today', 'Projects', 'Calendar', 'Notes'].map((item) => `<a href="#${item.toLowerCase()}">${item}</a>`).join('')}</nav></header>`;
+  return `<header class="app-header"><div><p class="eyebrow">Personal workspace</p><h1>Project Timer</h1></div><div class="header-meta" aria-label="Current date and time"><span>${icon.clock}</span><span>${formatDate()}</span></div><nav class="top-nav" aria-label="Primary navigation">${['Today', 'Projects', 'Calendar', 'Notes'].map((item) => `<a href="#${item.toLowerCase()}" ${getRoute() === item.toLowerCase() ? 'aria-current="page"' : ''}>${item}</a>`).join('')}</nav></header>`;
 }
 
 function todayDashboard() {
@@ -104,7 +104,7 @@ function todayDashboard() {
 }
 
 function schedule() {
-  return section({ id: 'schedule', title: 'Today’s Schedule', eyebrow: 'Time blocks', content: `<div class="schedule-list">${state.schedule.map((block, index) => `<div class="time-block ${index === state.activeIndex ? 'active-task' : ''}"><input class="schedule-done" data-index="${index}" type="checkbox" ${block.done ? 'checked' : ''} aria-label="Mark ${escapeHtml(block.title)} complete" /><input class="time-input" data-index="${index}" type="time" value="${escapeHtml(block.time)}" /><span class="task-copy"><input class="text-input schedule-title" data-index="${index}" value="${escapeHtml(block.title)}" aria-label="Block title" /><input class="text-input schedule-project" data-index="${index}" value="${escapeHtml(block.project)}" aria-label="Block project" list="project-options" /></span><div class="row-actions"><button class="delete-block" data-index="${index}" aria-label="Delete ${escapeHtml(block.title)}">${icon.trash} Delete</button></div></div>`).join('')}</div><button id="add-block" class="add-button"><span>${icon.plus}</span> Add Block</button><datalist id="project-options">${state.projects.map((project) => `<option value="${escapeHtml(project)}"></option>`).join('')}</datalist>` });
+  return section({ id: 'schedule', title: 'Today’s Schedule', eyebrow: 'Time blocks', content: `<div class="schedule-list">${state.schedule.map((block, index) => `<div class="time-block ${index === state.activeIndex ? 'active-task' : ''}" data-index="${index}" role="button" tabindex="0" aria-label="Select ${escapeHtml(block.title)}"><input class="schedule-done" data-index="${index}" type="checkbox" ${block.done ? 'checked' : ''} aria-label="Mark ${escapeHtml(block.title)} complete" /><input class="time-input" data-index="${index}" type="time" value="${escapeHtml(block.time)}" /><span class="task-copy"><input class="text-input schedule-title" data-index="${index}" value="${escapeHtml(block.title)}" aria-label="Block title" /><input class="text-input schedule-project" data-index="${index}" value="${escapeHtml(block.project)}" aria-label="Block project" list="project-options" /></span><div class="row-actions"><button class="delete-block" data-index="${index}" aria-label="Delete ${escapeHtml(block.title)}">${icon.trash} Delete</button></div></div>`).join('')}</div><button id="add-block" class="add-button"><span>${icon.plus}</span> Add Block</button><datalist id="project-options">${state.projects.map((project) => `<option value="${escapeHtml(project)}"></option>`).join('')}</datalist>` });
 }
 
 function masterProjectList() {
@@ -120,8 +120,18 @@ function notesAndReview() {
   return `<div class="notes-grid">${section({ id: 'parking', title: 'Parking Lot', eyebrow: 'Quick capture', content: '<textarea aria-label="Parking lot notes"></textarea>' })}${section({ id: 'notes', title: 'Project Notes', eyebrow: 'Current project', content: '<textarea aria-label="Project notes"></textarea>' })}${section({ id: 'end-day', title: 'End of Day', eyebrow: 'Review', content: '<div class="review-card"><span>✓</span><div><h3>Accomplishments</h3><p>Summarize completed work and lessons learned.</p></div></div><div class="review-card"><span>›</span><div><h3>First task for tomorrow</h3><p>Choose the next focused starting point.</p></div></div>' })}</div>`;
 }
 
+function getRoute() {
+  const route = window.location.hash.replace('#', '').toLowerCase();
+  return route || 'today';
+}
+
+function mainContent() {
+  if (getRoute() === 'projects') return masterProjectList();
+  return `${todayDashboard()}${schedule()}${calendarSection()}${notesAndReview()}`;
+}
+
 function render() {
-  document.querySelector('#app').innerHTML = `${header()}<main>${todayDashboard()}<div class="two-column">${schedule()}${masterProjectList()}</div>${calendarSection()}${notesAndReview()}</main>`;
+  document.querySelector('#app').innerHTML = `${header()}<main>${mainContent()}</main>`;
   bindEvents();
 }
 
@@ -197,6 +207,40 @@ function resetCurrentDuration() {
   remainingSeconds = getBlockDurationSeconds(state.activeIndex);
 }
 
+function updateSelectedBlockUI() {
+  const current = state.schedule[state.activeIndex];
+  const next = state.schedule[state.activeIndex + 1];
+  const cards = document.querySelectorAll('.project-card');
+  const currentCard = cards[0];
+  const nextCard = cards[1];
+
+  if (currentCard) {
+    currentCard.querySelector('[data-card-title]').textContent = current?.project || 'No block selected';
+    currentCard.querySelector('[data-card-meta]').textContent = current?.title || 'Add a block to begin';
+  }
+
+  if (nextCard) {
+    nextCard.querySelector('[data-card-title]').textContent = next?.project || 'End of schedule';
+    nextCard.querySelector('[data-card-meta]').textContent = next?.title || 'No next block';
+  }
+
+  document.querySelectorAll('.time-block').forEach((block) => {
+    block.classList.toggle('active-task', Number(block.dataset.index) === state.activeIndex);
+  });
+  updateTimerDisplay();
+}
+
+function selectActiveBlock(index, shouldRender = true) {
+  const nextIndex = Number(index);
+  if (!Number.isInteger(nextIndex) || !state.schedule[nextIndex]) return;
+  state.activeIndex = nextIndex;
+  resetCurrentDuration();
+  lastTick = Date.now();
+  saveState();
+  if (shouldRender) render();
+  else updateSelectedBlockUI();
+}
+
 function sortSchedule() {
   const activeBlock = state.schedule[state.activeIndex];
   state.schedule.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
@@ -209,12 +253,26 @@ function bindEvents() {
   document.querySelector('#skip-button')?.addEventListener('click', advanceBlock);
   document.querySelector('#add-project')?.addEventListener('click', () => { state.projects.push('New Project'); saveState(); render(); });
   document.querySelector('#add-block')?.addEventListener('click', () => { state.schedule.push({ time: '09:00', title: 'New block', project: state.projects[0] ?? '', done: false }); sortSchedule(); resetCurrentDuration(); saveState(); render(); });
-  document.querySelectorAll('.project-name').forEach((input) => input.addEventListener('change', (event) => { state.projects[event.target.dataset.index] = event.target.value.trim() || 'Untitled Project'; saveState(); render(); }));
+  document.querySelectorAll('.project-name').forEach((input) => input.addEventListener('change', (event) => { const index = Number(event.target.dataset.index); const previousName = state.projects[index]; const nextName = event.target.value.trim() || 'Untitled Project'; state.projects[index] = nextName; state.schedule.forEach((block) => { if (block.project === previousName) block.project = nextName; }); saveState(); render(); }));
   document.querySelectorAll('.delete-project').forEach((button) => button.addEventListener('click', (event) => { state.projects.splice(event.currentTarget.dataset.index, 1); saveState(); render(); }));
-  document.querySelectorAll('.schedule-done').forEach((input) => input.addEventListener('change', (event) => { state.schedule[event.target.dataset.index].done = event.target.checked; saveState(); }));
+  document.querySelectorAll('.time-block').forEach((block) => {
+    block.addEventListener('click', (event) => {
+      if (event.target.closest('.delete-block')) return;
+      selectActiveBlock(block.dataset.index, false);
+    });
+    block.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        selectActiveBlock(block.dataset.index, false);
+      }
+    });
+  });
+  document.querySelectorAll('.schedule-done').forEach((input) => input.addEventListener('change', (event) => { state.schedule[event.target.dataset.index].done = event.target.checked; saveState(); render(); }));
   document.querySelectorAll('.time-input').forEach((input) => input.addEventListener('change', (event) => { state.schedule[event.target.dataset.index].time = event.target.value; sortSchedule(); resetCurrentDuration(); saveState(); render(); }));
   document.querySelectorAll('.schedule-title').forEach((input) => input.addEventListener('change', (event) => { state.schedule[event.target.dataset.index].title = event.target.value.trim() || 'Untitled block'; saveState(); render(); }));
   document.querySelectorAll('.schedule-project').forEach((input) => input.addEventListener('change', (event) => { state.schedule[event.target.dataset.index].project = event.target.value.trim(); saveState(); render(); }));
+  window.removeEventListener('hashchange', render);
+  window.addEventListener('hashchange', render);
   document.querySelectorAll('.delete-block').forEach((button) => button.addEventListener('click', (event) => { state.schedule.splice(event.currentTarget.dataset.index, 1); state.activeIndex = clampActiveIndex(state.activeIndex); resetCurrentDuration(); saveState(); render(); }));
 }
 
