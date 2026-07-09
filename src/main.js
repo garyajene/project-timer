@@ -1,15 +1,12 @@
 const STORAGE_KEY = 'project-timer-state-v1';
 const DEFAULT_BLOCK_MINUTES = 30;
 
+const DEMO_PROJECTS = new Set(['Project Timer', 'Writing system', 'Portfolio refresh', 'Health tracker', 'Home admin', 'Morning setup', 'Daily review']);
+const DEMO_TITLES = new Set(['Plan daily priorities', 'Use Project Timer', 'Review content backlog', 'Focused project block', 'Wrap-up and tomorrow setup']);
+
 const defaultState = {
-  projects: ['Project Timer', 'Writing system', 'Portfolio refresh', 'Health tracker', 'Home admin'],
-  schedule: [
-    { time: '08:30', title: 'Plan daily priorities', project: 'Morning setup', done: false },
-    { time: '09:00', title: 'Use Project Timer', project: 'Project Timer', done: false },
-    { time: '11:00', title: 'Review content backlog', project: 'Writing system', done: false },
-    { time: '13:30', title: 'Focused project block', project: 'Project Timer', done: false },
-    { time: '16:00', title: 'Wrap-up and tomorrow setup', project: 'Daily review', done: false },
-  ],
+  projects: [],
+  schedule: [],
   activeIndex: 0,
 };
 
@@ -17,23 +14,33 @@ const icon = { clock: '◷', edit: '✎', trash: '⌫', plus: '+', check: '✓',
 const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const monthDays = Array.from({ length: 30 }, (_, index) => index + 1);
 let state = loadState();
+let todayDraft = cloneSchedule(state.schedule);
 let isRunning = false;
 let remainingSeconds = getBlockDurationSeconds(state.activeIndex);
 let lastTick = Date.now();
 let timerId;
+saveState();
 
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (!saved || !Array.isArray(saved.projects) || !Array.isArray(saved.schedule)) return structuredClone(defaultState);
+    const projects = saved.projects.filter(Boolean).filter((project) => !DEMO_PROJECTS.has(project));
+    const schedule = saved.schedule
+      .map(normalizeBlock)
+      .filter((block) => block.time && block.title && !DEMO_TITLES.has(block.title) && !DEMO_PROJECTS.has(block.project));
     return {
-      projects: saved.projects.filter(Boolean),
-      schedule: saved.schedule.map(normalizeBlock).filter((block) => block.time && block.title),
+      projects,
+      schedule,
       activeIndex: Number.isInteger(saved.activeIndex) ? saved.activeIndex : 0,
     };
   } catch {
     return structuredClone(defaultState);
   }
+}
+
+function cloneSchedule(schedule) {
+  return schedule.map((block) => ({ ...block }));
 }
 
 function normalizeBlock(block) {
@@ -94,21 +101,26 @@ function projectCard(label, title, meta, active = false) {
 }
 
 function header() {
-  return `<header class="app-header"><div><p class="eyebrow">Personal workspace</p><h1>Project Timer</h1></div><div class="header-meta" aria-label="Current date and time"><span>${icon.clock}</span><span>${formatDate()}</span></div><nav class="top-nav" aria-label="Primary navigation">${['Today', 'Projects', 'Calendar', 'Notes'].map((item) => `<a href="#${item.toLowerCase()}" ${getRoute() === item.toLowerCase() ? 'aria-current="page"' : ''}>${item}</a>`).join('')}</nav></header>`;
+  return `<header class="app-header"><div><p class="eyebrow">Personal workspace</p><h1>Project Timer</h1></div><div class="header-meta" aria-label="Current date and time"><span>${icon.clock}</span><span>${formatDate()}</span></div><nav class="top-nav" aria-label="Primary navigation">${['Today', 'Timer', 'Projects', 'Calendar', 'Notes'].map((item) => `<a href="#${item.toLowerCase()}" ${getRoute() === item.toLowerCase() ? 'aria-current="page"' : ''}>${item}</a>`).join('')}</nav></header>`;
 }
 
-function todayDashboard() {
+function timerPage() {
   const current = state.schedule[state.activeIndex];
   const next = state.schedule[state.activeIndex + 1];
-  return section({ id: 'today', title: 'Today Dashboard', eyebrow: 'Default screen', className: 'hero-panel', content: `<div class="dashboard-grid">${projectCard('Current Project', current?.project || 'No block selected', current?.title || 'Add a block to begin', true)}${projectCard('Next Project', next?.project || 'End of schedule', next?.title || 'No next block')}</div><div class="timer-shell" aria-label="Countdown timer"><span id="timer-display">${formatSeconds(remainingSeconds)}</span><p id="timer-status">${current ? `${isRunning ? 'Running' : 'Paused'} · ${escapeHtml(current.title)}` : 'Add a schedule block to start timing'}</p></div><div class="actions"><button id="start-button" class="primary">Start</button><button id="stop-button">Stop</button><button id="skip-button">Skip</button></div>` });
+  return `${section({ id: 'timer', title: 'Timer', eyebrow: 'Execution only', className: 'hero-panel', content: `<div class="dashboard-grid">${projectCard('Active Block', current?.project || 'No block selected', current?.title || 'Save today’s schedule to begin', true)}${projectCard('Next Block', next?.project || 'End of schedule', next?.title || 'No next block')}</div><div class="timer-shell" aria-label="Countdown timer"><span id="timer-display">${formatSeconds(remainingSeconds)}</span><p id="timer-status">${current ? `${isRunning ? 'Running' : 'Paused'} · ${escapeHtml(current.title)}` : 'No saved blocks for today'}</p></div><div class="actions"><button id="start-button" class="primary">Start</button><button id="stop-button">Stop</button><button id="skip-button">Skip</button></div>` })}${timerSchedule()}`;
 }
 
-function schedule() {
-  return section({ id: 'schedule', title: 'Today’s Schedule', eyebrow: 'Time blocks', content: `<div class="schedule-list">${state.schedule.map((block, index) => `<div class="time-block ${index === state.activeIndex ? 'active-task' : ''}" data-index="${index}" role="button" tabindex="0" aria-label="Select ${escapeHtml(block.title)}"><input class="schedule-done" data-index="${index}" type="checkbox" ${block.done ? 'checked' : ''} aria-label="Mark ${escapeHtml(block.title)} complete" /><input class="time-input" data-index="${index}" type="time" value="${escapeHtml(block.time)}" /><span class="task-copy"><input class="text-input schedule-title" data-index="${index}" value="${escapeHtml(block.title)}" aria-label="Block title" /><input class="text-input schedule-project" data-index="${index}" value="${escapeHtml(block.project)}" aria-label="Block project" list="project-options" /></span><div class="row-actions"><button class="delete-block" data-index="${index}" aria-label="Delete ${escapeHtml(block.title)}">${icon.trash} Delete</button></div></div>`).join('')}</div><button id="add-block" class="add-button"><span>${icon.plus}</span> Add Block</button><datalist id="project-options">${state.projects.map((project) => `<option value="${escapeHtml(project)}"></option>`).join('')}</datalist>` });
+function timerSchedule() {
+  const blocks = state.schedule.map((block, index) => `<div class="time-block timer-block ${index === state.activeIndex ? 'active-task' : ''}" data-index="${index}" role="button" tabindex="0" aria-label="Make ${escapeHtml(block.title)} active"><input class="schedule-done" data-index="${index}" type="checkbox" ${block.done ? 'checked' : ''} aria-label="Mark ${escapeHtml(block.title)} complete" /><span class="time">${escapeHtml(block.time)}</span><span class="task-copy"><strong>${escapeHtml(block.title)}</strong><small>${escapeHtml(block.project)}</small></span></div>`).join('') || '<p class="empty-state">No saved schedule yet. Plan today on the Today page.</p>';
+  return section({ id: 'timer-schedule', title: 'Today’s Saved Schedule', eyebrow: 'Read-only plan', content: `<div class="schedule-list">${blocks}</div>` });
+}
+
+function todayPlanner() {
+  return section({ id: 'today', title: 'Today’s Schedule', eyebrow: 'Planning', content: `<p class="helper-text">Build today’s schedule from your Master Project List, adjust the order, then save it for the Timer page.</p><div class="schedule-list">${todayDraft.map((block, index) => `<div class="time-block" data-index="${index}"><input class="time-input" data-index="${index}" type="time" value="${escapeHtml(block.time)}" aria-label="Block time" /><span class="task-copy"><input class="text-input schedule-title" data-index="${index}" value="${escapeHtml(block.title)}" aria-label="Block title" /><input class="text-input schedule-project" data-index="${index}" value="${escapeHtml(block.project)}" aria-label="Block project" list="project-options" /></span><div class="row-actions"><button class="move-block" data-direction="up" data-index="${index}" aria-label="Move ${escapeHtml(block.title)} earlier">↑</button><button class="move-block" data-direction="down" data-index="${index}" aria-label="Move ${escapeHtml(block.title)} later">↓</button><button class="delete-block" data-index="${index}" aria-label="Delete ${escapeHtml(block.title)}">${icon.trash} Delete</button></div></div>`).join('') || '<p class="empty-state">No blocks planned for today.</p>'}</div><button id="add-block" class="add-button"><span>${icon.plus}</span> Add Project Block</button><button id="save-today" class="primary save-button">Save Today’s Schedule</button><datalist id="project-options">${state.projects.map((project) => `<option value="${escapeHtml(project)}"></option>`).join('')}</datalist>` });
 }
 
 function masterProjectList() {
-  return section({ id: 'projects', title: 'Master Project List', eyebrow: 'Backlog', content: `<div class="project-list">${state.projects.map((project, index) => `<div class="project-row"><input class="text-input project-name" data-index="${index}" value="${escapeHtml(project)}" aria-label="Project name" /><div class="row-actions"><button class="delete-project" data-index="${index}" aria-label="Delete ${escapeHtml(project)}">${icon.trash} Delete</button></div></div>`).join('')}</div><button id="add-project" class="add-button"><span>${icon.plus}</span> Add Project</button>` });
+  return section({ id: 'projects', title: 'Master Project List', eyebrow: 'Backlog', content: `<div class="project-list">${state.projects.map((project, index) => `<div class="project-row"><input class="text-input project-name" data-index="${index}" value="${escapeHtml(project)}" aria-label="Project name" /><div class="row-actions"><button class="delete-project" data-index="${index}" aria-label="Delete ${escapeHtml(project)}">${icon.trash} Delete</button></div></div>`).join('') || '<p class="empty-state">No projects yet.</p>'}</div><button id="add-project" class="add-button"><span>${icon.plus}</span> Add Project</button>` });
 }
 
 function calendarSection() {
@@ -126,8 +138,12 @@ function getRoute() {
 }
 
 function mainContent() {
-  if (getRoute() === 'projects') return masterProjectList();
-  return `${todayDashboard()}${schedule()}${calendarSection()}${notesAndReview()}`;
+  const route = getRoute();
+  if (route === 'projects') return masterProjectList();
+  if (route === 'timer') return timerPage();
+  if (route === 'calendar') return calendarSection();
+  if (route === 'notes') return notesAndReview();
+  return todayPlanner();
 }
 
 function render() {
@@ -241,20 +257,25 @@ function selectActiveBlock(index, shouldRender = true) {
   else updateSelectedBlockUI();
 }
 
-function sortSchedule() {
-  const activeBlock = state.schedule[state.activeIndex];
-  state.schedule.sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
-  state.activeIndex = Math.max(0, state.schedule.indexOf(activeBlock));
-}
-
 function bindEvents() {
+  window.removeEventListener('hashchange', render);
+  window.addEventListener('hashchange', render);
   document.querySelector('#start-button')?.addEventListener('click', startTimer);
   document.querySelector('#stop-button')?.addEventListener('click', stopTimer);
   document.querySelector('#skip-button')?.addEventListener('click', advanceBlock);
   document.querySelector('#add-project')?.addEventListener('click', () => { state.projects.push('New Project'); saveState(); render(); });
-  document.querySelector('#add-block')?.addEventListener('click', () => { state.schedule.push({ time: '09:00', title: 'New block', project: state.projects[0] ?? '', done: false }); sortSchedule(); resetCurrentDuration(); saveState(); render(); });
-  document.querySelectorAll('.project-name').forEach((input) => input.addEventListener('change', (event) => { const index = Number(event.target.dataset.index); const previousName = state.projects[index]; const nextName = event.target.value.trim() || 'Untitled Project'; state.projects[index] = nextName; state.schedule.forEach((block) => { if (block.project === previousName) block.project = nextName; }); saveState(); render(); }));
+  document.querySelectorAll('.project-name').forEach((input) => input.addEventListener('change', (event) => { const index = Number(event.target.dataset.index); const previousName = state.projects[index]; const nextName = event.target.value.trim() || 'Untitled Project'; state.projects[index] = nextName; state.schedule.forEach((block) => { if (block.project === previousName) block.project = nextName; }); todayDraft.forEach((block) => { if (block.project === previousName) block.project = nextName; }); saveState(); render(); }));
   document.querySelectorAll('.delete-project').forEach((button) => button.addEventListener('click', (event) => { state.projects.splice(event.currentTarget.dataset.index, 1); saveState(); render(); }));
+  if (document.querySelector('#save-today')) {
+    document.querySelector('#add-block')?.addEventListener('click', () => { const project = state.projects[0] ?? ''; todayDraft.push({ time: '09:00', title: project || 'New block', project, done: false }); render(); });
+    document.querySelector('#save-today')?.addEventListener('click', () => { state.schedule = cloneSchedule(todayDraft); state.activeIndex = clampActiveIndex(state.activeIndex); resetCurrentDuration(); saveState(); render(); });
+    document.querySelectorAll('.time-input').forEach((input) => input.addEventListener('change', (event) => { todayDraft[event.target.dataset.index].time = event.target.value; }));
+    document.querySelectorAll('.schedule-title').forEach((input) => input.addEventListener('change', (event) => { todayDraft[event.target.dataset.index].title = event.target.value.trim() || 'Untitled block'; }));
+    document.querySelectorAll('.schedule-project').forEach((input) => input.addEventListener('change', (event) => { const project = event.target.value.trim(); const block = todayDraft[event.target.dataset.index]; block.project = project; if (!block.title || block.title === 'New block') block.title = project || 'Untitled block'; }));
+    document.querySelectorAll('.move-block').forEach((button) => button.addEventListener('click', (event) => { const index = Number(event.currentTarget.dataset.index); const offset = event.currentTarget.dataset.direction === 'up' ? -1 : 1; const nextIndex = index + offset; if (!todayDraft[index] || !todayDraft[nextIndex]) return; const [block] = todayDraft.splice(index, 1); todayDraft.splice(nextIndex, 0, block); render(); }));
+    document.querySelectorAll('.delete-block').forEach((button) => button.addEventListener('click', (event) => { todayDraft.splice(event.currentTarget.dataset.index, 1); render(); }));
+    return;
+  }
   document.querySelectorAll('.time-block').forEach((block) => {
     block.addEventListener('click', (event) => {
       if (event.target.closest('.delete-block')) return;
@@ -268,12 +289,11 @@ function bindEvents() {
     });
   });
   document.querySelectorAll('.schedule-done').forEach((input) => input.addEventListener('change', (event) => { state.schedule[event.target.dataset.index].done = event.target.checked; saveState(); render(); }));
-  document.querySelectorAll('.time-input').forEach((input) => input.addEventListener('change', (event) => { state.schedule[event.target.dataset.index].time = event.target.value; sortSchedule(); resetCurrentDuration(); saveState(); render(); }));
-  document.querySelectorAll('.schedule-title').forEach((input) => input.addEventListener('change', (event) => { state.schedule[event.target.dataset.index].title = event.target.value.trim() || 'Untitled block'; saveState(); render(); }));
-  document.querySelectorAll('.schedule-project').forEach((input) => input.addEventListener('change', (event) => { state.schedule[event.target.dataset.index].project = event.target.value.trim(); saveState(); render(); }));
-  window.removeEventListener('hashchange', render);
-  window.addEventListener('hashchange', render);
-  document.querySelectorAll('.delete-block').forEach((button) => button.addEventListener('click', (event) => { state.schedule.splice(event.currentTarget.dataset.index, 1); state.activeIndex = clampActiveIndex(state.activeIndex); resetCurrentDuration(); saveState(); render(); }));
+  document.querySelectorAll('.time-input').forEach((input) => input.addEventListener('change', (event) => { state.schedule[event.target.dataset.index].time = event.target.value; resetCurrentDuration(); render(); }));
+  document.querySelectorAll('.schedule-title').forEach((input) => input.addEventListener('change', (event) => { state.schedule[event.target.dataset.index].title = event.target.value.trim() || 'Untitled block'; render(); }));
+  document.querySelectorAll('.schedule-project').forEach((input) => input.addEventListener('change', (event) => { const project = event.target.value.trim(); state.schedule[event.target.dataset.index].project = project; if (!state.schedule[event.target.dataset.index].title || state.schedule[event.target.dataset.index].title === 'New block') state.schedule[event.target.dataset.index].title = project || 'Untitled block'; render(); }));
+  document.querySelectorAll('.move-block').forEach((button) => button.addEventListener('click', (event) => { const index = Number(event.currentTarget.dataset.index); const offset = event.currentTarget.dataset.direction === 'up' ? -1 : 1; const nextIndex = index + offset; if (!state.schedule[index] || !state.schedule[nextIndex]) return; const [block] = state.schedule.splice(index, 1); state.schedule.splice(nextIndex, 0, block); state.activeIndex = nextIndex; resetCurrentDuration(); render(); }));
+  document.querySelectorAll('.delete-block').forEach((button) => button.addEventListener('click', (event) => { state.schedule.splice(event.currentTarget.dataset.index, 1); state.activeIndex = clampActiveIndex(state.activeIndex); resetCurrentDuration(); render(); }));
 }
 
 render();
