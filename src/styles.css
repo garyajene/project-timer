@@ -80,3 +80,23 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   .row-actions button { flex: 1; justify-content: center; }
   .week-view { grid-template-columns: repeat(2, 1fr); }
 }
+.text-input, .time-input {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: #070708;
+  color: #fff;
+  border-radius: 12px;
+  padding: .65rem .75rem;
+  outline: none;
+}
+.text-input:focus, .time-input:focus { border-color: var(--red); }
+.time-input { min-width: 7.5rem; color-scheme: dark; }
+.task-copy { gap: .45rem; }
+.schedule-title { font-weight: 800; }
+.schedule-project { color: var(--muted); }
+.time-block { grid-template-columns: auto auto minmax(0, 1fr) auto; }
+.project-row .text-input { font-weight: 800; }
+@media (max-width: 560px) {
+  .time-block { grid-template-columns: auto 1fr; }
+  .time-input, .task-copy, .time-block .row-actions { grid-column: 2; }
+}
