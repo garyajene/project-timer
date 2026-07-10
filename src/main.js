@@ -1,7 +1,7 @@
 const STORAGE_KEY = 'project-timer-state-v1';
 const DEFAULT_BLOCK_MINUTES = 30;
 const DURATION_PRESETS = [15, 30, 45, 60, 120, 180, 240];
-const BREAK_PRESETS = [0, 5, 10, 15, 30];
+const ZEN_BREAK_PRESETS = [0, 2, 5, 10, 15];
 
 const DEMO_PROJECTS = new Set(['Project Timer', 'Writing system', 'Portfolio refresh', 'Health tracker', 'Home admin', 'Morning setup', 'Daily review']);
 const DEMO_TITLES = new Set(['Plan daily priorities', 'Use Project Timer', 'Review content backlog', 'Focused project block', 'Wrap-up and tomorrow setup']);
@@ -21,6 +21,7 @@ let isRunning = false;
 let remainingSeconds = getBlockDurationSeconds(state.activeIndex);
 let lastTick = Date.now();
 let timerId;
+let zenBreakNotifiedKey = null;
 saveState();
 
 function loadState() {
@@ -52,7 +53,7 @@ function normalizeBlock(block) {
     title: block.title ?? (isBreak ? 'Break' : ''),
     project: block.project ?? '',
     duration: Number(block.duration) || DEFAULT_BLOCK_MINUTES,
-    breakMinutes: Number(block.breakMinutes) || 0,
+    zenBreakMinutes: Number(block.zenBreakMinutes ?? block.breakMinutes) || 0,
     isBreak,
     done: Boolean(block.done),
   };
@@ -92,11 +93,44 @@ function formatMinutes(minutes) {
 }
 
 function getNextStartTime(block) {
-  return minutesToTime(timeToMinutes(block.time) + (Number(block.duration) || DEFAULT_BLOCK_MINUTES) + (Number(block.breakMinutes) || 0));
+  return minutesToTime(timeToMinutes(block.time) + (Number(block.duration) || DEFAULT_BLOCK_MINUTES));
+}
+
+function formatTime(time) {
+  const [rawHours = 0, rawMinutes = 0] = String(time).split(':').map(Number);
+  const period = rawHours >= 12 ? 'PM' : 'AM';
+  const hours = rawHours % 12 || 12;
+  return `${hours}:${String(rawMinutes).padStart(2, '0')} ${period}`;
+}
+
+function getTimeParts(time) {
+  const [rawHours = 9, rawMinutes = 0] = String(time).split(':').map(Number);
+  return {
+    hour: rawHours % 12 || 12,
+    minutes: Number.isInteger(rawMinutes) ? rawMinutes : 0,
+    period: rawHours >= 12 ? 'PM' : 'AM',
+  };
+}
+
+function timePartsToTime(hour, minutes, period) {
+  const normalizedHour = Number(hour) % 12;
+  const hours24 = period === 'PM' ? normalizedHour + 12 : normalizedHour;
+  return `${String(hours24).padStart(2, '0')}:${String(Number(minutes)).padStart(2, '0')}`;
+}
+
+function timeSelector(block, index) {
+  const { hour, minutes, period } = getTimeParts(block.time);
+  const hourOptions = Array.from({ length: 12 }, (_, optionIndex) => optionIndex + 1)
+    .map((value) => `<option value="${value}" ${value === hour ? 'selected' : ''}>${value}</option>`)
+    .join('');
+  const minuteOptions = Array.from({ length: 60 }, (_, optionIndex) => optionIndex)
+    .map((value) => `<option value="${value}" ${value === minutes ? 'selected' : ''}>${String(value).padStart(2, '0')}</option>`)
+    .join('');
+  return `<div class="time-selector" role="group" aria-label="Start time"><label>Hour <select class="text-input time-hour" data-index="${index}">${hourOptions}</select></label><label>Minutes <select class="text-input time-minutes" data-index="${index}">${minuteOptions}</select></label><label>AM / PM <select class="text-input time-period" data-index="${index}"><option value="AM" ${period === 'AM' ? 'selected' : ''}>AM</option><option value="PM" ${period === 'PM' ? 'selected' : ''}>PM</option></select></label></div>`;
 }
 
 function createDraftBlock(time = '09:00') {
-  return { time, title: '', project: '', duration: DEFAULT_BLOCK_MINUTES, breakMinutes: 0, done: false };
+  return { time, title: '', project: '', duration: DEFAULT_BLOCK_MINUTES, zenBreakMinutes: 0, done: false };
 }
 
 function applyNextStartTimes(startIndex) {
@@ -108,18 +142,7 @@ function applyNextStartTimes(startIndex) {
 function buildSavedSchedule(draft) {
   return draft
     .filter((block) => block.project.trim())
-    .flatMap((block) => {
-      const workBlock = normalizeBlock({ ...block, title: block.title.trim(), isBreak: false });
-      if (!workBlock.breakMinutes) return [workBlock];
-      return [workBlock, normalizeBlock({
-        time: minutesToTime(timeToMinutes(workBlock.time) + workBlock.duration),
-        title: `${formatMinutes(workBlock.breakMinutes)} Break`,
-        project: 'Break',
-        duration: workBlock.breakMinutes,
-        breakMinutes: 0,
-        isBreak: true,
-      })];
-    });
+    .map((block) => normalizeBlock({ ...block, title: block.title.trim(), isBreak: false }));
 }
 
 function getBlockDurationSeconds(index) {
@@ -141,7 +164,7 @@ function formatSeconds(totalSeconds) {
 }
 
 function formatDate() {
-  return new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date());
+  return new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit', hour12: true }).format(new Date());
 }
 
 function section({ id, title, eyebrow, className = '', content }) {
@@ -163,7 +186,7 @@ function timerPage() {
 }
 
 function timerSchedule() {
-  const blocks = state.schedule.map((block, index) => `<div class="time-block timer-block ${block.isBreak ? 'break-block' : ''} ${index === state.activeIndex ? 'active-task' : ''}" data-index="${index}" role="button" tabindex="0" aria-label="Make ${escapeHtml(block.title || block.project)} active"><input class="schedule-done" data-index="${index}" type="checkbox" ${block.done ? 'checked' : ''} aria-label="Mark ${escapeHtml(block.title || block.project)} complete" /><span class="time">${escapeHtml(block.time)}</span><span class="task-copy"><strong>${escapeHtml(block.project || 'Task')}</strong><small>${escapeHtml(block.title || 'Task')}</small></span></div>`).join('') || '<p class="empty-state">No saved schedule yet. Plan today on the Today page.</p>';
+  const blocks = state.schedule.map((block, index) => `<div class="time-block timer-block ${block.isBreak ? 'break-block' : ''} ${index === state.activeIndex ? 'active-task' : ''}" data-index="${index}" role="button" tabindex="0" aria-label="Make ${escapeHtml(block.title || block.project)} active"><input class="schedule-done" data-index="${index}" type="checkbox" ${block.done ? 'checked' : ''} aria-label="Mark ${escapeHtml(block.title || block.project)} complete" /><span class="time">${escapeHtml(formatTime(block.time))}</span><span class="task-copy"><strong>${escapeHtml(block.project || 'Task')}</strong><small>${escapeHtml([block.title || 'Task', block.zenBreakMinutes ? `Zen Break: ${formatMinutes(block.zenBreakMinutes)}` : ''].filter(Boolean).join(' · '))}</small></span></div>`).join('') || '<p class="empty-state">No saved schedule yet. Plan today on the Today page.</p>';
   return section({ id: 'timer-schedule', title: 'Today’s Saved Schedule', eyebrow: 'Read-only plan', content: `<div class="schedule-list">${blocks}</div>` });
 }
 
@@ -173,8 +196,8 @@ function projectOptions(selectedProject) {
 }
 
 function todayPlanner() {
-  const rows = todayDraft.map((block, index) => `<div class="time-block planning-block" data-index="${index}"><div class="planning-fields"><label>Project <select class="text-input schedule-project" data-index="${index}" aria-label="Project" required>${projectOptions(block.project)}</select></label><label>Task <input class="text-input schedule-title" data-index="${index}" value="${escapeHtml(block.title)}" aria-label="Task" placeholder="Optional task description" /></label></div><div class="planning-controls"><label>Start Time <input class="time-input" data-index="${index}" type="time" value="${escapeHtml(block.time)}" aria-label="Start time" /></label><fieldset class="preset-group"><legend>Duration</legend>${DURATION_PRESETS.map((minutes) => `<button type="button" class="preset-button duration-preset ${block.duration === minutes ? 'active-preset' : ''}" data-index="${index}" data-minutes="${minutes}">${formatMinutes(minutes)}</button>`).join('')}</fieldset><label>Break <select class="text-input break-select" data-index="${index}" aria-label="Break after task">${BREAK_PRESETS.map((minutes) => `<option value="${minutes}" ${block.breakMinutes === minutes ? 'selected' : ''}>${minutes ? formatMinutes(minutes) : 'None'}</option>`).join('')}</select></label></div><div class="row-actions"><button class="move-block" data-direction="up" data-index="${index}" aria-label="Move task earlier">↑</button><button class="move-block" data-direction="down" data-index="${index}" aria-label="Move task later">↓</button><button class="delete-block" data-index="${index}" aria-label="Delete task">${icon.trash} Delete</button></div></div>`).join('') || '<p class="empty-state">No blocks planned for today.</p>';
-  return section({ id: 'today', title: 'Today’s Schedule', eyebrow: 'Planning', content: `<p class="helper-text">Build today’s schedule from your Master Project List with as little typing as possible: choose a project, add an optional task, then tap duration and break presets.</p><div class="schedule-list">${rows}</div><button id="add-block" class="add-button"><span>${icon.plus}</span> Add Project Block</button><button id="save-today" class="primary save-button">Save Today’s Schedule</button>` });
+  const rows = todayDraft.map((block, index) => `<div class="time-block planning-block" data-index="${index}"><div class="planning-fields"><label>Project <select class="text-input schedule-project" data-index="${index}" aria-label="Project" required>${projectOptions(block.project)}</select></label><label>Task <input class="text-input schedule-title" data-index="${index}" value="${escapeHtml(block.title)}" aria-label="Task" placeholder="Optional task description" /></label></div><div class="planning-controls"><label>Start Time ${timeSelector(block, index)}</label><fieldset class="preset-group"><legend>Duration</legend>${DURATION_PRESETS.map((minutes) => `<button type="button" class="preset-button duration-preset ${block.duration === minutes ? 'active-preset' : ''}" data-index="${index}" data-minutes="${minutes}">${formatMinutes(minutes)}</button>`).join('')}</fieldset><label>Zen Break <select class="text-input zen-break-select" data-index="${index}" aria-label="Zen Break during work block">${ZEN_BREAK_PRESETS.map((minutes) => `<option value="${minutes}" ${block.zenBreakMinutes === minutes ? 'selected' : ''}>${minutes ? formatMinutes(minutes) : 'None'}</option>`).join('')}</select></label></div><div class="row-actions"><button class="move-block" data-direction="up" data-index="${index}" aria-label="Move task earlier">↑</button><button class="move-block" data-direction="down" data-index="${index}" aria-label="Move task later">↓</button><button class="delete-block" data-index="${index}" aria-label="Delete task">${icon.trash} Delete</button></div></div>`).join('') || '<p class="empty-state">No blocks planned for today.</p>';
+  return section({ id: 'today', title: 'Today’s Schedule', eyebrow: 'Planning', content: `<p class="helper-text">Build today’s schedule from your Master Project List with as little typing as possible: choose a project, add an optional task, then tap duration presets, and an optional Zen Break reminder.</p><div class="schedule-list">${rows}</div><button id="add-block" class="add-button"><span>${icon.plus}</span> Add Project Block</button><button id="save-today" class="primary save-button">Save Today’s Schedule</button>` });
 }
 
 
@@ -183,7 +206,7 @@ function masterProjectList() {
 }
 
 function calendarSection() {
-  const dayItems = state.schedule.map((block) => `<p>${escapeHtml(block.time)} · ${escapeHtml(block.project)}${block.title ? ` · ${escapeHtml(block.title)}` : ''}</p>`).join('') || '<p>No blocks scheduled.</p>';
+  const dayItems = state.schedule.map((block) => `<p>${escapeHtml(formatTime(block.time))} · ${escapeHtml(block.project)}${block.title ? ` · ${escapeHtml(block.title)}` : ''}</p>`).join('') || '<p>No blocks scheduled.</p>';
   return section({ id: 'calendar', title: 'Calendar', eyebrow: 'Today', content: `<div class="calendar-tabs"><button class="active-tab">Day</button><button>Week</button><button>Month</button></div><div class="calendar-layout"><div class="day-view"><h3>Day view</h3>${dayItems}</div><div class="week-view">${weekDays.map((day) => `<div><strong>${day}</strong><span></span></div>`).join('')}</div><div class="month-view">${monthDays.map((day) => `<span class="${day === new Date().getDate() ? 'today-dot' : ''}">${day}</span>`).join('')}</div></div>` });
 }
 
@@ -239,6 +262,27 @@ function playNotification() {
   oscillator.addEventListener('ended', () => audioContext.close());
 }
 
+function getZenBreakKey(index) {
+  const block = state.schedule[index];
+  if (!block) return null;
+  return `${index}-${block.time}-${block.project}-${block.title}-${block.duration}-${block.zenBreakMinutes}`;
+}
+
+function maybeNotifyZenBreak() {
+  const block = state.schedule[state.activeIndex];
+  if (!block?.zenBreakMinutes || block.isBreak) return false;
+  const durationSeconds = getBlockDurationSeconds(state.activeIndex);
+  const elapsedSeconds = durationSeconds - remainingSeconds;
+  if (elapsedSeconds < durationSeconds / 2) return false;
+  const key = getZenBreakKey(state.activeIndex);
+  if (zenBreakNotifiedKey === key) return false;
+  zenBreakNotifiedKey = key;
+  playNotification();
+  const status = document.querySelector('#timer-status');
+  if (status) status.textContent = `Zen Break · ${formatMinutes(block.zenBreakMinutes)} reset for ${block.project}`;
+  return true;
+}
+
 function advanceBlock() {
   if (state.schedule[state.activeIndex]) state.schedule[state.activeIndex].done = true;
   playNotification();
@@ -260,7 +304,9 @@ function tick() {
   remainingSeconds -= (now - lastTick) / 1000;
   lastTick = now;
   if (remainingSeconds <= 0) advanceBlock();
-  else updateTimerDisplay();
+  else {
+    if (!maybeNotifyZenBreak()) updateTimerDisplay();
+  }
 }
 
 function startTimer() {
@@ -310,6 +356,7 @@ function selectActiveBlock(index, shouldRender = true) {
   if (!Number.isInteger(nextIndex) || !state.schedule[nextIndex]) return;
   state.activeIndex = nextIndex;
   resetCurrentDuration();
+  zenBreakNotifiedKey = null;
   lastTick = Date.now();
   saveState();
   if (shouldRender) render();
@@ -333,11 +380,11 @@ function bindEvents() {
       document.querySelector(`.schedule-project[data-index="${todayDraft.length - 1}"]`)?.focus();
     });
     document.querySelector('#save-today')?.addEventListener('click', () => { state.schedule = buildSavedSchedule(todayDraft); state.activeIndex = clampActiveIndex(state.activeIndex); resetCurrentDuration(); saveState(); render(); });
-    document.querySelectorAll('.time-input').forEach((input) => input.addEventListener('change', (event) => { const index = Number(event.target.dataset.index); todayDraft[index].time = event.target.value; applyNextStartTimes(index); render(); }));
+    document.querySelectorAll('.time-hour, .time-minutes, .time-period').forEach((input) => input.addEventListener('change', (event) => { const index = Number(event.target.dataset.index); const row = event.target.closest('.planning-block'); const hour = row.querySelector('.time-hour').value; const minutes = row.querySelector('.time-minutes').value; const period = row.querySelector('.time-period').value; todayDraft[index].time = timePartsToTime(hour, minutes, period); applyNextStartTimes(index); render(); }));
     document.querySelectorAll('.schedule-title').forEach((input) => input.addEventListener('input', (event) => { todayDraft[event.target.dataset.index].title = event.target.value; }));
     document.querySelectorAll('.schedule-project').forEach((input) => input.addEventListener('change', (event) => { todayDraft[event.target.dataset.index].project = event.target.value; }));
     document.querySelectorAll('.duration-preset').forEach((button) => button.addEventListener('click', (event) => { const index = Number(event.currentTarget.dataset.index); todayDraft[index].duration = Number(event.currentTarget.dataset.minutes); applyNextStartTimes(index); render(); }));
-    document.querySelectorAll('.break-select').forEach((input) => input.addEventListener('change', (event) => { const index = Number(event.target.dataset.index); todayDraft[index].breakMinutes = Number(event.target.value); applyNextStartTimes(index); render(); }));
+    document.querySelectorAll('.zen-break-select').forEach((input) => input.addEventListener('change', (event) => { const index = Number(event.target.dataset.index); todayDraft[index].zenBreakMinutes = Number(event.target.value); render(); }));
     document.querySelectorAll('.move-block').forEach((button) => button.addEventListener('click', (event) => { const index = Number(event.currentTarget.dataset.index); const offset = event.currentTarget.dataset.direction === 'up' ? -1 : 1; const nextIndex = index + offset; if (!todayDraft[index] || !todayDraft[nextIndex]) return; const [block] = todayDraft.splice(index, 1); todayDraft.splice(nextIndex, 0, block); applyNextStartTimes(Math.min(index, nextIndex)); render(); }));
     document.querySelectorAll('.delete-block').forEach((button) => button.addEventListener('click', (event) => { const index = Number(event.currentTarget.dataset.index); todayDraft.splice(index, 1); applyNextStartTimes(Math.max(0, index - 1)); render(); }));
     return;
