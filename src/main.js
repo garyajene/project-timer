@@ -9,14 +9,17 @@ const DEMO_TITLES = new Set(['Plan daily priorities', 'Use Project Timer', 'Revi
 const defaultState = {
   projects: [],
   schedule: [],
+  schedules: {},
   activeIndex: 0,
 };
 
 const icon = { clock: '◷', edit: '✎', trash: '⌫', plus: '+', check: '✓', next: '›' };
-const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const monthDays = Array.from({ length: 30 }, (_, index) => index + 1);
+const weekDays = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 let state = structuredClone(defaultState);
 let todayDraft = [];
+let calendarView = 'day';
+let calendarDate = toDateKey(new Date());
+let calendarDraft = [];
 let isRunning = false;
 let remainingSeconds = DEFAULT_BLOCK_MINUTES * 60;
 let lastTick = Date.now();
@@ -28,17 +31,82 @@ let quickTaskDraft = { project: '', title: '', duration: 15, zenBreakMinutes: 0,
 let zenBreak = null;
 const zenBreakTriggers = new Map();
 
+
+function toDateKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function parseDateKey(dateKey) {
+  const [year, month, day] = String(dateKey).split('-').map(Number);
+  return new Date(year || new Date().getFullYear(), (month || 1) - 1, day || 1);
+}
+
+function addDays(dateKey, days) {
+  const date = parseDateKey(dateKey);
+  date.setDate(date.getDate() + days);
+  return toDateKey(date);
+}
+
+function addMonths(dateKey, months) {
+  const date = parseDateKey(dateKey);
+  date.setMonth(date.getMonth() + months, 1);
+  return toDateKey(date);
+}
+
+function formatDateLabel(dateKey, options = { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' }) {
+  return new Intl.DateTimeFormat(undefined, options).format(parseDateKey(dateKey));
+}
+
+function getWeekStart(dateKey) {
+  const date = parseDateKey(dateKey);
+  const day = date.getDay();
+  const mondayOffset = day === 0 ? -6 : 1 - day;
+  date.setDate(date.getDate() + mondayOffset);
+  return toDateKey(date);
+}
+
+function sortBlocks(blocks) {
+  return cloneSchedule(blocks).sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
+}
+
+function getScheduleForDate(dateKey) {
+  return sortBlocks(state.schedules?.[dateKey] || []);
+}
+
+function setScheduleForDate(dateKey, blocks) {
+  if (!state.schedules) state.schedules = {};
+  const cleanBlocks = sortBlocks(blocks).map(normalizeBlock);
+  if (cleanBlocks.length) state.schedules[dateKey] = cleanBlocks;
+  else delete state.schedules[dateKey];
+  if (dateKey === toDateKey(new Date())) state.schedule = cloneSchedule(cleanBlocks);
+}
+
 function loadState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (!saved || !Array.isArray(saved.projects) || !Array.isArray(saved.schedule)) return structuredClone(defaultState);
     const projects = saved.projects.filter(Boolean).filter((project) => !DEMO_PROJECTS.has(project));
-    const schedule = saved.schedule
+    const cleanSchedule = (schedule = []) => schedule
       .map(normalizeBlock)
       .filter((block) => block.time && (block.project || block.title) && !DEMO_TITLES.has(block.title) && !DEMO_PROJECTS.has(block.project));
+    const todayKey = toDateKey(new Date());
+    const schedules = {};
+    if (saved.schedules && typeof saved.schedules === 'object') {
+      Object.entries(saved.schedules).forEach(([dateKey, blocks]) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey) || !Array.isArray(blocks)) return;
+        const schedule = cleanSchedule(blocks);
+        if (schedule.length) schedules[dateKey] = schedule;
+      });
+    }
+    const schedule = cleanSchedule(saved.schedule);
+    if (schedule.length && !schedules[todayKey]) schedules[todayKey] = schedule;
     return {
       projects,
-      schedule,
+      schedules,
+      schedule: cloneSchedule(schedules[todayKey] || []),
       activeIndex: Number.isInteger(saved.activeIndex) ? saved.activeIndex : 0,
     };
   } catch {
@@ -242,9 +310,53 @@ function masterProjectList() {
   return section({ id: 'projects', title: 'Master Project List', eyebrow: 'Backlog', content: `<div class="project-list">${state.projects.map((project, index) => `<div class="project-row"><input class="text-input project-name" data-index="${index}" value="${escapeHtml(project)}" aria-label="Project name" /><div class="row-actions"><button class="delete-project" data-index="${index}" aria-label="Delete ${escapeHtml(project)}">${icon.trash} Delete</button></div></div>`).join('') || '<p class="empty-state">No projects yet.</p>'}</div><button id="add-project" class="add-button"><span>${icon.plus}</span> Add Project</button>` });
 }
 
+function calendarTaskSummary(block) {
+  return `<button type="button" class="calendar-task" data-calendar-task-time="${escapeHtml(block.time)}"><span class="time">${escapeHtml(formatTime(block.time))}</span><strong>${escapeHtml(block.project || 'Task')}</strong>${block.title ? `<small>${escapeHtml(block.title)}</small>` : ''}</button>`;
+}
+
+function calendarDetail(block) {
+  return `<div class="calendar-detail"><h3>${escapeHtml(block.project || 'Task')}</h3><p>${escapeHtml(block.title || 'No task name')}</p><dl><div><dt>Start time</dt><dd>${escapeHtml(formatTime(block.time))}</dd></div><div><dt>Duration</dt><dd>${escapeHtml(formatMinutes(block.duration))}</dd></div><div><dt>Status</dt><dd>${block.done ? 'Complete' : 'Not complete'}</dd></div>${block.zenBreakMinutes ? `<div><dt>Zen Break</dt><dd>${escapeHtml(formatMinutes(block.zenBreakMinutes))}</dd></div>` : ''}</dl></div>`;
+}
+
+function dayView(dateKey) {
+  const blocks = getScheduleForDate(dateKey);
+  const items = blocks.map((block) => `<article class="calendar-day-task" data-calendar-task-time="${escapeHtml(block.time)}" role="button" tabindex="0"><div><span class="time">${escapeHtml(formatTime(block.time))}</span><strong>${escapeHtml(block.project || 'Task')}</strong><small>${escapeHtml(block.title || 'No task name')}</small></div><span>${escapeHtml(formatMinutes(block.duration))}</span><span>${block.done ? 'Complete' : 'Not complete'}</span></article>`).join('') || '<p class="empty-state">No blocks scheduled.</p>';
+  return `<div class="day-view calendar-full-view"><div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(dateKey))}</h3><div class="actions"><button id="calendar-prev">Previous Day</button><button id="calendar-next">Next Day</button></div></div><div class="calendar-day-list">${items}</div><div id="calendar-task-detail"></div></div>`;
+}
+
+function weekView(dateKey) {
+  const weekStart = getWeekStart(dateKey);
+  const columns = weekDays.map((day, index) => {
+    const columnDate = addDays(weekStart, index);
+    const blocks = getScheduleForDate(columnDate).map(calendarTaskSummary).join('') || '<p class="empty-state">No tasks</p>';
+    return `<div><strong>${day}</strong><small>${escapeHtml(formatDateLabel(columnDate, { month: 'short', day: 'numeric' }))}</small>${blocks}</div>`;
+  }).join('');
+  return `<div class="calendar-full-view"><div class="calendar-view-heading"><h3>Week of ${escapeHtml(formatDateLabel(weekStart, { month: 'long', day: 'numeric', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Week</button><button id="calendar-next">Next Week</button></div></div><div class="week-view">${columns}</div></div>`;
+}
+
+function monthView(dateKey) {
+  const date = parseDateKey(dateKey);
+  const first = new Date(date.getFullYear(), date.getMonth(), 1);
+  const gridStart = getWeekStart(toDateKey(first));
+  const currentMonth = date.getMonth();
+  const cells = Array.from({ length: 42 }, (_, index) => {
+    const cellDate = addDays(gridStart, index);
+    const parsed = parseDateKey(cellDate);
+    const classes = [cellDate === toDateKey(new Date()) ? 'today-dot' : '', parsed.getMonth() !== currentMonth ? 'outside-month' : ''].filter(Boolean).join(' ');
+    const blocks = getScheduleForDate(cellDate).map((block) => `<span class="month-task"><strong>${escapeHtml(block.project || 'Task')}</strong>${block.title ? ` <small>${escapeHtml(block.title)}</small>` : ''}</span>`).join('');
+    return `<button type="button" class="month-day ${classes}" data-calendar-date="${cellDate}"><strong>${parsed.getDate()}</strong>${blocks || '<small class="empty-month-day">No tasks</small>'}</button>`;
+  }).join('');
+  return `<div class="calendar-full-view"><div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(dateKey, { month: 'long', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Month</button><button id="calendar-next">Next Month</button></div></div><div class="month-view">${cells}</div></div>`;
+}
+
+function calendarPlanner(dateKey) {
+  const rows = calendarDraft.map((block, index) => `<div class="time-block planning-block" data-index="${index}"><div class="planning-fields"><label>Project <select class="text-input calendar-project project-select" data-index="${index}" required>${projectOptions(block.project)}</select></label><label>Task <input class="text-input calendar-title" data-index="${index}" value="${escapeHtml(block.title)}" placeholder="Optional task description" /></label></div><div class="planning-controls"><label>Start Time ${timeSelector(block, index)}</label><fieldset class="preset-group"><legend>Duration</legend>${DURATION_PRESETS.map((minutes) => `<button type="button" class="preset-button calendar-duration-preset ${block.duration === minutes ? 'active-preset' : ''}" data-index="${index}" data-minutes="${minutes}">${formatMinutes(minutes)}</button>`).join('')}</fieldset></div><div class="row-actions"><button class="calendar-delete-block" data-index="${index}">${icon.trash} Delete</button></div></div>`).join('') || '<p class="empty-state">No blocks planned for this date.</p>';
+  return `<div class="calendar-planner"><h3>Plan ${escapeHtml(formatDateLabel(dateKey))}</h3><div class="schedule-list">${rows}</div><button id="calendar-add-block" class="add-button"><span>${icon.plus}</span> Add Project Block</button><button id="calendar-save" class="primary save-button">Save Schedule</button></div>`;
+}
+
 function calendarSection() {
-  const dayItems = state.schedule.map((block) => `<p>${escapeHtml(formatTime(block.time))} · ${escapeHtml(block.project)}${block.title ? ` · ${escapeHtml(block.title)}` : ''}</p>`).join('') || '<p>No blocks scheduled.</p>';
-  return section({ id: 'calendar', title: 'Calendar', eyebrow: 'Today', content: `<div class="calendar-tabs"><button class="active-tab">Day</button><button>Week</button><button>Month</button></div><div class="calendar-layout"><div class="day-view"><h3>Day view</h3>${dayItems}</div><div class="week-view">${weekDays.map((day) => `<div><strong>${day}</strong><span></span></div>`).join('')}</div><div class="month-view">${monthDays.map((day) => `<span class="${day === new Date().getDate() ? 'today-dot' : ''}">${day}</span>`).join('')}</div></div>` });
+  const selectedView = calendarView === 'week' ? weekView(calendarDate) : calendarView === 'month' ? monthView(calendarDate) : dayView(calendarDate);
+  return section({ id: 'calendar', title: 'Calendar', eyebrow: 'Planning', content: `<div class="calendar-controls"><label>Planning Date <input id="calendar-date" class="text-input" type="date" value="${calendarDate}" /></label></div><div class="calendar-tabs"><button class="${calendarView === 'day' ? 'active-tab' : ''}" data-calendar-view="day">Day</button><button class="${calendarView === 'week' ? 'active-tab' : ''}" data-calendar-view="week">Week</button><button class="${calendarView === 'month' ? 'active-tab' : ''}" data-calendar-view="month">Month</button></div><div class="calendar-layout single-calendar-view">${selectedView}</div>${calendarPlanner(calendarDate)}` });
 }
 
 function notesAndReview() {
@@ -540,6 +652,7 @@ function handleProjectSelectChange(event) {
     return;
   }
   if (select.classList.contains('schedule-project')) todayDraft[select.dataset.index].project = select.value;
+  if (select.classList.contains('calendar-project')) calendarDraft[select.dataset.index].project = select.value;
   if (select.id === 'quick-project') quickTaskDraft.project = select.value;
 }
 
@@ -559,6 +672,7 @@ function showInlineProjectCreator(select) {
     const project = addProjectToMasterList(input.value);
     if (!project) return;
     if (select.classList.contains('schedule-project')) todayDraft[select.dataset.index].project = project;
+    if (select.classList.contains('calendar-project')) calendarDraft[select.dataset.index].project = project;
     if (select.id === 'quick-project') quickTaskDraft.project = project;
     saveState();
     render();
@@ -566,6 +680,18 @@ function showInlineProjectCreator(select) {
   input.addEventListener('blur', () => {
     if (!input.value.trim()) render();
   });
+}
+
+function loadCalendarDraft(dateKey = calendarDate) {
+  calendarDraft = cloneSchedule(getScheduleForDate(dateKey).filter((block) => !block.isBreak));
+}
+
+function shiftCalendarDate(amount) {
+  if (calendarView === 'day') calendarDate = addDays(calendarDate, amount);
+  if (calendarView === 'week') calendarDate = addDays(calendarDate, amount * 7);
+  if (calendarView === 'month') calendarDate = addMonths(calendarDate, amount);
+  loadCalendarDraft();
+  render();
 }
 
 function bindGlobalEvents() {
@@ -593,8 +719,32 @@ function bindEvents() {
     document.querySelectorAll('.quick-duration-preset').forEach((preset) => preset.classList.toggle('active-preset', preset === event.currentTarget));
   }));
   document.querySelector('#add-project')?.addEventListener('click', () => { state.projects.push('New Project'); saveState(); render(); });
-  document.querySelectorAll('.project-name').forEach((input) => input.addEventListener('change', (event) => { const index = Number(event.target.dataset.index); const previousName = state.projects[index]; const nextName = event.target.value.trim() || 'Untitled Project'; state.projects[index] = nextName; state.schedule.forEach((block) => { if (block.project === previousName) block.project = nextName; }); todayDraft.forEach((block) => { if (block.project === previousName) block.project = nextName; }); saveState(); render(); }));
+  document.querySelectorAll('.project-name').forEach((input) => input.addEventListener('change', (event) => { const index = Number(event.target.dataset.index); const previousName = state.projects[index]; const nextName = event.target.value.trim() || 'Untitled Project'; state.projects[index] = nextName; state.schedule.forEach((block) => { if (block.project === previousName) block.project = nextName; }); Object.values(state.schedules || {}).forEach((schedule) => schedule.forEach((block) => { if (block.project === previousName) block.project = nextName; })); todayDraft.forEach((block) => { if (block.project === previousName) block.project = nextName; }); calendarDraft.forEach((block) => { if (block.project === previousName) block.project = nextName; }); saveState(); render(); }));
   document.querySelectorAll('.delete-project').forEach((button) => button.addEventListener('click', (event) => { state.projects.splice(event.currentTarget.dataset.index, 1); saveState(); render(); }));
+  if (document.querySelector('#calendar')) {
+    document.querySelectorAll('[data-calendar-view]').forEach((button) => button.addEventListener('click', (event) => { calendarView = event.currentTarget.dataset.calendarView; render(); }));
+    document.querySelector('#calendar-date')?.addEventListener('change', (event) => { calendarDate = event.target.value || toDateKey(new Date()); loadCalendarDraft(); render(); });
+    document.querySelector('#calendar-prev')?.addEventListener('click', () => shiftCalendarDate(-1));
+    document.querySelector('#calendar-next')?.addEventListener('click', () => shiftCalendarDate(1));
+    document.querySelectorAll('.month-day').forEach((button) => button.addEventListener('click', (event) => { calendarDate = event.currentTarget.dataset.calendarDate; calendarView = 'day'; loadCalendarDraft(); render(); }));
+    document.querySelectorAll('.calendar-day-task').forEach((item) => {
+      const showDetail = () => {
+        const block = getScheduleForDate(calendarDate).find((candidate) => candidate.time === item.dataset.calendarTaskTime);
+        const detail = document.querySelector('#calendar-task-detail');
+        if (block && detail) detail.innerHTML = calendarDetail(block);
+      };
+      item.addEventListener('click', showDetail);
+      item.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); showDetail(); } });
+    });
+    document.querySelector('#calendar-add-block')?.addEventListener('click', () => { const time = calendarDraft.length ? getNextStartTime(calendarDraft[calendarDraft.length - 1]) : '09:00'; calendarDraft.push(createDraftBlock(time)); render(); });
+    document.querySelector('#calendar-save')?.addEventListener('click', () => { setScheduleForDate(calendarDate, buildSavedSchedule(calendarDraft)); state.activeIndex = clampActiveIndex(state.activeIndex); resetCurrentDuration(); saveState(); loadCalendarDraft(); render(); });
+    document.querySelectorAll('.calendar-project').forEach((input) => input.addEventListener('change', handleProjectSelectChange));
+    document.querySelectorAll('.calendar-title').forEach((input) => input.addEventListener('input', (event) => { calendarDraft[event.target.dataset.index].title = event.target.value; }));
+    document.querySelectorAll('.calendar-duration-preset').forEach((button) => button.addEventListener('click', (event) => { const index = Number(event.currentTarget.dataset.index); calendarDraft[index].duration = Number(event.currentTarget.dataset.minutes); for (let i = index + 1; i < calendarDraft.length; i += 1) calendarDraft[i].time = getNextStartTime(calendarDraft[i - 1]); render(); }));
+    document.querySelectorAll('.calendar-delete-block').forEach((button) => button.addEventListener('click', (event) => { calendarDraft.splice(Number(event.currentTarget.dataset.index), 1); render(); }));
+    document.querySelectorAll('.time-hour, .time-minutes, .time-period').forEach((input) => input.addEventListener('change', (event) => { const index = Number(event.target.dataset.index); const row = event.target.closest('.planning-block'); calendarDraft[index].time = timePartsToTime(row.querySelector('.time-hour').value, row.querySelector('.time-minutes').value, row.querySelector('.time-period').value); for (let i = index + 1; i < calendarDraft.length; i += 1) calendarDraft[i].time = getNextStartTime(calendarDraft[i - 1]); render(); }));
+    return;
+  }
   if (document.querySelector('#save-today')) {
     document.querySelector('#add-block')?.addEventListener('click', () => {
       const time = todayDraft.length ? getNextStartTime(todayDraft[todayDraft.length - 1]) : '09:00';
@@ -602,7 +752,7 @@ function bindEvents() {
       render();
       document.querySelector(`.schedule-project[data-index="${todayDraft.length - 1}"]`)?.focus();
     });
-    document.querySelector('#save-today')?.addEventListener('click', () => { state.schedule = buildSavedSchedule(todayDraft); state.activeIndex = clampActiveIndex(state.activeIndex); resetCurrentDuration(); saveState(); render(); });
+    document.querySelector('#save-today')?.addEventListener('click', () => { state.schedule = buildSavedSchedule(todayDraft); setScheduleForDate(toDateKey(new Date()), state.schedule); state.activeIndex = clampActiveIndex(state.activeIndex); resetCurrentDuration(); saveState(); render(); });
     document.querySelectorAll('.time-hour, .time-minutes, .time-period').forEach((input) => input.addEventListener('change', (event) => { const index = Number(event.target.dataset.index); const row = event.target.closest('.planning-block'); const hour = row.querySelector('.time-hour').value; const minutes = row.querySelector('.time-minutes').value; const period = row.querySelector('.time-period').value; todayDraft[index].time = timePartsToTime(hour, minutes, period); applyNextStartTimes(index); render(); }));
     document.querySelectorAll('.schedule-title').forEach((input) => input.addEventListener('input', (event) => { todayDraft[event.target.dataset.index].title = event.target.value; }));
     document.querySelectorAll('.schedule-project').forEach((input) => input.addEventListener('change', handleProjectSelectChange));
@@ -636,6 +786,7 @@ function initializeApp() {
   try {
     state = loadState();
     todayDraft = cloneSchedule(state.schedule.filter((block) => !block.isBreak));
+    calendarDraft = cloneSchedule(getScheduleForDate(calendarDate).filter((block) => !block.isBreak));
     remainingSeconds = getBlockDurationSeconds(state.activeIndex);
     saveState();
   } catch (error) {
