@@ -15,10 +15,10 @@ const defaultState = {
 const icon = { clock: '◷', edit: '✎', trash: '⌫', plus: '+', check: '✓', next: '›' };
 const weekDays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const monthDays = Array.from({ length: 30 }, (_, index) => index + 1);
-let state = loadState();
-let todayDraft = cloneSchedule(state.schedule.filter((block) => !block.isBreak));
+let state = structuredClone(defaultState);
+let todayDraft = [];
 let isRunning = false;
-let remainingSeconds = getBlockDurationSeconds(state.activeIndex);
+let remainingSeconds = DEFAULT_BLOCK_MINUTES * 60;
 let lastTick = Date.now();
 let timerId;
 let zenBreakNotifiedKey = null;
@@ -26,7 +26,6 @@ let quickTask = null;
 let isQuickTaskFormOpen = false;
 let zenBreak = null;
 const zenBreakTriggers = new Map();
-saveState();
 
 function loadState() {
   try {
@@ -253,9 +252,44 @@ function mainContent() {
   return todayPlanner();
 }
 
+function getAppElement() {
+  return document.querySelector('#app');
+}
+
+function errorPanel(error) {
+  const message = error instanceof Error ? error.message : 'Unknown startup error';
+  return section({
+    id: 'startup-error',
+    title: 'Project Timer is available',
+    eyebrow: 'Startup warning',
+    className: 'startup-error-panel',
+    content: `<p class="helper-text">One part of the application could not initialize, but the app shell is still available. Check the browser console for details.</p><pre>${escapeHtml(message)}</pre>`,
+  });
+}
+
+function renderShell(content = '') {
+  const app = getAppElement();
+  if (!app) {
+    console.error('Project Timer startup failed: #app container is missing.');
+    return false;
+  }
+  app.innerHTML = `${header()}<main>${content}</main>`;
+  return true;
+}
+
 function render() {
-  document.querySelector('#app').innerHTML = `${header()}<main>${mainContent()}</main>`;
-  bindEvents();
+  try {
+    if (!renderShell(mainContent())) return;
+    bindEvents();
+  } catch (error) {
+    console.error('Project Timer render failed.', error);
+    try {
+      renderShell(errorPanel(error));
+      bindGlobalEvents();
+    } catch (shellError) {
+      console.error('Project Timer shell render failed.', shellError);
+    }
+  }
 }
 
 function updateTimerDisplay() {
@@ -456,9 +490,13 @@ function selectActiveBlock(index, shouldRender = true) {
   else updateSelectedBlockUI();
 }
 
-function bindEvents() {
+function bindGlobalEvents() {
   window.removeEventListener('hashchange', render);
   window.addEventListener('hashchange', render);
+}
+
+function bindEvents() {
+  bindGlobalEvents();
   document.querySelector('#start-button')?.addEventListener('click', startTimer);
   document.querySelector('#stop-button')?.addEventListener('click', stopTimer);
   document.querySelector('#skip-button')?.addEventListener('click', advanceBlock);
@@ -508,4 +546,24 @@ function bindEvents() {
   document.querySelectorAll('.delete-block').forEach((button) => button.addEventListener('click', (event) => { state.schedule.splice(event.currentTarget.dataset.index, 1); state.activeIndex = clampActiveIndex(state.activeIndex); resetCurrentDuration(); render(); }));
 }
 
-render();
+function initializeApp() {
+  try {
+    state = loadState();
+    todayDraft = cloneSchedule(state.schedule.filter((block) => !block.isBreak));
+    remainingSeconds = getBlockDurationSeconds(state.activeIndex);
+    saveState();
+  } catch (error) {
+    console.error('Project Timer startup failed while loading saved state.', error);
+    state = structuredClone(defaultState);
+    todayDraft = [];
+    remainingSeconds = DEFAULT_BLOCK_MINUTES * 60;
+  } finally {
+    render();
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeApp, { once: true });
+} else {
+  initializeApp();
+}
