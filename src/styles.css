@@ -14,7 +14,7 @@
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin: 0; min-width: 320px; background: radial-gradient(circle at top right, rgba(255,41,61,.18), transparent 32rem), #000; }
-button, input, textarea { font: inherit; }
+button, input, textarea, select { font: inherit; }
 button { border: 1px solid var(--line); background: #111115; color: #fff; border-radius: 999px; padding: .85rem 1.15rem; cursor: pointer; display: inline-flex; align-items: center; gap: .45rem; transition: border-color .2s, transform .2s, background .2s; }
 button:hover { transform: translateY(-1px); border-color: rgba(255,255,255,.35); }
 input[type="checkbox"] { accent-color: var(--red); width: 1.1rem; height: 1.1rem; }
@@ -133,6 +133,21 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   margin-top: .35rem;
 }
 
+.time-selector {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(5.5rem, 1fr));
+  gap: .5rem;
+  margin-top: .35rem;
+}
+
+.time-selector .text-input {
+  margin-top: .25rem;
+}
+
+.time-selector label {
+  display: grid;
+}
+
 .schedule-project {
   color: #fff;
   font-weight: 800;
@@ -179,4 +194,5 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 
 @media (max-width: 560px) {
   .planning-fields, .planning-controls, .planning-block .row-actions { grid-column: 1 / -1; }
+  .time-selector { grid-template-columns: 1fr; }
 }
