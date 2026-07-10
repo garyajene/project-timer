@@ -212,7 +212,7 @@ function timerSchedule() {
 
 function zenBreakOverlay() {
   if (!zenBreak?.active) return '';
-  return `<div class="zen-break-overlay" role="dialog" aria-modal="true" aria-label="Zen Break"><div><p class="eyebrow">Zen Break</p><h2>Pause and reset</h2><span id="zen-break-countdown">${formatSeconds(zenBreak.remainingSeconds)}</span></div></div>`;
+  return `<div class="zen-break-overlay" role="dialog" aria-modal="true" aria-label="Zen Break"><div><p class="eyebrow">Zen Break</p><h2>Pause and reset</h2><span id="zen-break-countdown">${formatSeconds(zenBreak.remainingSeconds)}</span><div class="actions zen-break-actions"><button id="end-zen-break" type="button">End Break Now</button><button id="extend-zen-break" type="button" class="primary">Extend 2 Minutes</button></div></div></div>`;
 }
 
 function projectOptions(selectedProject) {
@@ -366,11 +366,33 @@ function startZenBreak(block) {
   timerId = setInterval(tickZenBreak, 250);
 }
 
-function tickZenBreak() {
+function syncZenBreakCountdown() {
   if (!zenBreak?.active) return;
   const now = Date.now();
   zenBreak.remainingSeconds -= (now - zenBreak.lastTick) / 1000;
   zenBreak.lastTick = now;
+}
+
+function endZenBreakNow() {
+  if (!zenBreak?.active) return;
+  clearInterval(timerId);
+  remainingSeconds = zenBreak.pausedRemainingSeconds;
+  zenBreak = null;
+  startTimer();
+  render();
+}
+
+function extendZenBreak() {
+  if (!zenBreak?.active) return;
+  syncZenBreakCountdown();
+  zenBreak.remainingSeconds += 120;
+  const display = document.querySelector('#zen-break-countdown');
+  if (display) display.textContent = formatSeconds(zenBreak.remainingSeconds);
+}
+
+function tickZenBreak() {
+  if (!zenBreak?.active) return;
+  syncZenBreakCountdown();
   const display = document.querySelector('#zen-break-countdown');
   if (display) display.textContent = formatSeconds(zenBreak.remainingSeconds);
   if (zenBreak.remainingSeconds <= 0) {
@@ -556,6 +578,8 @@ function bindEvents() {
   document.querySelector('#start-button')?.addEventListener('click', startTimer);
   document.querySelector('#stop-button')?.addEventListener('click', stopTimer);
   document.querySelector('#skip-button')?.addEventListener('click', advanceBlock);
+  document.querySelector('#end-zen-break')?.addEventListener('click', endZenBreakNow);
+  document.querySelector('#extend-zen-break')?.addEventListener('click', extendZenBreak);
   document.querySelector('#quick-task-button')?.addEventListener('click', () => { isQuickTaskFormOpen = true; render(); });
   document.querySelector('#cancel-quick-task')?.addEventListener('click', () => { isQuickTaskFormOpen = false; render(); });
   document.querySelector('#quick-task-form')?.addEventListener('submit', startQuickTask);
