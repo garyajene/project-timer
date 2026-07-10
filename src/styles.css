@@ -196,3 +196,66 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   .planning-fields, .planning-controls, .planning-block .row-actions { grid-column: 1 / -1; }
   .time-selector { grid-template-columns: 1fr; }
 }
+
+.quick-task-panel {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+}
+
+.quick-task-button {
+  font-size: clamp(1.1rem, 3vw, 1.45rem);
+  padding: 1rem 1.6rem;
+}
+
+.quick-task-form {
+  width: min(100%, 46rem);
+  display: grid;
+  gap: 1rem;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: #08080a;
+  padding: 1rem;
+}
+
+.quick-duration-group {
+  justify-content: center;
+}
+
+.quick-form-actions {
+  justify-content: center;
+}
+
+.zen-timing-control {
+  display: grid;
+  gap: .35rem;
+  max-width: 14rem;
+  color: var(--muted);
+  font-size: .8rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+
+.zen-break-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  background: radial-gradient(circle, rgba(255,41,61,.28), rgba(0,0,0,.96) 62%);
+  padding: 1rem;
+}
+
+.zen-break-overlay h2 {
+  font-size: clamp(2.5rem, 8vw, 6rem);
+}
+
+.zen-break-overlay span {
+  display: block;
+  margin-top: 1rem;
+  font-size: clamp(3rem, 13vw, 9rem);
+  font-weight: 900;
+  letter-spacing: -.08em;
+  line-height: .95;
+}
