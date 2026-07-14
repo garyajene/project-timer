@@ -1,0 +1,37 @@
+.trading-dashboard { display: grid; gap: 1.25rem; }
+.td-tabs { flex-wrap: wrap; }
+.td-grid { display: grid; gap: 1.25rem; }
+.td-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.td-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .85rem; }
+.td-form-grid.compact { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.td-form-grid label, .td-progress-head span { color: var(--muted); font-size: .8rem; font-weight: 800; letter-spacing: .04em; }
+.td-form-grid .text-input { margin-top: .35rem; }
+.td-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .85rem; }
+.td-stat-card { border: 1px solid var(--line); background: #08080a; border-radius: 18px; padding: 1rem; display: grid; gap: .35rem; }
+.td-stat-card span, .td-stat-card small, .td-note { color: var(--muted); }
+.td-stat-card strong { font-size: clamp(1.35rem, 3vw, 2rem); letter-spacing: -.04em; }
+.td-note { border: 1px solid var(--line); border-radius: 18px; padding: 1rem; margin-top: 1rem; background: rgba(255,41,61,.08); }
+.td-progress-head { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; margin-bottom: 1rem; }
+.td-progress-head strong { display: block; font-size: 1.4rem; }
+.td-progress { height: 1rem; border-radius: 999px; background: #070708; border: 1px solid var(--line); overflow: hidden; }
+.td-progress span { display: block; height: 100%; background: linear-gradient(90deg, var(--red-dark), var(--red)); }
+.td-table-wrap { overflow: auto; border: 1px solid var(--line); border-radius: 18px; }
+.trading-dashboard table { width: 100%; border-collapse: collapse; min-width: 58rem; }
+.trading-dashboard th, .trading-dashboard td { padding: .75rem; text-align: left; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.trading-dashboard th { color: var(--muted); font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; background: #08080a; }
+.td-chart { width: 100%; height: 15rem; border: 1px solid var(--line); border-radius: 18px; background: radial-gradient(circle at top right, rgba(255,41,61,.12), transparent 24rem), #08080a; }
+.td-chart polyline { fill: none; stroke: var(--red); stroke-width: 3; vector-effect: non-scaling-stroke; }
+.td-comparison-chart { position: relative; display: grid; gap: .75rem; }
+.td-comparison-chart .td-chart { grid-area: 1 / 1; }
+.td-comparison-chart .actual polyline { stroke: #fff; stroke-dasharray: 5 4; }
+.td-legend { display: flex; gap: 1rem; color: var(--muted); }
+.td-legend span::before { content: ''; display: inline-block; width: 1rem; height: .2rem; margin-right: .4rem; vertical-align: middle; background: var(--red); }
+.td-legend .actual-line::before { background: #fff; }
+.td-check { display: flex; align-items: center; gap: .5rem; margin: .5rem 0; color: var(--muted); }
+.td-score { display: grid; place-items: center; width: 12rem; height: 12rem; margin: 1rem auto; border-radius: 50%; border: 10px solid var(--red); background: #08080a; font-size: 3.5rem; font-weight: 900; }
+.td-score span { font-size: 1rem; color: var(--muted); }
+.td-behavior-list, .td-library { display: grid; gap: .75rem; }
+.td-behavior-list span, .td-library article { border: 1px solid var(--line); border-radius: 16px; padding: .85rem; background: #08080a; }
+.td-library { grid-template-columns: repeat(3, 1fr); }
+.td-library p { color: var(--muted); margin: .35rem 0 0; }
+@media (max-width: 900px) { .td-grid.two, .td-form-grid, .td-form-grid.compact, .td-stat-grid, .td-progress-head, .td-library { grid-template-columns: 1fr; } }
