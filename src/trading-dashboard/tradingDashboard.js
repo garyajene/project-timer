@@ -1,7 +1,7 @@
 const tabs = ['Account Settings', 'Live Account Simulation', 'Trade Journal', 'Goal Planner', 'Trading Psychology'];
 
 const settings = {
-  mode: 'percentage',
+  dailyTargetType: 'percentage',
   startingBalance: 25000,
   dailyTargetReturn: 1.8,
   dailyDollarTarget: 450,
@@ -45,9 +45,10 @@ function calculateLedger() {
   return Array.from({ length: settings.tradingDays }, (_, index) => {
     const day = index + 1;
     const startingBalance = balance;
-    const invested = settings.mode === 'percentage' ? startingBalance * (settings.reinvestmentRate / 100) : Math.min(settings.dailyDollarTarget / Math.max(settings.dailyTargetReturn / 100, 0.0001), startingBalance);
+    const invested = startingBalance * (settings.reinvestmentRate / 100);
     const isLossDay = settings.dailyLossPercentage > 0 && day % 7 === 0;
-    const gross = isLossDay ? -(invested * (settings.dailyLossPercentage / 100)) : (settings.mode === 'percentage' ? invested * (settings.dailyTargetReturn / 100) : settings.dailyDollarTarget);
+    const grossTarget = settings.dailyTargetType === 'percentage' ? invested * (settings.dailyTargetReturn / 100) : settings.dailyDollarTarget;
+    const gross = isLossDay ? -(invested * (settings.dailyLossPercentage / 100)) : grossTarget;
     const fees = feeFor(invested);
     const tax = gross > 0 ? gross * (settings.taxes / 100) : 0;
     const net = gross - fees - tax;
@@ -66,11 +67,14 @@ function field(label, id, value, type = 'number', extra = '') {
 }
 
 function accountSettings() {
-  return `<div class="td-grid two"><section class="project-card"><h3>Compounding inputs</h3><div class="td-form-grid"><label>Calculator Mode<select class="text-input" id="td-mode"><option value="percentage" ${settings.mode === 'percentage' ? 'selected' : ''}>Percentage Mode</option><option value="dollar" ${settings.mode === 'dollar' ? 'selected' : ''}>Dollar Amount Mode</option></select></label>${field('Starting account balance', 'td-startingBalance', settings.startingBalance)}${field('Daily target return (%)', 'td-dailyTargetReturn', settings.dailyTargetReturn, 'number', 'step="0.1"')}${field('Daily dollar target', 'td-dailyDollarTarget', settings.dailyDollarTarget)}${field('Reinvestment rate (%)', 'td-reinvestmentRate', settings.reinvestmentRate)}<label>Trading fee type<select class="text-input" id="td-feeType"><option value="percentage" ${settings.feeType === 'percentage' ? 'selected' : ''}>Percentage fee</option><option value="flat" ${settings.feeType === 'flat' ? 'selected' : ''}>Flat fee</option></select></label>${field('Trading fee value', 'td-feeValue', settings.feeValue, 'number', 'step="0.01"')}${field('Number of trading days', 'td-tradingDays', settings.tradingDays)}${field('Optional daily loss (%)', 'td-dailyLossPercentage', settings.dailyLossPercentage, 'number', 'step="0.1"')}${field('Taxes (%) optional', 'td-taxes', settings.taxes)}${field('Goal value', 'td-goalValue', settings.goalValue)}</div></section><section class="project-card" id="td-scenario-summary">${scenarioSummary()}</section></div>`;
+  const dailyTargetInput = settings.dailyTargetType === 'percentage'
+    ? field('Daily Target (%)', 'td-dailyTargetReturn', settings.dailyTargetReturn, 'number', 'step="0.1" placeholder="2.0%"')
+    : field('Daily Target ($)', 'td-dailyDollarTarget', settings.dailyDollarTarget, 'number', 'placeholder="$500"');
+  return `<div class="td-grid two"><section class="project-card"><h3>Compounding inputs</h3><div class="td-form-grid">${field('Starting account balance', 'td-startingBalance', settings.startingBalance)}<label>Daily Target Type<select class="text-input" id="td-dailyTargetType"><option value="percentage" ${settings.dailyTargetType === 'percentage' ? 'selected' : ''}>Percentage</option><option value="dollar" ${settings.dailyTargetType === 'dollar' ? 'selected' : ''}>Dollar Amount</option></select></label>${dailyTargetInput}${field('Reinvestment rate (%)', 'td-reinvestmentRate', settings.reinvestmentRate)}<label>Trading fee type<select class="text-input" id="td-feeType"><option value="percentage" ${settings.feeType === 'percentage' ? 'selected' : ''}>Percentage fee</option><option value="flat" ${settings.feeType === 'flat' ? 'selected' : ''}>Flat fee</option></select></label>${field('Trading fee value', 'td-feeValue', settings.feeValue, 'number', 'step="0.01"')}${field('Number of trading days', 'td-tradingDays', settings.tradingDays)}${field('Optional daily loss (%)', 'td-dailyLossPercentage', settings.dailyLossPercentage, 'number', 'step="0.1"')}${field('Taxes (%) optional', 'td-taxes', settings.taxes)}${field('Goal value', 'td-goalValue', settings.goalValue)}</div></section><section class="project-card" id="td-scenario-summary">${scenarioSummary()}</section></div>`;
 }
 
 function scenarioSummary() {
-  return `<h3>Scenario summary</h3><p class="helper-text">This proof-of-concept keeps calculations in the browser and updates the simulation automatically as inputs change.</p>${summaryCards().join('')}<div class="td-note">Mode-aware calculations are reused by the live ledger, goal comparison, and psychology score context.</div>`;
+  return `<h3>Scenario summary</h3><p class="helper-text">This proof-of-concept keeps calculations in the browser and updates the simulation automatically as inputs change.</p>${summaryCards().join('')}<div class="td-note">Daily target calculations are reused by the live ledger, goal comparison, and psychology score context.</div>`;
 }
 
 function summaryCards() {
@@ -153,6 +157,6 @@ export function bindTradingDashboardEvents(render) {
     settings[event.target.id.replace('td-', '')] = nextValue;
     updateVisibleCalculations();
   }));
-  document.querySelector('#td-mode')?.addEventListener('change', (event) => { settings.mode = event.target.value; updateVisibleCalculations(); });
+  document.querySelector('#td-dailyTargetType')?.addEventListener('change', (event) => { settings.dailyTargetType = event.target.value; render(); });
   document.querySelector('#td-feeType')?.addEventListener('change', (event) => { settings.feeType = event.target.value; updateVisibleCalculations(); });
 }
