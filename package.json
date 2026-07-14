@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "node server.js",
-    "build": "rm -rf dist && mkdir -p dist/src && cp index.html dist/ && cp src/main.js src/styles.css dist/src/",
+    "build": "rm -rf dist && mkdir -p dist/src && cp index.html dist/ && cp src/main.js src/styles.css dist/src/ && cp -R src/trading-dashboard dist/src/",
     "start": "node server.js",
     "preview": "node server.js"
   },
