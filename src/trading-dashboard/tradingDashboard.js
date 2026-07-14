@@ -66,11 +66,21 @@ function field(label, id, value, type = 'number', extra = '') {
   return `<label>${label}<input class="text-input td-setting-input" id="${id}" type="${type}" value="${escapeHtml(value)}" ${extra} /></label>`;
 }
 
+function dailyTargetField() {
+  const isPercentageTarget = settings.dailyTargetType === 'percentage';
+  const label = isPercentageTarget ? 'Daily Target Percentage' : 'Daily Target Dollar Amount';
+  const value = isPercentageTarget ? settings.dailyTargetReturn : settings.dailyDollarTarget;
+  const helper = isPercentageTarget
+    ? 'Enter the percent return you want to target each trading day.'
+    : 'Enter the dollar profit you want to target each trading day.';
+  const adornment = isPercentageTarget ? '%' : '$';
+  const extra = isPercentageTarget ? 'step="0.1" min="0" placeholder="2.0"' : 'step="1" min="0" placeholder="500"';
+
+  return `<label class="td-target-field">${label}<span class="td-input-with-adornment ${isPercentageTarget ? 'suffix' : 'prefix'}"><span>${adornment}</span><input class="text-input td-setting-input" id="td-dailyTargetValue" type="number" value="${escapeHtml(value)}" ${extra} /></span><small>${helper}</small></label>`;
+}
+
 function accountSettings() {
-  const dailyTargetInput = settings.dailyTargetType === 'percentage'
-    ? field('Daily Target (%)', 'td-dailyTargetReturn', settings.dailyTargetReturn, 'number', 'step="0.1" placeholder="2.0%"')
-    : field('Daily Target ($)', 'td-dailyDollarTarget', settings.dailyDollarTarget, 'number', 'placeholder="$500"');
-  return `<div class="td-grid two"><section class="project-card"><h3>Compounding inputs</h3><div class="td-form-grid">${field('Starting account balance', 'td-startingBalance', settings.startingBalance)}<label>Daily Target Type<select class="text-input" id="td-dailyTargetType"><option value="percentage" ${settings.dailyTargetType === 'percentage' ? 'selected' : ''}>Percentage</option><option value="dollar" ${settings.dailyTargetType === 'dollar' ? 'selected' : ''}>Dollar Amount</option></select></label>${dailyTargetInput}${field('Reinvestment rate (%)', 'td-reinvestmentRate', settings.reinvestmentRate)}<label>Trading fee type<select class="text-input" id="td-feeType"><option value="percentage" ${settings.feeType === 'percentage' ? 'selected' : ''}>Percentage fee</option><option value="flat" ${settings.feeType === 'flat' ? 'selected' : ''}>Flat fee</option></select></label>${field('Trading fee value', 'td-feeValue', settings.feeValue, 'number', 'step="0.01"')}${field('Number of trading days', 'td-tradingDays', settings.tradingDays)}${field('Optional daily loss (%)', 'td-dailyLossPercentage', settings.dailyLossPercentage, 'number', 'step="0.1"')}${field('Taxes (%) optional', 'td-taxes', settings.taxes)}${field('Goal value', 'td-goalValue', settings.goalValue)}</div></section><section class="project-card" id="td-scenario-summary">${scenarioSummary()}</section></div>`;
+  return `<div class="td-grid two"><section class="project-card"><h3>Compounding inputs</h3><div class="td-form-grid">${field('Starting account balance', 'td-startingBalance', settings.startingBalance)}<label>Daily Target Type<select class="text-input" id="td-dailyTargetType"><option value="percentage" ${settings.dailyTargetType === 'percentage' ? 'selected' : ''}>Percentage</option><option value="dollar" ${settings.dailyTargetType === 'dollar' ? 'selected' : ''}>Dollar Amount</option></select></label>${dailyTargetField()}${field('Reinvestment rate (%)', 'td-reinvestmentRate', settings.reinvestmentRate)}<label>Trading fee type<select class="text-input" id="td-feeType"><option value="percentage" ${settings.feeType === 'percentage' ? 'selected' : ''}>Percentage fee</option><option value="flat" ${settings.feeType === 'flat' ? 'selected' : ''}>Flat fee</option></select></label>${field('Trading fee value', 'td-feeValue', settings.feeValue, 'number', 'step="0.01"')}${field('Number of trading days', 'td-tradingDays', settings.tradingDays)}${field('Optional daily loss (%)', 'td-dailyLossPercentage', settings.dailyLossPercentage, 'number', 'step="0.1"')}${field('Taxes (%) optional', 'td-taxes', settings.taxes)}${field('Goal value', 'td-goalValue', settings.goalValue)}</div></section><section class="project-card" id="td-scenario-summary">${scenarioSummary()}</section></div>`;
 }
 
 function scenarioSummary() {
@@ -80,7 +90,8 @@ function scenarioSummary() {
 function summaryCards() {
   const ledger = calculateLedger();
   const final = ledger.at(-1) || { endingBalance: settings.startingBalance, runningProfit: 0 };
-  return [statCard('Projected balance', money(final.endingBalance), `${settings.tradingDays} trading days`), statCard('Projected profit', money(final.runningProfit), `${percent((final.runningProfit / settings.startingBalance) * 100)} return`), statCard('Goal progress', percent(Math.min((final.endingBalance / settings.goalValue) * 100, 100)), `${money(settings.goalValue)} target`)];
+  const targetDetail = settings.dailyTargetType === 'percentage' ? `${percent(settings.dailyTargetReturn)} return` : `${money(settings.dailyDollarTarget)} profit`;
+  return [statCard('Daily target', settings.dailyTargetType === 'percentage' ? percent(settings.dailyTargetReturn) : money(settings.dailyDollarTarget), targetDetail), statCard('Projected balance', money(final.endingBalance), `${settings.tradingDays} trading days`), statCard('Projected profit', money(final.runningProfit), `${percent((final.runningProfit / settings.startingBalance) * 100)} return`), statCard('Goal progress', percent(Math.min((final.endingBalance / settings.goalValue) * 100, 100)), `${money(settings.goalValue)} target`)];
 }
 
 function sparkline(points, className = '') {
@@ -154,7 +165,10 @@ export function bindTradingDashboardEvents(render) {
   document.querySelectorAll('.td-setting-input').forEach((input) => input.addEventListener('input', (event) => {
     const nextValue = Number(event.target.value);
     if (!Number.isFinite(nextValue)) return;
-    settings[event.target.id.replace('td-', '')] = nextValue;
+    const settingKey = event.target.id === 'td-dailyTargetValue'
+      ? (settings.dailyTargetType === 'percentage' ? 'dailyTargetReturn' : 'dailyDollarTarget')
+      : event.target.id.replace('td-', '');
+    settings[settingKey] = nextValue;
     updateVisibleCalculations();
   }));
   document.querySelector('#td-dailyTargetType')?.addEventListener('change', (event) => { settings.dailyTargetType = event.target.value; render(); });
