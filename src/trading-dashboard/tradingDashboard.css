@@ -6,6 +6,14 @@
 .td-form-grid.compact { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .td-form-grid label, .td-progress-head span { color: var(--muted); font-size: .8rem; font-weight: 800; letter-spacing: .04em; }
 .td-form-grid .text-input { margin-top: .35rem; }
+.td-target-field { display: grid; }
+.td-target-field small { color: var(--muted); font-size: .72rem; font-weight: 700; letter-spacing: normal; line-height: 1.35; margin-top: .35rem; }
+.td-input-with-adornment { position: relative; display: block; }
+.td-input-with-adornment span { position: absolute; top: calc(.35rem + 50%); transform: translateY(-50%); color: var(--muted); font-size: .9rem; font-weight: 900; pointer-events: none; }
+.td-input-with-adornment.prefix span { left: .85rem; }
+.td-input-with-adornment.suffix span { right: .85rem; }
+.td-input-with-adornment.prefix input { padding-left: 2rem; }
+.td-input-with-adornment.suffix input { padding-right: 2rem; }
 .td-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .85rem; }
 .td-stat-card { border: 1px solid var(--line); background: #08080a; border-radius: 18px; padding: 1rem; display: grid; gap: .35rem; }
 .td-stat-card span, .td-stat-card small, .td-note { color: var(--muted); }
