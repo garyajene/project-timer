@@ -227,6 +227,56 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   justify-content: center;
 }
 
+.custom-duration-label {
+  display: grid;
+  gap: .35rem;
+  color: var(--muted);
+  font-size: .8rem;
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+
+.custom-duration-label span {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  color: var(--text);
+}
+
+.custom-duration-label input {
+  width: 8rem;
+}
+
+.custom-duration-label small {
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.active-block-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .75rem;
+  margin: 1rem 0 0;
+}
+
+.active-block-details div {
+  display: grid;
+  gap: .2rem;
+}
+
+.active-block-details dt {
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.active-block-details dd {
+  margin: 0;
+  font-weight: 800;
+}
+
 .zen-timing-control {
   display: grid;
   gap: .35rem;
