@@ -283,7 +283,7 @@ function timerPage() {
   const current = getActiveBlock();
   const next = quickTask?.active ? state.schedule[state.activeIndex] : state.schedule[state.activeIndex + 1];
   const canStart = quickTask?.active || state.schedule.length;
-  return `${section({ id: 'timer', title: 'Timer', eyebrow: 'Execution only', className: 'hero-panel', content: `<div class="dashboard-grid">${activeBlockCard(current)}${projectCard('Next Block', next?.project || 'End of schedule', next?.title || 'No next block')}</div><div class="timer-shell" aria-label="Countdown timer"><span id="timer-display">${formatSeconds(remainingSeconds)}</span><p id="timer-status">${current ? `${isRunning ? 'Running' : 'Paused'} · ${escapeHtml(current.project)}${current.title ? ` · ${escapeHtml(current.title)}` : ''}` : 'No saved blocks for today'}</p></div><div class="actions"><button id="start-button" class="primary" ${canStart ? '' : 'disabled'}>Start</button><button id="stop-button">Stop</button><button id="skip-button">Skip</button></div><div class="quick-task-panel"><button id="quick-task-button" class="primary quick-task-button">${icon.plus} Quick Task</button>${quickTaskForm()}</div>` })}${timerSchedule()}${zenBreakOverlay()}`;
+  return `${section({ id: 'timer', title: 'Timer', eyebrow: 'Execution only', className: 'hero-panel', content: `<div class="dashboard-grid">${activeBlockCard(current)}${projectCard('Next Block', next?.project || 'End of schedule', next?.title || 'No next block')}</div><div class="timer-shell" aria-label="Countdown timer"><span id="timer-display">${formatSeconds(remainingSeconds)}</span><p id="timer-status">${current ? `${isRunning ? 'Running' : 'Paused'} · ${escapeHtml(current.project)}${current.title ? ` · ${escapeHtml(current.title)}` : ''}` : 'No saved blocks for today'}</p></div><div class="actions"><button id="start-button" class="primary" ${canStart ? '' : 'disabled'}>Start</button><button id="stop-button">Stop</button><button id="reset-button" ${canStart ? '' : 'disabled'} aria-label="Reset timer to its full duration">Reset</button><button id="skip-button">Skip</button></div><div class="quick-task-panel"><button id="quick-task-button" class="primary quick-task-button">${icon.plus} Quick Task</button>${quickTaskForm()}</div>` })}${timerSchedule()}${zenBreakOverlay()}`;
 }
 
 function timerSchedule() {
@@ -602,7 +602,16 @@ function stopTimer() {
 }
 
 function resetCurrentDuration() {
-  remainingSeconds = getBlockDurationSeconds(state.activeIndex);
+  remainingSeconds = getBlockDurationSeconds(quickTask?.active ? 'quick' : state.activeIndex);
+}
+
+function resetTimer() {
+  isRunning = false;
+  clearInterval(timerId);
+  zenBreak = null;
+  zenBreakNotifiedKey = null;
+  resetCurrentDuration();
+  updateTimerDisplay();
 }
 
 function startQuickTask(event) {
@@ -729,6 +738,7 @@ function bindEvents() {
   bindTradingDashboardEvents(render);
   document.querySelector('#start-button')?.addEventListener('click', startTimer);
   document.querySelector('#stop-button')?.addEventListener('click', stopTimer);
+  document.querySelector('#reset-button')?.addEventListener('click', resetTimer);
   document.querySelector('#skip-button')?.addEventListener('click', advanceBlock);
   document.querySelector('#end-zen-break')?.addEventListener('click', endZenBreakNow);
   document.querySelector('#extend-zen-break')?.addEventListener('click', extendZenBreak);
