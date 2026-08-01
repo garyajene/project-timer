@@ -1,4 +1,5 @@
 import { tradingDashboardSection, bindTradingDashboardEvents } from './trading-dashboard/tradingDashboard.js';
+import { sounds } from './audio.js';
 const STORAGE_KEY = 'project-timer-state-v1';
 const DEFAULT_BLOCK_MINUTES = 30;
 const DURATION_PRESETS = [5, 10, 15, 30, 45, 60, 120, 180, 240];
@@ -444,27 +445,6 @@ function updateTimerDisplay() {
   if (status) status.textContent = current ? `${isRunning ? 'Running' : 'Paused'} · ${current.project}${current.title ? ` · ${current.title}` : ''}` : 'Add a schedule block to start timing';
 }
 
-function playNotification() {
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContext) return;
-
-  const audioContext = new AudioContext();
-  const oscillator = audioContext.createOscillator();
-  const gain = audioContext.createGain();
-
-  oscillator.type = 'sine';
-  oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
-  gain.gain.setValueAtTime(0.001, audioContext.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.25, audioContext.currentTime + 0.02);
-  gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.35);
-
-  oscillator.connect(gain);
-  gain.connect(audioContext.destination);
-  oscillator.start();
-  oscillator.stop(audioContext.currentTime + 0.35);
-  oscillator.addEventListener('ended', () => audioContext.close());
-}
-
 function getZenBreakKey(index) {
   const block = index === 'quick' ? quickTask : state.schedule[index];
   if (!block) return null;
@@ -486,7 +466,7 @@ function getZenBreakTriggerSecond(index, block, durationSeconds) {
 function startZenBreak(block) {
   isRunning = false;
   clearInterval(timerId);
-  playNotification();
+  sounds.zenBreak();
   zenBreak = {
     active: true,
     remainingSeconds: Math.max(Number(block.zenBreakMinutes), 1) * 60,
@@ -509,7 +489,8 @@ function endZenBreakNow() {
   clearInterval(timerId);
   remainingSeconds = zenBreak.pausedRemainingSeconds;
   zenBreak = null;
-  startTimer();
+  sounds.zenBreak();
+  startTimer({ playStartSound: false });
   render();
 }
 
@@ -529,7 +510,8 @@ function tickZenBreak() {
   if (zenBreak.remainingSeconds <= 0) {
     remainingSeconds = zenBreak.pausedRemainingSeconds;
     zenBreak = null;
-    startTimer();
+    sounds.zenBreak();
+    startTimer({ playStartSound: false });
     render();
   }
 }
@@ -549,23 +531,27 @@ function maybeNotifyZenBreak() {
   return true;
 }
 
-function advanceBlock() {
+function advanceBlock({ completed = false } = {}) {
+  const shouldContinue = isRunning;
+  if (completed) sounds.complete();
   if (quickTask?.active) {
-    playNotification();
     const restoreSeconds = quickTask.pausedRemainingSeconds;
     quickTask = null;
     remainingSeconds = restoreSeconds;
-    isRunning = Boolean(state.schedule[state.activeIndex]);
+    isRunning = shouldContinue && Boolean(state.schedule[state.activeIndex]);
     lastTick = Date.now();
     render();
-    if (isRunning) startTimer();
+    if (isRunning) {
+      sounds.start();
+      startTimer({ playStartSound: false });
+    }
     return;
   }
   if (state.schedule[state.activeIndex]) state.schedule[state.activeIndex].done = true;
-  playNotification();
   if (state.activeIndex < state.schedule.length - 1) {
     state.activeIndex += 1;
     remainingSeconds = getBlockDurationSeconds(state.activeIndex);
+    if (shouldContinue) sounds.start();
   } else {
     isRunning = false;
     clearInterval(timerId);
@@ -580,15 +566,17 @@ function tick() {
   const now = Date.now();
   remainingSeconds -= (now - lastTick) / 1000;
   lastTick = now;
-  if (remainingSeconds <= 0) advanceBlock();
+  if (remainingSeconds <= 0) advanceBlock({ completed: true });
   else {
     if (!maybeNotifyZenBreak()) updateTimerDisplay();
   }
 }
 
-function startTimer() {
+function startTimer({ playStartSound = true } = {}) {
   if (!quickTask?.active && !state.schedule.length) return;
+  if (isRunning) return;
   isRunning = true;
+  if (playStartSound) sounds.start();
   lastTick = Date.now();
   clearInterval(timerId);
   timerId = setInterval(tick, 250);
@@ -639,6 +627,7 @@ function startQuickTask(event) {
   zenBreakNotifiedKey = null;
   isQuickTaskFormOpen = false;
   remainingSeconds = getBlockDurationSeconds('quick');
+  isRunning = false;
   startTimer();
   render();
 }
@@ -669,10 +658,12 @@ function updateSelectedBlockUI() {
 function selectActiveBlock(index, shouldRender = true) {
   const nextIndex = Number(index);
   if (quickTask?.active || !Number.isInteger(nextIndex) || !state.schedule[nextIndex]) return;
+  const isNewRunningSession = isRunning && nextIndex !== state.activeIndex;
   state.activeIndex = nextIndex;
   resetCurrentDuration();
   zenBreakNotifiedKey = null;
   lastTick = Date.now();
+  if (isNewRunningSession) sounds.start();
   saveState();
   if (shouldRender) render();
   else updateSelectedBlockUI();
