@@ -1,7 +1,7 @@
 const soundUrls = {
   start: new URL('./assets/sounds/here we go.mp3', import.meta.url),
-  zenBreak: new URL('./assets/sounds/Mudita Bell - Melodic Mirth (alarm sound)mp3.mp3', import.meta.url),
-  complete: new URL('./assets/sounds/buzzer_alarm.mp3', import.meta.url),
+  zenBreak: new URL('./assets/sounds/muduta.mp3', import.meta.url),
+  complete: new URL('./assets/sounds/buzzer.mp3', import.meta.url),
 };
 
 const audioPlayers = new Map();

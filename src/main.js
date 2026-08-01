@@ -14,6 +14,7 @@ const defaultState = {
   schedule: [],
   schedules: {},
   activeIndex: 0,
+  autoStartNextTask: false,
 };
 
 const icon = { clock: '◷', edit: '✎', trash: '⌫', plus: '+', check: '✓', next: '›' };
@@ -111,6 +112,7 @@ function loadState() {
       schedules,
       schedule: cloneSchedule(schedules[todayKey] || []),
       activeIndex: Number.isInteger(saved.activeIndex) ? saved.activeIndex : 0,
+      autoStartNextTask: saved.autoStartNextTask === true,
     };
   } catch {
     return structuredClone(defaultState);
@@ -284,7 +286,7 @@ function timerPage() {
   const current = getActiveBlock();
   const next = quickTask?.active ? state.schedule[state.activeIndex] : state.schedule[state.activeIndex + 1];
   const canStart = quickTask?.active || state.schedule.length;
-  return `${section({ id: 'timer', title: 'Timer', eyebrow: 'Execution only', className: 'hero-panel', content: `<div class="dashboard-grid">${activeBlockCard(current)}${projectCard('Next Block', next?.project || 'End of schedule', next?.title || 'No next block')}</div><div class="timer-shell" aria-label="Countdown timer"><span id="timer-display">${formatSeconds(remainingSeconds)}</span><p id="timer-status">${current ? `${isRunning ? 'Running' : 'Paused'} · ${escapeHtml(current.project)}${current.title ? ` · ${escapeHtml(current.title)}` : ''}` : 'No saved blocks for today'}</p></div><div class="actions"><button id="start-button" class="primary" ${canStart ? '' : 'disabled'}>Start</button><button id="stop-button">Stop</button><button id="reset-button" ${canStart ? '' : 'disabled'} aria-label="Reset timer to its full duration">Reset</button><button id="skip-button">Skip</button></div><div class="quick-task-panel"><button id="quick-task-button" class="primary quick-task-button">${icon.plus} Quick Task</button>${quickTaskForm()}</div>` })}${timerSchedule()}${zenBreakOverlay()}`;
+  return `${section({ id: 'timer', title: 'Timer', eyebrow: 'Execution only', className: 'hero-panel', content: `<div class="dashboard-grid">${activeBlockCard(current)}${projectCard('Next Block', next?.project || 'End of schedule', next?.title || 'No next block')}</div><div class="timer-shell" aria-label="Countdown timer"><span id="timer-display">${formatSeconds(remainingSeconds)}</span><p id="timer-status">${current ? `${isRunning ? 'Running' : 'Paused'} · ${escapeHtml(current.project)}${current.title ? ` · ${escapeHtml(current.title)}` : ''}` : 'No saved blocks for today'}</p></div><div class="actions"><button id="start-button" class="primary" ${canStart ? '' : 'disabled'}>Start</button><button id="stop-button">Stop</button><button id="reset-button" ${canStart ? '' : 'disabled'} aria-label="Reset timer to its full duration">Reset</button><button id="skip-button">Skip</button></div><label class="auto-start-control"><span><strong>Auto-Start Next Task</strong><small>Begin the next scheduled task when a timer finishes naturally.</small></span><input id="auto-start-next-task" type="checkbox" role="switch" ${state.autoStartNextTask ? 'checked' : ''} /></label><div class="quick-task-panel"><button id="quick-task-button" class="primary quick-task-button">${icon.plus} Quick Task</button>${quickTaskForm()}</div>` })}${timerSchedule()}${zenBreakOverlay()}`;
 }
 
 function timerSchedule() {
@@ -532,16 +534,18 @@ function maybeNotifyZenBreak() {
 }
 
 function advanceBlock({ completed = false } = {}) {
-  const shouldContinue = isRunning;
+  const shouldContinue = completed && state.autoStartNextTask;
   if (completed) sounds.complete();
+  isRunning = false;
+  clearInterval(timerId);
   if (quickTask?.active) {
     const restoreSeconds = quickTask.pausedRemainingSeconds;
     quickTask = null;
     remainingSeconds = restoreSeconds;
-    isRunning = shouldContinue && Boolean(state.schedule[state.activeIndex]);
+    const resumeSchedule = shouldContinue && Boolean(state.schedule[state.activeIndex]);
     lastTick = Date.now();
     render();
-    if (isRunning) {
+    if (resumeSchedule) {
       sounds.start();
       startTimer({ playStartSound: false });
     }
@@ -551,7 +555,6 @@ function advanceBlock({ completed = false } = {}) {
   if (state.activeIndex < state.schedule.length - 1) {
     state.activeIndex += 1;
     remainingSeconds = getBlockDurationSeconds(state.activeIndex);
-    if (shouldContinue) sounds.start();
   } else {
     isRunning = false;
     clearInterval(timerId);
@@ -559,6 +562,10 @@ function advanceBlock({ completed = false } = {}) {
   }
   saveState();
   render();
+  if (shouldContinue && remainingSeconds > 0) {
+    sounds.start();
+    startTimer({ playStartSound: false });
+  }
 }
 
 function tick() {
@@ -731,6 +738,10 @@ function bindEvents() {
   document.querySelector('#stop-button')?.addEventListener('click', stopTimer);
   document.querySelector('#reset-button')?.addEventListener('click', resetTimer);
   document.querySelector('#skip-button')?.addEventListener('click', advanceBlock);
+  document.querySelector('#auto-start-next-task')?.addEventListener('change', (event) => {
+    state.autoStartNextTask = event.target.checked;
+    saveState();
+  });
   document.querySelector('#end-zen-break')?.addEventListener('click', endZenBreakNow);
   document.querySelector('#extend-zen-break')?.addEventListener('click', extendZenBreak);
   document.querySelector('#quick-task-button')?.addEventListener('click', () => { isQuickTaskFormOpen = true; render(); });
