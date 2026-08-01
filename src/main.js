@@ -1,7 +1,8 @@
 import { tradingDashboardSection, bindTradingDashboardEvents } from './trading-dashboard/tradingDashboard.js';
 const STORAGE_KEY = 'project-timer-state-v1';
 const DEFAULT_BLOCK_MINUTES = 30;
-const DURATION_PRESETS = [15, 30, 45, 60, 120, 180, 240];
+const DURATION_PRESETS = [5, 10, 15, 30, 45, 60, 120, 180, 240];
+const QUICK_START_PROJECT = 'Quick Start';
 const ZEN_BREAK_PRESETS = [0, 2, 5, 10, 15];
 
 const DEMO_PROJECTS = new Set(['Project Timer', 'Writing system', 'Portfolio refresh', 'Health tracker', 'Home admin', 'Morning setup', 'Daily review']);
@@ -28,7 +29,7 @@ let timerId;
 let zenBreakNotifiedKey = null;
 let quickTask = null;
 let isQuickTaskFormOpen = false;
-let quickTaskDraft = { project: '', title: '', duration: 15, zenBreakMinutes: 0, zenBreakTiming: 'midpoint' };
+let quickTaskDraft = { project: QUICK_START_PROJECT, title: '', duration: 15, zenBreakMinutes: 0, zenBreakTiming: 'midpoint' };
 let zenBreak = null;
 const zenBreakTriggers = new Map();
 
@@ -161,6 +162,11 @@ function minutesToTime(totalMinutes) {
 }
 
 function formatMinutes(minutes) {
+  if (minutes > 60 && minutes % 60 !== 0) {
+    const hours = Math.floor(minutes / 60);
+    const remainder = minutes % 60;
+    return `${hours} ${hours === 1 ? 'Hour' : 'Hours'} ${remainder} Minutes`;
+  }
   if (minutes === 60) return '1 Hour';
   if (minutes > 60) return `${minutes / 60} Hours`;
   return `${minutes} Minutes`;
@@ -250,6 +256,11 @@ function projectCard(label, title, meta, active = false) {
   return `<article class="project-card ${active ? 'active-card' : ''}"><p class="eyebrow">${label}</p><h3 data-card-title>${escapeHtml(title)}</h3><p data-card-meta>${escapeHtml(meta)}</p></article>`;
 }
 
+function activeBlockCard(current) {
+  if (!current) return projectCard('Active Block', 'No block selected', 'Save today’s schedule to begin', true);
+  return `<article class="project-card active-card active-block-card"><p class="eyebrow">Active Block</p><h3 data-card-title>${escapeHtml(current.project || QUICK_START_PROJECT)}</h3><p data-card-meta>${escapeHtml(current.title || 'Untitled task')}</p><dl class="active-block-details"><div><dt>Duration</dt><dd>${escapeHtml(formatMinutes(current.duration || DEFAULT_BLOCK_MINUTES))}</dd></div><div><dt>Remaining</dt><dd id="active-remaining">${formatSeconds(remainingSeconds)}</dd></div><div><dt>Status</dt><dd id="active-status">${isRunning ? 'Running' : 'Paused'}</dd></div></dl></article>`;
+}
+
 function header() {
   return `<header class="app-header"><div><p class="eyebrow">Personal workspace</p><h1>Project Timer</h1></div><div class="header-meta" aria-label="Current date and time"><span>${icon.clock}</span><span>${formatDate()}</span></div><nav class="top-nav" aria-label="Primary navigation">${['Today', 'Timer', 'Projects', 'Calendar', 'Notes', 'Trading Dashboard'].map((item) => { const route = item.toLowerCase().replaceAll(' ', '-'); return `<a href="#${route}" ${getRoute() === route ? 'aria-current="page"' : ''}>${item}</a>`; }).join('')}</nav></header>`;
 }
@@ -264,14 +275,15 @@ function getActiveLabel() {
 
 function quickTaskForm() {
   if (!isQuickTaskFormOpen) return '';
-  return `<form id="quick-task-form" class="quick-task-form"><div class="planning-fields"><label>Project <select class="text-input project-select" id="quick-project" required>${projectOptions(quickTaskDraft.project)}</select></label><label>Task <input class="text-input" id="quick-title" value="${escapeHtml(quickTaskDraft.title)}" placeholder="Optional task description" /></label></div><fieldset class="preset-group quick-duration-group"><legend>Duration</legend>${DURATION_PRESETS.map((minutes) => `<button type="button" class="preset-button quick-duration-preset ${quickTaskDraft.duration === minutes ? 'active-preset' : ''}" data-minutes="${minutes}">${formatMinutes(minutes)}</button>`).join('')}</fieldset><input type="hidden" id="quick-duration" value="${quickTaskDraft.duration}" /><div class="planning-controls"><label>Zen Break <select class="text-input" id="quick-zen-break" aria-label="Zen Break during quick task">${ZEN_BREAK_PRESETS.map((minutes) => `<option value="${minutes}" ${quickTaskDraft.zenBreakMinutes === minutes ? 'selected' : ''}>${minutes ? formatMinutes(minutes) : 'None'}</option>`).join('')}</select></label>${quickTaskDraft.zenBreakMinutes ? zenBreakTimingControl({ value: quickTaskDraft.zenBreakTiming, className: 'quick-zen-timing', id: 'quick-zen-break-timing' }) : ''}</div><div class="actions quick-form-actions"><button type="submit" class="primary">Start Now</button><button type="button" id="cancel-quick-task">Cancel</button></div></form>`;
+  const customDuration = DURATION_PRESETS.includes(quickTaskDraft.duration) ? '' : quickTaskDraft.duration;
+  return `<form id="quick-task-form" class="quick-task-form"><div class="planning-fields"><label>Project <select class="text-input project-select" id="quick-project" required>${projectOptions(quickTaskDraft.project, true)}</select></label><label>Task <input class="text-input" id="quick-title" value="${escapeHtml(quickTaskDraft.title)}" placeholder="Optional task description" /></label></div><fieldset class="preset-group quick-duration-group"><legend>Duration</legend>${DURATION_PRESETS.map((minutes) => `<button type="button" class="preset-button quick-duration-preset ${quickTaskDraft.duration === minutes ? 'active-preset' : ''}" data-minutes="${minutes}">${formatMinutes(minutes)}</button>`).join('')}</fieldset><label class="custom-duration-label">Custom duration <span><input class="text-input" id="quick-custom-duration" type="number" min="1" max="1440" step="1" value="${customDuration}" placeholder="e.g. 75" /> minutes</span><small>Enter any duration from 1 minute to 24 hours.</small></label><input type="hidden" id="quick-duration" value="${quickTaskDraft.duration}" /><div class="planning-controls"><label>Zen Break <select class="text-input" id="quick-zen-break" aria-label="Zen Break during quick task">${ZEN_BREAK_PRESETS.map((minutes) => `<option value="${minutes}" ${quickTaskDraft.zenBreakMinutes === minutes ? 'selected' : ''}>${minutes ? formatMinutes(minutes) : 'None'}</option>`).join('')}</select></label>${quickTaskDraft.zenBreakMinutes ? zenBreakTimingControl({ value: quickTaskDraft.zenBreakTiming, className: 'quick-zen-timing', id: 'quick-zen-break-timing' }) : ''}</div><div class="actions quick-form-actions"><button type="submit" class="primary">Start Now</button><button type="button" id="cancel-quick-task">Cancel</button></div></form>`;
 }
 
 function timerPage() {
   const current = getActiveBlock();
   const next = quickTask?.active ? state.schedule[state.activeIndex] : state.schedule[state.activeIndex + 1];
   const canStart = quickTask?.active || state.schedule.length;
-  return `${section({ id: 'timer', title: 'Timer', eyebrow: 'Execution only', className: 'hero-panel', content: `<div class="dashboard-grid">${projectCard(getActiveLabel(), current?.project || 'No block selected', current?.title || (current?.isBreak ? 'Pause before the next project' : 'Save today’s schedule to begin'), true)}${projectCard('Next Block', next?.project || 'End of schedule', next?.title || 'No next block')}</div><div class="timer-shell" aria-label="Countdown timer"><span id="timer-display">${formatSeconds(remainingSeconds)}</span><p id="timer-status">${current ? `${isRunning ? 'Running' : 'Paused'} · ${escapeHtml(current.project)}${current.title ? ` · ${escapeHtml(current.title)}` : ''}` : 'No saved blocks for today'}</p></div><div class="actions"><button id="start-button" class="primary" ${canStart ? '' : 'disabled'}>Start</button><button id="stop-button">Stop</button><button id="skip-button">Skip</button></div><div class="quick-task-panel"><button id="quick-task-button" class="primary quick-task-button">${icon.plus} Quick Task</button>${quickTaskForm()}</div>` })}${timerSchedule()}${zenBreakOverlay()}`;
+  return `${section({ id: 'timer', title: 'Timer', eyebrow: 'Execution only', className: 'hero-panel', content: `<div class="dashboard-grid">${activeBlockCard(current)}${projectCard('Next Block', next?.project || 'End of schedule', next?.title || 'No next block')}</div><div class="timer-shell" aria-label="Countdown timer"><span id="timer-display">${formatSeconds(remainingSeconds)}</span><p id="timer-status">${current ? `${isRunning ? 'Running' : 'Paused'} · ${escapeHtml(current.project)}${current.title ? ` · ${escapeHtml(current.title)}` : ''}` : 'No saved blocks for today'}</p></div><div class="actions"><button id="start-button" class="primary" ${canStart ? '' : 'disabled'}>Start</button><button id="stop-button">Stop</button><button id="skip-button">Skip</button></div><div class="quick-task-panel"><button id="quick-task-button" class="primary quick-task-button">${icon.plus} Quick Task</button>${quickTaskForm()}</div>` })}${timerSchedule()}${zenBreakOverlay()}`;
 }
 
 function timerSchedule() {
@@ -284,10 +296,11 @@ function zenBreakOverlay() {
   return `<div class="zen-break-overlay" role="dialog" aria-modal="true" aria-label="Zen Break"><div><p class="eyebrow">Zen Break</p><h2>Pause and reset</h2><span id="zen-break-countdown">${formatSeconds(zenBreak.remainingSeconds)}</span><div class="actions zen-break-actions"><button id="end-zen-break" type="button">End Break Now</button><button id="extend-zen-break" type="button" class="primary">Extend 2 Minutes</button></div></div></div>`;
 }
 
-function projectOptions(selectedProject) {
+function projectOptions(selectedProject, includeQuickStart = false) {
   const createOption = '<option value="__create_project__">+ Create New Project...</option>';
   const placeholder = `<option value="" ${selectedProject ? '' : 'selected'} disabled>Select project</option>`;
-  return createOption + placeholder + state.projects.map((project) => `<option value="${escapeHtml(project)}" ${project === selectedProject ? 'selected' : ''}>${escapeHtml(project)}</option>`).join('');
+  const quickStartOption = includeQuickStart ? `<option value="${QUICK_START_PROJECT}" ${selectedProject === QUICK_START_PROJECT ? 'selected' : ''}>${QUICK_START_PROJECT} (No Project)</option>` : '';
+  return quickStartOption + createOption + placeholder + state.projects.map((project) => `<option value="${escapeHtml(project)}" ${project === selectedProject ? 'selected' : ''}>${escapeHtml(project)}</option>`).join('');
 }
 
 function zenBreakTimingControl({ value = 'midpoint', className = '', index = '', id = '' } = {}) {
@@ -422,8 +435,12 @@ function render() {
 function updateTimerDisplay() {
   const display = document.querySelector('#timer-display');
   const status = document.querySelector('#timer-status');
+  const activeRemaining = document.querySelector('#active-remaining');
+  const activeStatus = document.querySelector('#active-status');
   const current = getActiveBlock();
   if (display) display.textContent = formatSeconds(remainingSeconds);
+  if (activeRemaining) activeRemaining.textContent = formatSeconds(remainingSeconds);
+  if (activeStatus) activeStatus.textContent = isRunning ? 'Running' : 'Paused';
   if (status) status.textContent = current ? `${isRunning ? 'Running' : 'Paused'} · ${current.project}${current.title ? ` · ${current.title}` : ''}` : 'Add a schedule block to start timing';
 }
 
@@ -592,17 +609,23 @@ function startQuickTask(event) {
   event.preventDefault();
   const project = document.querySelector('#quick-project')?.value;
   if (!project || project === '__create_project__') return;
+  const durationInput = document.querySelector('#quick-duration');
+  const duration = Number(durationInput?.value);
+  if (!Number.isInteger(duration) || duration < 1 || duration > 1440) {
+    document.querySelector('#quick-custom-duration')?.focus();
+    return;
+  }
   quickTaskDraft = {
     project,
     title: document.querySelector('#quick-title')?.value.trim() || '',
-    duration: Number(document.querySelector('#quick-duration')?.value) || 15,
+    duration,
     zenBreakMinutes: Number(document.querySelector('#quick-zen-break')?.value) || 0,
     zenBreakTiming: document.querySelector('#quick-zen-break-timing')?.value || 'midpoint',
   };
   quickTask = {
     active: true,
     ...quickTaskDraft,
-    pausedRemainingSeconds: remainingSeconds,
+    pausedRemainingSeconds: quickTask?.active ? quickTask.pausedRemainingSeconds : remainingSeconds,
   };
   zenBreakNotifiedKey = null;
   isQuickTaskFormOpen = false;
@@ -714,11 +737,20 @@ function bindEvents() {
   document.querySelector('#quick-task-form')?.addEventListener('submit', startQuickTask);
   document.querySelector('#quick-project')?.addEventListener('change', handleProjectSelectChange);
   document.querySelector('#quick-title')?.addEventListener('input', (event) => { quickTaskDraft.title = event.target.value; });
+  document.querySelector('#quick-custom-duration')?.addEventListener('input', (event) => {
+    const duration = Number(event.target.value);
+    if (Number.isInteger(duration) && duration >= 1 && duration <= 1440) {
+      quickTaskDraft.duration = duration;
+      document.querySelector('#quick-duration').value = duration;
+    }
+    document.querySelectorAll('.quick-duration-preset').forEach((preset) => preset.classList.remove('active-preset'));
+  });
   document.querySelector('#quick-zen-break')?.addEventListener('change', (event) => { quickTaskDraft.zenBreakMinutes = Number(event.target.value); if (!quickTaskDraft.zenBreakTiming) quickTaskDraft.zenBreakTiming = 'midpoint'; render(); });
   document.querySelector('#quick-zen-break-timing')?.addEventListener('change', (event) => { quickTaskDraft.zenBreakTiming = event.target.value; });
   document.querySelectorAll('.quick-duration-preset').forEach((button) => button.addEventListener('click', (event) => {
     quickTaskDraft.duration = Number(event.currentTarget.dataset.minutes);
     document.querySelector('#quick-duration').value = event.currentTarget.dataset.minutes;
+    document.querySelector('#quick-custom-duration').value = '';
     document.querySelectorAll('.quick-duration-preset').forEach((preset) => preset.classList.toggle('active-preset', preset === event.currentTarget));
   }));
   document.querySelector('#add-project')?.addEventListener('click', () => { state.projects.push('New Project'); saveState(); render(); });
