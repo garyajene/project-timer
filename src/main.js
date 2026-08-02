@@ -392,7 +392,7 @@ function calendarDetail(block) {
 function dayView(dateKey) {
   const blocks = getScheduleForDate(dateKey);
   const items = blocks.map((block) => `<article class="calendar-day-task" data-calendar-task-time="${escapeHtml(block.time)}" role="button" tabindex="0"><div><span class="time">${escapeHtml(formatTime(block.time))}</span><strong>${escapeHtml(block.project || 'Task')}</strong><small>${escapeHtml(block.title || 'No task name')}</small></div><span>${escapeHtml(formatMinutes(block.duration))}</span><span>${block.done ? 'Complete' : 'Not complete'}</span></article>`).join('') || '<p class="empty-state">No blocks scheduled.</p>';
-  return `<div class="day-view calendar-full-view"><div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(dateKey))}</h3><div class="actions"><button id="calendar-prev">Previous Day</button><button id="calendar-next">Next Day</button></div></div><div class="calendar-day-list">${items}</div><div id="calendar-task-detail"></div></div>`;
+  return `<div class="day-view calendar-full-view"><div class="calendar-day-actions actions"><button id="calendar-prev">Previous Day</button><button id="calendar-next">Next Day</button></div><div class="calendar-day-list">${items}</div><div id="calendar-task-detail"></div></div>`;
 }
 
 function weekView(dateKey) {
