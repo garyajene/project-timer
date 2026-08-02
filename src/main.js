@@ -34,6 +34,8 @@ let isQuickTaskFormOpen = false;
 let quickTaskDraft = { project: QUICK_START_PROJECT, title: '', duration: 15, zenBreakMinutes: 0, zenBreakTiming: 'midpoint' };
 let zenBreak = null;
 const zenBreakTriggers = new Map();
+let pendingSave = Promise.resolve();
+let projectSaveTimer;
 
 
 function toDateKey(date) {
@@ -88,7 +90,7 @@ function setScheduleForDate(dateKey, blocks) {
   if (dateKey === toDateKey(new Date())) state.schedule = cloneSchedule(cleanBlocks);
 }
 
-function loadState() {
+function loadCachedState() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
     if (!saved || !Array.isArray(saved.projects) || !Array.isArray(saved.schedule)) return structuredClone(defaultState);
@@ -119,6 +121,38 @@ function loadState() {
   }
 }
 
+async function loadState() {
+  try {
+    const response = await fetch('/api/state', { headers: { Accept: 'application/json' }, cache: 'no-store' });
+    if (!response.ok) throw new Error(`Server returned ${response.status}`);
+    const serverState = await response.json();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(serverState));
+    return sanitizeState(serverState);
+  } catch (error) {
+    console.warn('Server state is temporarily unavailable; using the browser cache.', error);
+    return loadCachedState();
+  }
+}
+
+function sanitizeState(saved) {
+  if (!saved || !Array.isArray(saved.projects) || !Array.isArray(saved.schedule)) return structuredClone(defaultState);
+  const projects = saved.projects.filter(Boolean).filter((project) => !DEMO_PROJECTS.has(project));
+  const cleanSchedule = (schedule = []) => schedule.map(normalizeBlock)
+    .filter((block) => block.time && (block.project || block.title) && !DEMO_TITLES.has(block.title) && !DEMO_PROJECTS.has(block.project));
+  const todayKey = toDateKey(new Date());
+  const schedules = {};
+  if (saved.schedules && typeof saved.schedules === 'object') {
+    Object.entries(saved.schedules).forEach(([dateKey, blocks]) => {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey) || !Array.isArray(blocks)) return;
+      const schedule = cleanSchedule(blocks);
+      if (schedule.length) schedules[dateKey] = schedule;
+    });
+  }
+  const schedule = cleanSchedule(saved.schedule);
+  if (schedule.length && !schedules[todayKey]) schedules[todayKey] = schedule;
+  return { projects, schedules, schedule: cloneSchedule(schedules[todayKey] || []), activeIndex: Number.isInteger(saved.activeIndex) ? saved.activeIndex : 0, autoStartNextTask: saved.autoStartNextTask === true };
+}
+
 function cloneSchedule(schedule) {
   return schedule.map((block) => ({ ...block }));
 }
@@ -139,7 +173,18 @@ function normalizeBlock(block) {
 
 function saveState() {
   state.activeIndex = clampActiveIndex(state.activeIndex);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  const snapshot = structuredClone(state);
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+  pendingSave = pendingSave.catch(() => {}).then(async () => {
+    const response = await fetch('/api/state', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(snapshot),
+      keepalive: true,
+    });
+    if (!response.ok) throw new Error(`Server rejected state with status ${response.status}`);
+  }).catch((error) => console.error('Could not save state to the server.', error));
+  return pendingSave;
 }
 
 function clampActiveIndex(index) {
@@ -765,8 +810,40 @@ function bindEvents() {
     document.querySelector('#quick-custom-duration').value = '';
     document.querySelectorAll('.quick-duration-preset').forEach((preset) => preset.classList.toggle('active-preset', preset === event.currentTarget));
   }));
-  document.querySelector('#add-project')?.addEventListener('click', () => { state.projects.push('New Project'); saveState(); render(); });
-  document.querySelectorAll('.project-name').forEach((input) => input.addEventListener('change', (event) => { const index = Number(event.target.dataset.index); const previousName = state.projects[index]; const nextName = event.target.value.trim() || 'Untitled Project'; state.projects[index] = nextName; state.schedule.forEach((block) => { if (block.project === previousName) block.project = nextName; }); Object.values(state.schedules || {}).forEach((schedule) => schedule.forEach((block) => { if (block.project === previousName) block.project = nextName; })); todayDraft.forEach((block) => { if (block.project === previousName) block.project = nextName; }); calendarDraft.forEach((block) => { if (block.project === previousName) block.project = nextName; }); saveState(); render(); }));
+  document.querySelector('#add-project')?.addEventListener('click', () => {
+    let name = 'New Project';
+    let suffix = 2;
+    while (state.projects.includes(name)) name = `New Project ${suffix++}`;
+    state.projects.push(name);
+    saveState();
+    render();
+    const input = document.querySelector(`.project-name[data-index="${state.projects.length - 1}"]`);
+    input?.focus();
+    input?.select();
+  });
+  document.querySelectorAll('.project-name').forEach((input) => {
+    input.addEventListener('input', (event) => {
+      const index = Number(event.target.dataset.index);
+      const previousName = state.projects[index];
+      const nextName = event.target.value;
+      state.projects[index] = nextName;
+      state.schedule.forEach((block) => { if (block.project === previousName) block.project = nextName; });
+      Object.values(state.schedules || {}).forEach((schedule) => schedule.forEach((block) => { if (block.project === previousName) block.project = nextName; }));
+      todayDraft.forEach((block) => { if (block.project === previousName) block.project = nextName; });
+      calendarDraft.forEach((block) => { if (block.project === previousName) block.project = nextName; });
+      clearTimeout(projectSaveTimer);
+      projectSaveTimer = setTimeout(saveState, 250);
+    });
+    input.addEventListener('blur', (event) => {
+      if (!event.target.value.trim()) {
+        event.target.value = 'Untitled Project';
+        state.projects[Number(event.target.dataset.index)] = event.target.value;
+      }
+      clearTimeout(projectSaveTimer);
+      saveState();
+    });
+    input.addEventListener('keydown', (event) => { if (event.key === 'Enter') event.target.blur(); });
+  });
   document.querySelectorAll('.delete-project').forEach((button) => button.addEventListener('click', (event) => { state.projects.splice(event.currentTarget.dataset.index, 1); saveState(); render(); }));
   if (document.querySelector('#calendar')) {
     document.querySelectorAll('[data-calendar-view]').forEach((button) => button.addEventListener('click', (event) => { calendarView = event.currentTarget.dataset.calendarView; render(); }));
@@ -829,13 +906,12 @@ function bindEvents() {
   document.querySelectorAll('.delete-block').forEach((button) => button.addEventListener('click', (event) => { state.schedule.splice(event.currentTarget.dataset.index, 1); state.activeIndex = clampActiveIndex(state.activeIndex); resetCurrentDuration(); render(); }));
 }
 
-function initializeApp() {
+async function initializeApp() {
   try {
-    state = loadState();
+    state = await loadState();
     todayDraft = cloneSchedule(state.schedule.filter((block) => !block.isBreak));
     calendarDraft = cloneSchedule(getScheduleForDate(calendarDate).filter((block) => !block.isBreak));
     remainingSeconds = getBlockDurationSeconds(state.activeIndex);
-    saveState();
   } catch (error) {
     console.error('Project Timer startup failed while loading saved state.', error);
     state = structuredClone(defaultState);

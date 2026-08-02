@@ -7,7 +7,8 @@
     "dev": "node server.js",
     "build": "rm -rf dist && mkdir -p dist/src && cp index.html dist/ && cp src/main.js src/audio.js src/styles.css dist/src/ && cp -R src/assets src/trading-dashboard dist/src/",
     "start": "node server.js",
-    "preview": "node server.js"
+    "preview": "node server.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18"
