@@ -483,6 +483,24 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   background: #08080a;
 }
 
+.calendar-planner .planning-block {
+  grid-template-columns: minmax(15rem, 1.5fr) minmax(10rem, 1fr) auto;
+}
+
+.calendar-planner .planning-controls {
+  align-content: start;
+  gap: .35rem;
+}
+
+.calendar-time-error {
+  color: #ff7d89;
+  font-size: .8rem;
+}
+
+.calendar-start-time[aria-invalid="true"] {
+  border-color: var(--red);
+}
+
 @media (max-width: 900px) {
   .calendar-view-heading,
   .calendar-day-task {
