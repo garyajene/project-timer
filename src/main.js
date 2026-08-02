@@ -36,6 +36,7 @@ let zenBreak = null;
 const zenBreakTriggers = new Map();
 let pendingSave = Promise.resolve();
 let projectSaveTimer;
+let scheduleSaveMessage = '';
 
 
 function toDateKey(date) {
@@ -183,7 +184,11 @@ function saveState() {
       keepalive: true,
     });
     if (!response.ok) throw new Error(`Server rejected state with status ${response.status}`);
-  }).catch((error) => console.error('Could not save state to the server.', error));
+    return true;
+  }).catch((error) => {
+    console.error('Could not save state to the server.', error);
+    return false;
+  });
   return pendingSave;
 }
 
@@ -362,9 +367,13 @@ function addProjectToMasterList(name) {
   return project;
 }
 
+function saveStatus() {
+  return `<p id="schedule-save-status" class="helper-text" role="status" aria-live="polite">${escapeHtml(scheduleSaveMessage)}</p>`;
+}
+
 function todayPlanner() {
   const rows = todayDraft.map((block, index) => `<div class="time-block planning-block" data-index="${index}"><div class="planning-fields"><label>Project <select class="text-input schedule-project project-select" data-index="${index}" aria-label="Project" required>${projectOptions(block.project)}</select></label><label>Task <input class="text-input schedule-title" data-index="${index}" value="${escapeHtml(block.title)}" aria-label="Task" placeholder="Optional task description" /></label></div><div class="planning-controls"><label>Start Time ${timeSelector(block, index)}</label><fieldset class="preset-group"><legend>Duration</legend>${DURATION_PRESETS.map((minutes) => `<button type="button" class="preset-button duration-preset ${block.duration === minutes ? 'active-preset' : ''}" data-index="${index}" data-minutes="${minutes}">${formatMinutes(minutes)}</button>`).join('')}</fieldset><label>Zen Break <select class="text-input zen-break-select" data-index="${index}" aria-label="Zen Break during work block">${ZEN_BREAK_PRESETS.map((minutes) => `<option value="${minutes}" ${block.zenBreakMinutes === minutes ? 'selected' : ''}>${minutes ? formatMinutes(minutes) : 'None'}</option>`).join('')}</select></label>${block.zenBreakMinutes ? zenBreakTimingControl({ value: block.zenBreakTiming, className: 'draft-zen-timing', index }) : ''}</div><div class="row-actions"><button class="move-block" data-direction="up" data-index="${index}" aria-label="Move task earlier">↑</button><button class="move-block" data-direction="down" data-index="${index}" aria-label="Move task later">↓</button><button class="delete-block" data-index="${index}" aria-label="Delete task">${icon.trash} Delete</button></div></div>`).join('') || '<p class="empty-state">No blocks planned for today.</p>';
-  return section({ id: 'today', title: 'Today’s Schedule', eyebrow: 'Planning', content: `<p class="helper-text">Build today’s schedule from your Master Project List with as little typing as possible: choose a project, add an optional task, then tap duration presets, and an optional Zen Break reminder.</p><div class="schedule-list">${rows}</div><button id="add-block" class="add-button"><span>${icon.plus}</span> Add Project Block</button><button id="save-today" class="primary save-button">Save Today’s Schedule</button>` });
+  return section({ id: 'today', title: 'Today’s Schedule', eyebrow: 'Planning', content: `<p class="helper-text">Build today’s schedule from your Master Project List with as little typing as possible: choose a project, add an optional task, then tap duration presets, and an optional Zen Break reminder.</p><div class="schedule-list">${rows}</div><button id="add-block" class="add-button"><span>${icon.plus}</span> Add Project Block</button><button id="save-today" class="primary save-button">Save Today’s Schedule</button>${saveStatus()}` });
 }
 
 
@@ -416,7 +425,7 @@ function calendarPlanner(dateKey) {
     const validTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(block.time);
     return `<div class="time-block planning-block" data-index="${index}"><div class="planning-fields"><label>Project <select class="text-input calendar-project project-select" data-index="${index}" required>${projectOptions(block.project)}</select></label><label>Task <input class="text-input calendar-title" data-index="${index}" value="${escapeHtml(block.title)}" placeholder="Optional task description" /></label></div><div class="planning-controls"><label for="calendar-start-time-${index}">Start Time</label><input id="calendar-start-time-${index}" class="text-input calendar-start-time" data-index="${index}" type="time" value="${validTime ? escapeHtml(block.time) : ''}" aria-describedby="calendar-time-error-${index}" ${validTime ? '' : 'aria-invalid="true"'} required /><small id="calendar-time-error-${index}" class="calendar-time-error" ${validTime ? 'hidden' : ''}>Enter a valid start time.</small></div><div class="row-actions"><button class="calendar-delete-block" data-index="${index}">${icon.trash} Delete</button></div></div>`;
   }).join('') || '<p class="empty-state">No blocks planned for this date.</p>';
-  return `<div class="calendar-planner"><div class="schedule-list">${rows}</div><button id="calendar-add-block" class="add-button"><span>${icon.plus}</span> Add Project Block</button><button id="calendar-save" class="primary save-button">Save Schedule</button></div>`;
+  return `<div class="calendar-planner"><div class="schedule-list">${rows}</div><button id="calendar-add-block" class="add-button"><span>${icon.plus}</span> Add Project Block</button><button id="calendar-save" class="primary save-button">Save Schedule</button>${saveStatus()}</div>`;
 }
 
 function calendarSection() {
@@ -779,6 +788,27 @@ function bindGlobalEvents() {
   window.addEventListener('hashchange', render);
 }
 
+function validateProjectSelections(selector) {
+  const missingProject = [...document.querySelectorAll(selector)].find((select) => !select.value || select.value === '__create_project__');
+  if (!missingProject) return true;
+  scheduleSaveMessage = 'Choose a project for every block before saving.';
+  const status = document.querySelector('#schedule-save-status');
+  if (status) status.textContent = scheduleSaveMessage;
+  missingProject.setCustomValidity('Choose a project for this block.');
+  missingProject.reportValidity();
+  missingProject.addEventListener('change', () => missingProject.setCustomValidity(''), { once: true });
+  return false;
+}
+
+async function persistSchedule(button) {
+  scheduleSaveMessage = 'Saving schedule…';
+  button.disabled = true;
+  button.textContent = 'Saving…';
+  const saved = await saveState();
+  scheduleSaveMessage = saved ? 'Schedule saved.' : 'Schedule could not be saved. Your changes remain on this page; please try again.';
+  return saved;
+}
+
 function bindEvents() {
   bindGlobalEvents();
   bindTradingDashboardEvents(render);
@@ -864,7 +894,8 @@ function bindEvents() {
       item.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); showDetail(); } });
     });
     document.querySelector('#calendar-add-block')?.addEventListener('click', () => { const time = calendarDraft.length ? getNextStartTime(calendarDraft[calendarDraft.length - 1]) : '09:00'; calendarDraft.push(createDraftBlock(time)); render(); });
-    document.querySelector('#calendar-save')?.addEventListener('click', () => {
+    document.querySelector('#calendar-save')?.addEventListener('click', async (event) => {
+      if (!validateProjectSelections('.calendar-project')) return;
       const timeInputs = [...document.querySelectorAll('.calendar-start-time')];
       const invalidInput = timeInputs.find((input) => !input.validity.valid || !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.value));
       if (invalidInput) {
@@ -874,7 +905,10 @@ function bindEvents() {
         return;
       }
       timeInputs.forEach((input) => { calendarDraft[Number(input.dataset.index)].time = input.value; });
-      setScheduleForDate(calendarDate, buildSavedSchedule(calendarDraft)); state.activeIndex = clampActiveIndex(state.activeIndex); resetCurrentDuration(); saveState(); loadCalendarDraft(); render();
+      setScheduleForDate(calendarDate, buildSavedSchedule(calendarDraft)); state.activeIndex = clampActiveIndex(state.activeIndex); resetCurrentDuration();
+      const saved = await persistSchedule(event.currentTarget);
+      if (saved) loadCalendarDraft();
+      render();
     });
     document.querySelectorAll('.calendar-project').forEach((input) => input.addEventListener('change', handleProjectSelectChange));
     document.querySelectorAll('.calendar-title').forEach((input) => input.addEventListener('input', (event) => { calendarDraft[event.target.dataset.index].title = event.target.value; }));
@@ -902,7 +936,15 @@ function bindEvents() {
       render();
       document.querySelector(`.schedule-project[data-index="${todayDraft.length - 1}"]`)?.focus();
     });
-    document.querySelector('#save-today')?.addEventListener('click', () => { state.schedule = buildSavedSchedule(todayDraft); setScheduleForDate(toDateKey(new Date()), state.schedule); state.activeIndex = clampActiveIndex(state.activeIndex); resetCurrentDuration(); saveState(); render(); });
+    document.querySelector('#save-today')?.addEventListener('click', async (event) => {
+      if (!validateProjectSelections('.schedule-project')) return;
+      state.schedule = buildSavedSchedule(todayDraft);
+      setScheduleForDate(toDateKey(new Date()), state.schedule);
+      state.activeIndex = clampActiveIndex(state.activeIndex);
+      resetCurrentDuration();
+      await persistSchedule(event.currentTarget);
+      render();
+    });
     document.querySelectorAll('.time-hour, .time-minutes, .time-period').forEach((input) => input.addEventListener('change', (event) => { const index = Number(event.target.dataset.index); const row = event.target.closest('.planning-block'); const hour = row.querySelector('.time-hour').value; const minutes = row.querySelector('.time-minutes').value; const period = row.querySelector('.time-period').value; todayDraft[index].time = timePartsToTime(hour, minutes, period); applyNextStartTimes(index); render(); }));
     document.querySelectorAll('.schedule-title').forEach((input) => input.addEventListener('input', (event) => { todayDraft[event.target.dataset.index].title = event.target.value; }));
     document.querySelectorAll('.schedule-project').forEach((input) => input.addEventListener('change', handleProjectSelectChange));
