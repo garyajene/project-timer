@@ -3,6 +3,7 @@ import { sounds } from './audio.js';
 const STORAGE_KEY = 'project-timer-state-v1';
 const DEFAULT_BLOCK_MINUTES = 30;
 const DURATION_PRESETS = [5, 10, 15, 30, 45, 60, 120, 180, 240];
+const CALENDAR_DURATION_OPTIONS = [15, 30, 45, 60, 120, 180, 240];
 const QUICK_START_PROJECT = 'Quick Start';
 const ZEN_BREAK_PRESETS = [0, 2, 5, 10, 15];
 
@@ -385,14 +386,8 @@ function calendarTaskSummary(block) {
   return `<button type="button" class="calendar-task" data-calendar-task-time="${escapeHtml(block.time)}"><span class="time">${escapeHtml(formatTime(block.time))}</span><strong>${escapeHtml(block.project || 'Task')}</strong>${block.title ? `<small>${escapeHtml(block.title)}</small>` : ''}</button>`;
 }
 
-function calendarDetail(block) {
-  return `<div class="calendar-detail"><h3>${escapeHtml(block.project || 'Task')}</h3><p>${escapeHtml(block.title || 'No task name')}</p><dl><div><dt>Start time</dt><dd>${escapeHtml(formatTime(block.time))}</dd></div><div><dt>Duration</dt><dd>${escapeHtml(formatMinutes(block.duration))}</dd></div><div><dt>Status</dt><dd>${block.done ? 'Complete' : 'Not complete'}</dd></div>${block.zenBreakMinutes ? `<div><dt>Zen Break</dt><dd>${escapeHtml(formatMinutes(block.zenBreakMinutes))}</dd></div>` : ''}</dl></div>`;
-}
-
 function dayView(dateKey) {
-  const blocks = getScheduleForDate(dateKey);
-  const items = blocks.map((block) => `<article class="calendar-day-task" data-calendar-task-time="${escapeHtml(block.time)}" role="button" tabindex="0"><div><span class="time">${escapeHtml(formatTime(block.time))}</span><strong>${escapeHtml(block.project || 'Task')}</strong><small>${escapeHtml(block.title || 'No task name')}</small></div><span>${escapeHtml(formatMinutes(block.duration))}</span><span>${block.done ? 'Complete' : 'Not complete'}</span></article>`).join('') || '<p class="empty-state">No blocks scheduled.</p>';
-  return `<div class="day-view calendar-full-view"><div class="calendar-day-actions actions"><button id="calendar-prev">Previous Day</button><button id="calendar-next">Next Day</button></div><div class="calendar-day-list">${items}</div><div id="calendar-task-detail"></div></div>`;
+  return `<div class="day-view calendar-full-view"><div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(dateKey))}</h3><div class="actions"><button id="calendar-prev">Previous Day</button><button id="calendar-next">Next Day</button></div></div>${calendarPlanner()}</div>`;
 }
 
 function weekView(dateKey) {
@@ -420,17 +415,25 @@ function monthView(dateKey) {
   return `<div class="calendar-full-view"><div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(dateKey, { month: 'long', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Month</button><button id="calendar-next">Next Month</button></div></div><div class="month-view">${cells}</div></div>`;
 }
 
-function calendarPlanner(dateKey) {
+function calendarTimeSelector(block, index) {
+  const [hours24 = 9, minutes = 0] = String(block.time).split(':').map(Number);
+  const period = hours24 >= 12 ? 'PM' : 'AM';
+  const hour = hours24 % 12 || 12;
+  const hourOptions = Array.from({ length: 12 }, (_, option) => option + 1).map((value) => `<option value="${value}" ${value === hour ? 'selected' : ''}>${value}</option>`).join('');
+  const minuteOptions = Array.from({ length: 60 }, (_, value) => `<option value="${value}" ${value === minutes ? 'selected' : ''}>${String(value).padStart(2, '0')}</option>`).join('');
+  return `<div class="calendar-time-selector" data-index="${index}"><label>Hour<select class="text-input calendar-hour" data-index="${index}" aria-label="Start time hour">${hourOptions}</select></label><span aria-hidden="true">:</span><label>Minute<select class="text-input calendar-minute" data-index="${index}" aria-label="Start time minute">${minuteOptions}</select></label><button type="button" class="calendar-period" data-index="${index}" data-period="${period}" aria-label="Start time ${period}; click to switch">${period}</button></div>`;
+}
+
+function calendarPlanner() {
   const rows = calendarDraft.map((block, index) => {
-    const validTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(block.time);
-    return `<div class="time-block planning-block" data-index="${index}"><div class="planning-fields"><label>Project <select class="text-input calendar-project project-select" data-index="${index}" required>${projectOptions(block.project)}</select></label><label>Task <input class="text-input calendar-title" data-index="${index}" value="${escapeHtml(block.title)}" placeholder="Optional task description" /></label></div><div class="planning-controls"><label for="calendar-start-time-${index}">Start Time</label><input id="calendar-start-time-${index}" class="text-input calendar-start-time" data-index="${index}" type="time" value="${validTime ? escapeHtml(block.time) : ''}" aria-describedby="calendar-time-error-${index}" ${validTime ? '' : 'aria-invalid="true"'} required /><small id="calendar-time-error-${index}" class="calendar-time-error" ${validTime ? 'hidden' : ''}>Enter a valid start time.</small></div><div class="row-actions"><button class="calendar-delete-block" data-index="${index}">${icon.trash} Delete</button></div></div>`;
+    return `<article class="calendar-block-card" data-index="${index}"><div class="calendar-card-fields"><label>Project<select class="text-input calendar-project project-select" data-index="${index}" required>${projectOptions(block.project)}</select></label><label>Task <span class="optional-label">(optional)</span><input class="text-input calendar-title" data-index="${index}" value="${escapeHtml(block.title)}" placeholder="Task description" /></label><fieldset><legend>Start Time</legend>${calendarTimeSelector(block, index)}</fieldset><label>Block Length<select class="text-input calendar-duration" data-index="${index}" aria-label="Block Length">${CALENDAR_DURATION_OPTIONS.map((minutes) => `<option value="${minutes}" ${block.duration === minutes ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label></div><button class="calendar-delete-block" data-index="${index}" aria-label="Delete project block">${icon.trash} Delete</button></article>`;
   }).join('') || '<p class="empty-state">No blocks planned for this date.</p>';
-  return `<div class="calendar-planner"><div class="schedule-list">${rows}</div><button id="calendar-add-block" class="add-button"><span>${icon.plus}</span> Add Project Block</button><button id="calendar-save" class="primary save-button">Save Schedule</button>${saveStatus()}</div>`;
+  return `<div class="calendar-planner"><div class="schedule-list">${rows}</div><div class="calendar-editor-actions"><button id="calendar-add-block" class="add-button"><span>${icon.plus}</span> Add Project Block</button><button id="calendar-save" class="primary save-button">Save Schedule</button></div>${saveStatus()}</div>`;
 }
 
 function calendarSection() {
   const selectedView = calendarView === 'week' ? weekView(calendarDate) : calendarView === 'month' ? monthView(calendarDate) : dayView(calendarDate);
-  return section({ id: 'calendar', title: 'Calendar', eyebrow: 'Planning', content: `<div class="calendar-controls"><label>Planning Date <input id="calendar-date" class="text-input" type="date" value="${calendarDate}" /></label></div><div class="calendar-tabs"><button class="${calendarView === 'day' ? 'active-tab' : ''}" data-calendar-view="day">Day</button><button class="${calendarView === 'week' ? 'active-tab' : ''}" data-calendar-view="week">Week</button><button class="${calendarView === 'month' ? 'active-tab' : ''}" data-calendar-view="month">Month</button></div><div class="calendar-layout single-calendar-view">${selectedView}</div>${calendarPlanner(calendarDate)}` });
+  return section({ id: 'calendar', title: 'Calendar', eyebrow: 'Planning', content: `<div class="calendar-controls"><label>Planning Date <input id="calendar-date" class="text-input" type="date" value="${calendarDate}" /></label></div><div class="calendar-tabs"><button class="${calendarView === 'day' ? 'active-tab' : ''}" data-calendar-view="day">Day</button><button class="${calendarView === 'week' ? 'active-tab' : ''}" data-calendar-view="week">Week</button><button class="${calendarView === 'month' ? 'active-tab' : ''}" data-calendar-view="month">Month</button></div><div class="calendar-layout single-calendar-view">${selectedView}</div>` });
 }
 
 function notesAndReview() {
@@ -884,27 +887,9 @@ function bindEvents() {
     document.querySelector('#calendar-prev')?.addEventListener('click', () => shiftCalendarDate(-1));
     document.querySelector('#calendar-next')?.addEventListener('click', () => shiftCalendarDate(1));
     document.querySelectorAll('.month-day').forEach((button) => button.addEventListener('click', (event) => { calendarDate = event.currentTarget.dataset.calendarDate; calendarView = 'day'; loadCalendarDraft(); render(); }));
-    document.querySelectorAll('.calendar-day-task').forEach((item) => {
-      const showDetail = () => {
-        const block = getScheduleForDate(calendarDate).find((candidate) => candidate.time === item.dataset.calendarTaskTime);
-        const detail = document.querySelector('#calendar-task-detail');
-        if (block && detail) detail.innerHTML = calendarDetail(block);
-      };
-      item.addEventListener('click', showDetail);
-      item.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); showDetail(); } });
-    });
     document.querySelector('#calendar-add-block')?.addEventListener('click', () => { const time = calendarDraft.length ? getNextStartTime(calendarDraft[calendarDraft.length - 1]) : '09:00'; calendarDraft.push(createDraftBlock(time)); render(); });
     document.querySelector('#calendar-save')?.addEventListener('click', async (event) => {
       if (!validateProjectSelections('.calendar-project')) return;
-      const timeInputs = [...document.querySelectorAll('.calendar-start-time')];
-      const invalidInput = timeInputs.find((input) => !input.validity.valid || !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.value));
-      if (invalidInput) {
-        invalidInput.setAttribute('aria-invalid', 'true');
-        document.querySelector(`#calendar-time-error-${invalidInput.dataset.index}`)?.removeAttribute('hidden');
-        invalidInput.focus();
-        return;
-      }
-      timeInputs.forEach((input) => { calendarDraft[Number(input.dataset.index)].time = input.value; });
       setScheduleForDate(calendarDate, buildSavedSchedule(calendarDraft)); state.activeIndex = clampActiveIndex(state.activeIndex); resetCurrentDuration();
       const saved = await persistSchedule(event.currentTarget);
       if (saved) loadCalendarDraft();
@@ -912,20 +897,21 @@ function bindEvents() {
     });
     document.querySelectorAll('.calendar-project').forEach((input) => input.addEventListener('change', handleProjectSelectChange));
     document.querySelectorAll('.calendar-title').forEach((input) => input.addEventListener('input', (event) => { calendarDraft[event.target.dataset.index].title = event.target.value; }));
+    document.querySelectorAll('.calendar-duration').forEach((input) => input.addEventListener('change', (event) => { calendarDraft[event.target.dataset.index].duration = Number(event.target.value); }));
     document.querySelectorAll('.calendar-delete-block').forEach((button) => button.addEventListener('click', (event) => { calendarDraft.splice(Number(event.currentTarget.dataset.index), 1); render(); }));
-    document.querySelectorAll('.calendar-start-time').forEach((input) => input.addEventListener('change', (event) => {
-      const index = Number(event.target.dataset.index);
-      const error = document.querySelector(`#calendar-time-error-${index}`);
-      if (!event.target.validity.valid || !/^([01]\d|2[0-3]):[0-5]\d$/.test(event.target.value)) {
-        event.target.setAttribute('aria-invalid', 'true');
-        error?.removeAttribute('hidden');
-        return;
-      }
-      event.target.removeAttribute('aria-invalid');
-      error?.setAttribute('hidden', '');
-      calendarDraft[index].time = event.target.value;
-      for (let i = index + 1; i < calendarDraft.length; i += 1) calendarDraft[i].time = getNextStartTime(calendarDraft[i - 1]);
-      render();
+    const updateCalendarTime = (index) => {
+      const hour = Number(document.querySelector(`.calendar-hour[data-index="${index}"]`)?.value || 12);
+      const minute = Number(document.querySelector(`.calendar-minute[data-index="${index}"]`)?.value || 0);
+      const period = document.querySelector(`.calendar-period[data-index="${index}"]`)?.dataset.period || 'AM';
+      calendarDraft[index].time = `${String((hour % 12) + (period === 'PM' ? 12 : 0)).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    };
+    document.querySelectorAll('.calendar-hour, .calendar-minute').forEach((input) => input.addEventListener('change', (event) => updateCalendarTime(Number(event.target.dataset.index))));
+    document.querySelectorAll('.calendar-period').forEach((button) => button.addEventListener('click', (event) => {
+      const periodButton = event.currentTarget;
+      periodButton.dataset.period = periodButton.dataset.period === 'AM' ? 'PM' : 'AM';
+      periodButton.textContent = periodButton.dataset.period;
+      periodButton.setAttribute('aria-label', `Start time ${periodButton.dataset.period}; click to switch`);
+      updateCalendarTime(Number(periodButton.dataset.index));
     }));
     return;
   }
