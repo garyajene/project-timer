@@ -482,28 +482,85 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 }
 
 .calendar-planner {
+  display: grid;
+  gap: 1rem;
+}
+
+.calendar-block-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1rem;
+  align-items: end;
   border: 1px solid var(--line);
   border-radius: 18px;
   padding: 1rem;
-  background: #08080a;
+  background: #0a0a0d;
 }
 
-.calendar-planner .planning-block {
-  grid-template-columns: minmax(15rem, 1.5fr) minmax(10rem, 1fr) auto;
+.calendar-card-fields {
+  display: grid;
+  grid-template-columns: minmax(11rem, 1.3fr) minmax(11rem, 1.3fr) minmax(15rem, 1fr) minmax(9rem, .8fr);
+  gap: .85rem;
+  align-items: end;
 }
 
-.calendar-planner .planning-controls {
-  align-content: start;
-  gap: .35rem;
-}
-
-.calendar-time-error {
-  color: #ff7d89;
+.calendar-card-fields > label,
+.calendar-card-fields legend,
+.calendar-time-selector label {
+  color: var(--muted);
   font-size: .8rem;
+  font-weight: 800;
+  letter-spacing: .04em;
 }
 
-.calendar-start-time[aria-invalid="true"] {
+.calendar-card-fields .text-input {
+  margin-top: .35rem;
+}
+
+.calendar-card-fields fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.optional-label {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.calendar-time-selector {
+  display: grid;
+  grid-template-columns: minmax(4.5rem, 1fr) auto minmax(4.5rem, 1fr) auto;
+  gap: .4rem;
+  align-items: end;
+  margin-top: .35rem;
+}
+
+.calendar-time-selector > span {
+  padding-bottom: .7rem;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.calendar-period {
+  justify-content: center;
   border-color: var(--red);
+  border-radius: 12px;
+  padding: .65rem .8rem;
+  background: rgba(255,41,61,.16);
+  font-weight: 900;
+}
+
+.calendar-editor-actions {
+  display: flex;
+  gap: .75rem;
+  flex-wrap: wrap;
+}
+
+.calendar-editor-actions .add-button,
+.calendar-editor-actions .save-button {
+  margin: 0;
 }
 
 @media (max-width: 900px) {
@@ -514,4 +571,11 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   .calendar-view-heading {
     align-items: start;
   }
+  .calendar-card-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .calendar-block-card,
+  .calendar-card-fields { grid-template-columns: 1fr; }
+  .calendar-block-card > button { justify-content: center; }
 }
