@@ -130,6 +130,102 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .time-block input, .time-block button { cursor: auto; }
 
 .helper-text, .empty-state { color: var(--muted); }
+.today-overview {
+  display: grid;
+  gap: clamp(2rem, 5vw, 3.5rem);
+  padding: clamp(1.5rem, 4vw, 2.75rem);
+}
+
+.today-page-heading h2 {
+  font-size: clamp(2.2rem, 6vw, 4.25rem);
+  letter-spacing: -.055em;
+}
+
+.today-page-heading p {
+  margin: .35rem 0 0;
+  color: #d7a4aa;
+  font-size: clamp(1rem, 2vw, 1.2rem);
+  font-weight: 650;
+}
+
+.today-agenda {
+  display: grid;
+  gap: 1rem;
+}
+
+.today-agenda > h3 {
+  margin: 0;
+  color: var(--red);
+  font-size: .78rem;
+  font-weight: 900;
+  letter-spacing: .16em;
+}
+
+.today-schedule-list {
+  display: grid;
+  gap: .8rem;
+}
+
+.today-schedule-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 1.25rem;
+  align-items: center;
+  min-height: 5.75rem;
+  padding: 1.15rem 1.3rem;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: #0a0a0d;
+}
+
+.today-block-copy {
+  display: grid;
+  gap: .3rem;
+  min-width: 0;
+}
+
+.today-block-copy strong {
+  overflow-wrap: anywhere;
+  font-size: clamp(1.05rem, 2vw, 1.3rem);
+  letter-spacing: -.015em;
+}
+
+.today-block-copy small {
+  color: var(--muted);
+  font-size: .9rem;
+}
+
+.today-block-time {
+  display: flex;
+  align-items: center;
+  gap: .65rem;
+  margin: 0;
+  color: #fff;
+  font-size: clamp(.95rem, 2vw, 1.1rem);
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.today-block-time span { color: var(--red); }
+
+.today-current-block {
+  border-color: rgba(255,41,61,.78);
+  background: linear-gradient(110deg, rgba(255,41,61,.13), #0a0a0d 62%);
+  box-shadow: inset 3px 0 0 var(--red);
+}
+
+.today-empty-state {
+  margin: 0;
+  padding: 1.25rem 0;
+}
+
+@media (max-width: 560px) {
+  .today-schedule-row {
+    grid-template-columns: 1fr;
+    gap: .8rem;
+  }
+}
 .save-button { margin-top: 1rem; margin-left: .75rem; }
 .timer-block { grid-template-columns: auto auto minmax(0, 1fr); }
 .timer-block .task-copy { gap: .2rem; }
