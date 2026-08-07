@@ -26,6 +26,16 @@ test('Auto-Start is a compact Timer control without a separate explanation card'
   assert.doesNotMatch(timerPage, /Begin the next scheduled task|<small>/);
 });
 
+test('Zen Break is restored as a compact, collapsed Timer control', () => {
+  const timerPage = mainSource.slice(mainSource.indexOf('function zenBreakControl('), mainSource.indexOf('function timerSchedule()'));
+  assert.match(timerPage, /class="zen-break-control"/);
+  assert.match(timerPage, /id="zen-break-enabled"[^>]+role="switch"/);
+  assert.match(timerPage, /<details class="zen-break-menu"/);
+  assert.doesNotMatch(timerPage, /<details class="zen-break-menu"[^>]+open/);
+  assert.match(mainSource, /#timer-zen-break-duration/);
+  assert.match(mainSource, /#timer-zen-break-timing/);
+});
+
 test('main timer is editable only before a timer session starts', () => {
   assert.match(mainSource, /id="timer-display"[^>]+\$\{hasTimerStarted \? 'disabled' : ''\}/);
   assert.match(mainSource, /#timer-display'\)\?\.addEventListener\('change'/);
@@ -35,7 +45,7 @@ test('main timer is editable only before a timer session starts', () => {
 });
 
 test('Quick Task uses only a name and the shared timer duration controls', () => {
-  const quickTaskField = mainSource.slice(mainSource.indexOf('function quickTaskNameField()'), mainSource.indexOf('function timerPage()'));
+  const quickTaskField = mainSource.slice(mainSource.indexOf('function quickTaskNameField()'), mainSource.indexOf('function zenBreakControl('));
   assert.match(quickTaskField, /Quick Task Name/);
   assert.doesNotMatch(quickTaskField, /Project|Duration|Start Now/);
   assert.match(mainSource, /#quick-task-button'\)\?\.addEventListener\('click', activateQuickTask\)/);
@@ -89,4 +99,12 @@ test('Next Block and saved schedule blocks use the same selection behavior', () 
   assert.match(mainSource, /projectCard\('Next Block'.*next \? nextIndex : null\)/);
   assert.match(mainSource, /document\.querySelectorAll\('\[data-select-block\]'\)/);
   assert.match(mainSource, /document\.querySelectorAll\('\.time-block'\)/);
+});
+
+test('block navigation exposes both adjacent scheduled blocks', () => {
+  const timerPage = mainSource.slice(mainSource.indexOf('function timerPage()'), mainSource.indexOf('function timerSchedule()'));
+  assert.match(timerPage, /const previousIndex = quickTask\?\.active \? null : state\.activeIndex - 1/);
+  assert.match(timerPage, /projectCard\('Previous Block'.*previous \? previousIndex : null\)/);
+  assert.match(timerPage, /projectCard\('Next Block'.*next \? nextIndex : null\)/);
+  assert.match(timerPage, /block-navigation/);
 });
