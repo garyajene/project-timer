@@ -55,3 +55,38 @@ test('all four Timer controls retain their existing event handlers', () => {
   assert.match(mainSource, /#reset-button'\)\?\.addEventListener\('click', resetTimer\)/);
   assert.match(mainSource, /#skip-button'\)\?\.addEventListener\('click', advanceBlock\)/);
 });
+
+test('Reset stops the shared timer and clears both timer values to zero', () => {
+  const resetTimer = mainSource.slice(mainSource.indexOf('function resetTimer()'), mainSource.indexOf('function activateQuickTask()'));
+  assert.match(resetTimer, /isRunning = false/);
+  assert.match(resetTimer, /clearInterval\(timerId\)/);
+  assert.match(resetTimer, /configuredDurationSeconds = 0/);
+  assert.match(resetTimer, /remainingSeconds = 0/);
+  assert.doesNotMatch(resetTimer, /resetCurrentDuration|getBlockDurationSeconds/);
+});
+
+test('selecting a scheduled block replaces Quick Task and pauses a freshly loaded duration', () => {
+  const selectActiveBlock = mainSource.slice(mainSource.indexOf('function selectActiveBlock('), mainSource.indexOf('function handleProjectSelectChange'));
+  assert.match(selectActiveBlock, /isRunning = false/);
+  assert.match(selectActiveBlock, /clearInterval\(timerId\)/);
+  assert.match(selectActiveBlock, /quickTask = null/);
+  assert.match(selectActiveBlock, /state\.activeIndex = nextIndex/);
+  assert.match(selectActiveBlock, /resetCurrentDuration\(\)/);
+  assert.match(selectActiveBlock, /hasTimerStarted = false/);
+  assert.doesNotMatch(selectActiveBlock, /quickTask\?\.active.*return/);
+});
+
+test('creating a Quick Task pauses the timer and loads its configured duration', () => {
+  const activateQuickTask = mainSource.slice(mainSource.indexOf('function activateQuickTask()'), mainSource.indexOf('function selectActiveBlock('));
+  assert.match(activateQuickTask, /isRunning = false/);
+  assert.match(activateQuickTask, /clearInterval\(timerId\)/);
+  assert.match(activateQuickTask, /remainingSeconds = configuredDurationSeconds/);
+  assert.match(activateQuickTask, /hasTimerStarted = false/);
+});
+
+test('Next Block and saved schedule blocks use the same selection behavior', () => {
+  assert.match(mainSource, /data-select-block="\$\{selectIndex\}"/);
+  assert.match(mainSource, /projectCard\('Next Block'.*next \? nextIndex : null\)/);
+  assert.match(mainSource, /document\.querySelectorAll\('\[data-select-block\]'\)/);
+  assert.match(mainSource, /document\.querySelectorAll\('\.time-block'\)/);
+});
