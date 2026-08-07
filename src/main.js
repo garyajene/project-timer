@@ -401,13 +401,11 @@ function saveStatus() {
 
 function todayPlanner() {
   const now = new Date();
-  const currentMinutes = (now.getHours() * 60) + now.getMinutes();
   const rows = getScheduleForDate(toDateKey(now)).map((block) => {
-    const startMinutes = timeToMinutes(block.time);
-    const endMinutes = startMinutes + (Number(block.duration) || DEFAULT_BLOCK_MINUTES);
-    const isCurrent = currentMinutes >= startMinutes && currentMinutes < endMinutes;
-    return `<article class="today-schedule-row ${isCurrent ? 'today-current-block' : ''}"><div class="today-block-copy"><strong>${escapeHtml(block.project || 'Task')}</strong>${block.title ? `<small>${escapeHtml(block.title)}</small>` : ''}</div><p class="today-block-time"><time datetime="${escapeHtml(block.time)}">${escapeHtml(formatTime(block.time))}</time><span aria-hidden="true">→</span><time datetime="${escapeHtml(getNextStartTime(block))}">${escapeHtml(formatTime(getNextStartTime(block)))}</time></p></article>`;
-  }).join('') || '<p class="empty-state today-empty-state">No projects scheduled for today.</p>';
+    const duration = Number(block.duration) || DEFAULT_BLOCK_MINUTES;
+    const endTime = getNextStartTime(block);
+    return `<article class="today-schedule-row"><h4>${escapeHtml(block.project || 'Task')}</h4><dl class="today-block-details"><div><dt>Start:</dt><dd><time datetime="${escapeHtml(block.time)}">${escapeHtml(formatTime(block.time))}</time></dd></div><div><dt>End:</dt><dd><time datetime="${escapeHtml(endTime)}">${escapeHtml(formatTime(endTime))}</time></dd></div><div><dt>Duration:</dt><dd>${escapeHtml(formatMinutes(duration))}</dd></div></dl></article>`;
+  }).join('') || '<p class="empty-state today-empty-state">Nothing scheduled for today.</p>';
   return `<section id="today" class="panel today-overview"><header class="today-page-heading"><h2>TODAY</h2><p>What am I doing today?</p></header><div class="today-agenda"><h3>TODAY’S SCHEDULE</h3><div class="today-schedule-list">${rows}</div></div></section>`;
 }
 
