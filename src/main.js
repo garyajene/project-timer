@@ -25,6 +25,7 @@ let calendarView = 'day';
 let calendarDate = toDateKey(new Date());
 let calendarDraft = [];
 let isRunning = false;
+let isUserPaused = false;
 let remainingSeconds = DEFAULT_BLOCK_MINUTES * 60;
 let configuredDurationSeconds = remainingSeconds;
 let hasTimerStarted = false;
@@ -312,7 +313,16 @@ function projectCard(label, title, meta, active = false, selectIndex = null) {
 
 function activeBlockCard(current) {
   if (!current) return projectCard('Active Block', 'No block selected', 'Save today’s schedule to begin', true);
-  return `<article class="project-card active-card active-block-card"><p class="eyebrow">Active Block</p><h3 data-card-title>${escapeHtml(current.project || QUICK_START_PROJECT)}</h3><p data-card-meta>${escapeHtml(current.title || 'Untitled task')}</p><dl class="active-block-details"><div><dt>Duration</dt><dd>${escapeHtml(formatMinutes(current.duration || DEFAULT_BLOCK_MINUTES))}</dd></div><div><dt>Remaining</dt><dd id="active-remaining">${formatSeconds(remainingSeconds)}</dd></div><div><dt>Status</dt><dd id="active-status">${isRunning ? 'Running' : 'Paused'}</dd></div></dl></article>`;
+  const scheduledTimes = current.time ? `<div><dt>Start Time</dt><dd>${escapeHtml(formatTime(current.time))}</dd></div><div><dt>End Time</dt><dd>${escapeHtml(formatTime(getNextStartTime(current)))}</dd></div>` : '';
+  return `<article class="project-card active-card active-block-card"><p class="eyebrow">Active Block</p><h3 data-card-title>${escapeHtml(current.project || QUICK_START_PROJECT)}</h3><p data-card-meta>${escapeHtml(current.title || 'Untitled task')}</p><dl class="active-block-details"><div><dt>Duration</dt><dd>${escapeHtml(formatMinutes(current.duration || DEFAULT_BLOCK_MINUTES))}</dd></div>${scheduledTimes}</dl></article>`;
+}
+
+function getTimerStatus(current) {
+  if (!current) return 'Add a schedule block to start timing';
+  const paused = isUserPaused ? 'PAUSED · ' : '';
+  const name = `${current.project}${current.title ? ` · ${current.title}` : ''}`;
+  const endTime = quickTask?.active ? '' : ` · ENDS AT ${formatTime(getNextStartTime(current))}`;
+  return `${paused}${name}${endTime}`;
 }
 
 function primaryNavigation(className = '') {
@@ -352,9 +362,9 @@ function timerPage() {
   const canStart = quickTask?.active || state.schedule.length;
   const quickTaskControls = quickTask?.active ? `${quickTaskNameField()}<fieldset class="preset-group timer-presets"><legend>Duration</legend>${DURATION_PRESETS.map((minutes) => `<button type="button" class="preset-button timer-duration-preset ${configuredDurationSeconds === minutes * 60 ? 'active-preset' : ''}" data-minutes="${minutes}" ${hasTimerStarted ? 'disabled' : ''}>${formatMinutes(minutes)}</button>`).join('')}</fieldset>` : '';
   const autoStartControl = `<label class="auto-start-control"><span>Auto-Start</span><input id="auto-start-next-task" type="checkbox" role="switch" aria-label="Auto-Start Next Task" ${state.autoStartNextTask ? 'checked' : ''} /></label>`;
-  const timerActions = `<div class="actions timer-actions"><button id="start-button" class="primary" ${canStart ? '' : 'disabled'}>Start</button><button id="stop-button">Stop</button><button id="reset-button" ${canStart ? '' : 'disabled'} aria-label="Clear timer to zero">Reset</button><button id="skip-button">Skip</button>${autoStartControl}${zenBreakControl(current)}</div>`;
+  const timerActions = `<div class="actions timer-actions"><button id="start-button" class="primary" ${canStart ? '' : 'disabled'}>Start</button><button id="stop-button">Pause</button><button id="reset-button" ${canStart ? '' : 'disabled'} aria-label="Clear timer to zero">Reset</button><button id="skip-button">Skip</button>${autoStartControl}${zenBreakControl(current)}</div>`;
   const quickTaskButton = quickTask?.active ? '' : `<button id="quick-task-button" class="quick-task-button" ${hasTimerStarted ? 'disabled' : ''}>${icon.plus} Quick Task</button>`;
-  return `${section({ id: 'timer', title: 'Timer', eyebrow: 'Execution only', className: 'hero-panel', content: `<div class="timer-control-area"><div class="timer-shell" aria-label="Countdown timer"><input id="timer-display" value="${formatSeconds(remainingSeconds)}" aria-label="Timer duration in hours, minutes, and seconds" inputmode="numeric" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" ${hasTimerStarted ? 'disabled' : ''} /><p id="timer-status">${current ? `${isRunning ? 'Running' : 'Paused'} · ${escapeHtml(current.project)}${current.title ? ` · ${escapeHtml(current.title)}` : ''}` : 'No saved blocks for today'}</p></div>${quickTaskControls}${timerActions}${quickTaskButton}</div>${primaryNavigation('timer-nav')}<div class="block-navigation"><div class="dashboard-grid">${projectCard('Previous Block', previous ? `← ${previous.project}` : 'Start of schedule', previous?.title || 'No previous block', false, previous ? previousIndex : null)}${activeBlockCard(current)}${projectCard('Next Block', next ? `${next.project} →` : 'End of schedule', next?.title || 'No next block', false, next ? nextIndex : null)}</div></div>` })}${timerSchedule()}${zenBreakOverlay()}`;
+  return `${section({ id: 'timer', title: 'Timer', eyebrow: 'Execution only', className: 'hero-panel', content: `<div class="timer-control-area"><div class="timer-shell" aria-label="Countdown timer"><input id="timer-display" value="${formatSeconds(remainingSeconds)}" aria-label="Timer duration in hours, minutes, and seconds" inputmode="numeric" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" ${hasTimerStarted ? 'disabled' : ''} /><p id="timer-status">${escapeHtml(getTimerStatus(current))}</p></div>${quickTaskControls}${timerActions}${quickTaskButton}</div>${primaryNavigation('timer-nav')}<div class="block-navigation"><div class="dashboard-grid">${projectCard('Previous Block', previous ? `← ${previous.project}` : 'Start of schedule', previous?.title || 'No previous block', false, previous ? previousIndex : null)}${activeBlockCard(current)}${projectCard('Next Block', next ? `${next.project} →` : 'End of schedule', next?.title || 'No next block', false, next ? nextIndex : null)}</div></div>` })}${timerSchedule()}${zenBreakOverlay()}`;
 }
 
 function timerSchedule() {
@@ -514,13 +524,9 @@ function render() {
 function updateTimerDisplay() {
   const display = document.querySelector('#timer-display');
   const status = document.querySelector('#timer-status');
-  const activeRemaining = document.querySelector('#active-remaining');
-  const activeStatus = document.querySelector('#active-status');
   const current = getActiveBlock();
   if (display) display.value = formatSeconds(remainingSeconds);
-  if (activeRemaining) activeRemaining.textContent = formatSeconds(remainingSeconds);
-  if (activeStatus) activeStatus.textContent = isRunning ? 'Running' : 'Paused';
-  if (status) status.textContent = current ? `${isRunning ? 'Running' : 'Paused'} · ${current.project}${current.title ? ` · ${current.title}` : ''}` : 'Add a schedule block to start timing';
+  if (status) status.textContent = getTimerStatus(current);
 }
 
 function getZenBreakKey(index) {
@@ -613,6 +619,7 @@ function advanceBlock({ completed = false } = {}) {
   const shouldContinue = completed && state.autoStartNextTask;
   if (completed) sounds.complete();
   isRunning = false;
+  isUserPaused = false;
   hasTimerStarted = false;
   clearInterval(timerId);
   if (quickTask?.active) {
@@ -665,6 +672,7 @@ function startTimer({ playStartSound = true } = {}) {
     return;
   }
   isRunning = true;
+  isUserPaused = false;
   hasTimerStarted = true;
   document.querySelectorAll('#timer-display, #quick-title, .timer-duration-preset, #quick-task-button').forEach((control) => { control.disabled = true; });
   if (playStartSound) sounds.start();
@@ -675,7 +683,9 @@ function startTimer({ playStartSound = true } = {}) {
 }
 
 function stopTimer() {
+  if (!isRunning) return;
   isRunning = false;
+  isUserPaused = true;
   clearInterval(timerId);
   updateTimerDisplay();
 }
@@ -687,6 +697,7 @@ function resetCurrentDuration() {
 
 function resetTimer() {
   isRunning = false;
+  isUserPaused = false;
   clearInterval(timerId);
   zenBreak = null;
   zenBreakNotifiedKey = null;
@@ -698,6 +709,7 @@ function resetTimer() {
 
 function activateQuickTask() {
   isRunning = false;
+  isUserPaused = false;
   clearInterval(timerId);
   zenBreak = null;
   hasTimerStarted = false;
@@ -712,6 +724,7 @@ function selectActiveBlock(index) {
   const nextIndex = Number(index);
   if (!Number.isInteger(nextIndex) || !state.schedule[nextIndex]) return;
   isRunning = false;
+  isUserPaused = false;
   clearInterval(timerId);
   zenBreak = null;
   quickTask = null;

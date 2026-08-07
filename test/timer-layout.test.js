@@ -66,6 +66,25 @@ test('all four Timer controls retain their existing event handlers', () => {
   assert.match(mainSource, /#skip-button'\)\?\.addEventListener\('click', advanceBlock\)/);
 });
 
+test('Active Block shows scheduled duration, start time, and calculated end time only', () => {
+  const activeBlockCard = mainSource.slice(mainSource.indexOf('function activeBlockCard('), mainSource.indexOf('function getTimerStatus('));
+  assert.match(activeBlockCard, /<dt>Duration<\/dt>/);
+  assert.match(activeBlockCard, /<dt>Start Time<\/dt>.*formatTime\(current\.time\)/);
+  assert.match(activeBlockCard, /<dt>End Time<\/dt>.*formatTime\(getNextStartTime\(current\)\)/);
+  assert.doesNotMatch(activeBlockCard, /Remaining|Status|Paused/);
+});
+
+test('scheduled timer status shows end time and only marks an intentional pause', () => {
+  const timerStatus = mainSource.slice(mainSource.indexOf('function getTimerStatus('), mainSource.indexOf('function primaryNavigation('));
+  const stopTimer = mainSource.slice(mainSource.indexOf('function stopTimer()'), mainSource.indexOf('function resetCurrentDuration()'));
+  assert.match(timerStatus, /isUserPaused \? 'PAUSED · ' : ''/);
+  assert.match(timerStatus, /quickTask\?\.active \? '' : ` · ENDS AT/);
+  assert.match(timerStatus, /formatTime\(getNextStartTime\(current\)\)/);
+  assert.match(stopTimer, /if \(!isRunning\) return/);
+  assert.match(stopTimer, /isUserPaused = true/);
+  assert.match(mainSource, /<button id="stop-button">Pause<\/button>/);
+});
+
 test('Reset stops the shared timer and clears both timer values to zero', () => {
   const resetTimer = mainSource.slice(mainSource.indexOf('function resetTimer()'), mainSource.indexOf('function activateQuickTask()'));
   assert.match(resetTimer, /isRunning = false/);
