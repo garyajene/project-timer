@@ -6,11 +6,24 @@ const mainSource = await readFile(new URL('../src/main.js', import.meta.url), 'u
 
 test('Timer page keeps all duration and task controls connected to the main timer', () => {
   const timerPage = mainSource.slice(mainSource.indexOf('function timerPage()'), mainSource.indexOf('function timerSchedule()'));
-  const orderedMarkers = ['class="timer-shell"', '${quickTaskNameField()}', '${presets}', 'id="quick-task-button"', 'class="actions timer-actions"', "primaryNavigation('timer-nav')", 'class="dashboard-grid"', 'class="auto-start-control"'];
+  const orderedMarkers = ['class="timer-shell"', '${quickTaskControls}', '${timerActions}', '${quickTaskButton}', "primaryNavigation('timer-nav')", 'class="dashboard-grid"'];
   const positions = orderedMarkers.map((marker) => timerPage.indexOf(marker));
 
   assert.ok(positions.every((position) => position >= 0), 'all Timer page layout regions are present');
   assert.deepEqual(positions, [...positions].sort((left, right) => left - right));
+});
+
+test('Quick Task fields and duration presets render only while Quick Task is active', () => {
+  const timerPage = mainSource.slice(mainSource.indexOf('function timerPage()'), mainSource.indexOf('function timerSchedule()'));
+  assert.match(timerPage, /const quickTaskControls = quickTask\?\.active \?/);
+  assert.match(timerPage, /const quickTaskButton = quickTask\?\.active \? ''/);
+  assert.match(timerPage, /quickTaskNameField\(\).*timer-presets/);
+});
+
+test('Auto-Start is a compact Timer control without a separate explanation card', () => {
+  const timerPage = mainSource.slice(mainSource.indexOf('function timerPage()'), mainSource.indexOf('function timerSchedule()'));
+  assert.match(timerPage, /timer-actions.*\$\{autoStartControl\}/);
+  assert.doesNotMatch(timerPage, /Begin the next scheduled task|<small>/);
 });
 
 test('main timer is editable only before a timer session starts', () => {
