@@ -168,9 +168,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 
 .today-schedule-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 1.25rem;
-  align-items: center;
+  gap: .75rem;
   min-height: 5.75rem;
   padding: 1.15rem 1.3rem;
   border: 1px solid var(--line);
@@ -178,41 +176,33 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   background: #0a0a0d;
 }
 
-.today-block-copy {
-  display: grid;
-  gap: .3rem;
-  min-width: 0;
-}
-
-.today-block-copy strong {
+.today-schedule-row h4 {
+  margin: 0;
   overflow-wrap: anywhere;
   font-size: clamp(1.05rem, 2vw, 1.3rem);
   letter-spacing: -.015em;
 }
 
-.today-block-copy small {
-  color: var(--muted);
-  font-size: .9rem;
+.today-block-details {
+  display: grid;
+  gap: .35rem;
+  margin: 0;
 }
 
-.today-block-time {
+.today-block-details div {
   display: flex;
-  align-items: center;
-  gap: .65rem;
+  gap: .4rem;
+}
+
+.today-block-details dt {
+  color: #d7a4aa;
+  font-weight: 750;
+}
+
+.today-block-details dd {
   margin: 0;
   color: #fff;
-  font-size: clamp(.95rem, 2vw, 1.1rem);
-  font-weight: 850;
   font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.today-block-time span { color: var(--red); }
-
-.today-current-block {
-  border-color: rgba(255,41,61,.78);
-  background: linear-gradient(110deg, rgba(255,41,61,.13), #0a0a0d 62%);
-  box-shadow: inset 3px 0 0 var(--red);
 }
 
 .today-empty-state {
@@ -220,12 +210,6 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   padding: 1.25rem 0;
 }
 
-@media (max-width: 560px) {
-  .today-schedule-row {
-    grid-template-columns: 1fr;
-    gap: .8rem;
-  }
-}
 .save-button { margin-top: 1rem; margin-left: .75rem; }
 .timer-block { grid-template-columns: auto auto minmax(0, 1fr); }
 .timer-block .task-copy { gap: .2rem; }

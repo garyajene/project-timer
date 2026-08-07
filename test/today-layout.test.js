@@ -13,15 +13,17 @@ test('Today is a read-only overview backed by today’s saved schedule', () => {
   assert.doesNotMatch(todayPage, /button|input|select|textarea/);
 });
 
-test('Today shows project, optional task, and calculated start and end times', () => {
+test('Today shows project, calculated start and end times, and duration', () => {
   assert.match(todayPage, /block\.project/);
-  assert.match(todayPage, /block\.title \?/);
   assert.match(todayPage, /formatTime\(block\.time\)/);
-  assert.match(todayPage, /formatTime\(getNextStartTime\(block\)\)/);
+  assert.match(todayPage, /endTime = getNextStartTime\(block\)/);
+  assert.match(todayPage, /formatTime\(endTime\)/);
+  assert.match(todayPage, /formatMinutes\(duration\)/);
+  assert.match(todayPage, /<dt>Start:<\/dt>/);
+  assert.match(todayPage, /<dt>End:<\/dt>/);
+  assert.match(todayPage, /<dt>Duration:<\/dt>/);
 });
 
-test('Today highlights only the current scheduled block and has a simple empty state', () => {
-  assert.match(todayPage, /currentMinutes >= startMinutes && currentMinutes < endMinutes/);
-  assert.match(todayPage, /today-current-block/);
-  assert.match(todayPage, /No projects scheduled for today\./);
+test('Today has the requested simple empty state', () => {
+  assert.match(todayPage, /Nothing scheduled for today\./);
 });
