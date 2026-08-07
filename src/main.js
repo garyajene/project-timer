@@ -1,4 +1,3 @@
-import { tradingDashboardSection, bindTradingDashboardEvents } from './trading-dashboard/tradingDashboard.js';
 import { sounds } from './audio.js';
 const STORAGE_KEY = 'project-timer-state-v1';
 const DEFAULT_BLOCK_MINUTES = 30;
@@ -316,7 +315,7 @@ function activeBlockCard(current) {
 }
 
 function header() {
-  return `<header class="app-header"><div><p class="eyebrow">Personal workspace</p><h1>Project Timer</h1></div><div class="header-meta" aria-label="Current date and time"><span>${icon.clock}</span><span>${formatDate()}</span></div><nav class="top-nav" aria-label="Primary navigation">${['Today', 'Timer', 'Projects', 'Calendar', 'Notes', 'Trading Dashboard'].map((item) => { const route = item.toLowerCase().replaceAll(' ', '-'); return `<a href="#${route}" ${getRoute() === route ? 'aria-current="page"' : ''}>${item}</a>`; }).join('')}</nav></header>`;
+  return `<header class="app-header"><div><p class="eyebrow">Personal workspace</p><h1>Project Timer</h1></div><div class="header-meta" aria-label="Current date and time"><span>${icon.clock}</span><span>${formatDate()}</span></div><nav class="top-nav" aria-label="Primary navigation">${['Today', 'Timer', 'Projects', 'Calendar', 'Notes'].map((item) => { const route = item.toLowerCase().replaceAll(' ', '-'); return `<a href="#${route}" ${getRoute() === route ? 'aria-current="page"' : ''}>${item}</a>`; }).join('')}</nav></header>`;
 }
 
 function getActiveBlock() {
@@ -451,7 +450,6 @@ function mainContent() {
   if (route === 'timer') return timerPage();
   if (route === 'calendar') return calendarSection();
   if (route === 'notes') return notesAndReview();
-  if (route === 'trading-dashboard') return tradingDashboardSection();
   return todayPlanner();
 }
 
@@ -814,7 +812,6 @@ async function persistSchedule(button) {
 
 function bindEvents() {
   bindGlobalEvents();
-  bindTradingDashboardEvents(render);
   document.querySelector('#start-button')?.addEventListener('click', startTimer);
   document.querySelector('#stop-button')?.addEventListener('click', stopTimer);
   document.querySelector('#reset-button')?.addEventListener('click', resetTimer);
