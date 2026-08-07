@@ -336,20 +336,29 @@ function quickTaskNameField() {
   return `<label class="quick-task-name">Quick Task Name<input class="text-input" id="quick-title" value="${escapeHtml(quickTask.title)}" placeholder="What are you working on?" required ${hasTimerStarted ? 'disabled' : ''} /></label>`;
 }
 
+function zenBreakControl(current) {
+  const available = Boolean(current && !current.isBreak);
+  const enabled = available && Number(current.zenBreakMinutes) > 0;
+  const selectedMinutes = enabled ? Number(current.zenBreakMinutes) : 5;
+  return `<div class="zen-break-control"><label class="zen-break-toggle"><span>Zen Break</span><input id="zen-break-enabled" type="checkbox" role="switch" aria-label="Enable Zen Break" ${enabled ? 'checked' : ''} ${available ? '' : 'disabled'} /></label><details class="zen-break-menu" ${available ? '' : 'aria-disabled="true"'}><summary aria-label="Zen Break options" title="Zen Break options">⌄</summary><div class="zen-break-options"><label>Duration<select id="timer-zen-break-duration" class="text-input" ${available ? '' : 'disabled'}>${ZEN_BREAK_PRESETS.filter(Boolean).map((minutes) => `<option value="${minutes}" ${minutes === selectedMinutes ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label>${zenBreakTimingControl({ value: current?.zenBreakTiming || 'midpoint', id: 'timer-zen-break-timing' })}</div></details></div>`;
+}
+
 function timerPage() {
   const current = getActiveBlock();
+  const previousIndex = quickTask?.active ? null : state.activeIndex - 1;
+  const previous = previousIndex === null ? null : state.schedule[previousIndex];
   const nextIndex = quickTask?.active ? state.activeIndex : state.activeIndex + 1;
   const next = state.schedule[nextIndex];
   const canStart = quickTask?.active || state.schedule.length;
   const quickTaskControls = quickTask?.active ? `${quickTaskNameField()}<fieldset class="preset-group timer-presets"><legend>Duration</legend>${DURATION_PRESETS.map((minutes) => `<button type="button" class="preset-button timer-duration-preset ${configuredDurationSeconds === minutes * 60 ? 'active-preset' : ''}" data-minutes="${minutes}" ${hasTimerStarted ? 'disabled' : ''}>${formatMinutes(minutes)}</button>`).join('')}</fieldset>` : '';
   const autoStartControl = `<label class="auto-start-control"><span>Auto-Start</span><input id="auto-start-next-task" type="checkbox" role="switch" aria-label="Auto-Start Next Task" ${state.autoStartNextTask ? 'checked' : ''} /></label>`;
-  const timerActions = `<div class="actions timer-actions"><button id="start-button" class="primary" ${canStart ? '' : 'disabled'}>Start</button><button id="stop-button">Stop</button><button id="reset-button" ${canStart ? '' : 'disabled'} aria-label="Clear timer to zero">Reset</button><button id="skip-button">Skip</button>${autoStartControl}</div>`;
+  const timerActions = `<div class="actions timer-actions"><button id="start-button" class="primary" ${canStart ? '' : 'disabled'}>Start</button><button id="stop-button">Stop</button><button id="reset-button" ${canStart ? '' : 'disabled'} aria-label="Clear timer to zero">Reset</button><button id="skip-button">Skip</button>${autoStartControl}${zenBreakControl(current)}</div>`;
   const quickTaskButton = quickTask?.active ? '' : `<button id="quick-task-button" class="quick-task-button" ${hasTimerStarted ? 'disabled' : ''}>${icon.plus} Quick Task</button>`;
-  return `${section({ id: 'timer', title: 'Timer', eyebrow: 'Execution only', className: 'hero-panel', content: `<div class="timer-control-area"><div class="timer-shell" aria-label="Countdown timer"><input id="timer-display" value="${formatSeconds(remainingSeconds)}" aria-label="Timer duration in hours, minutes, and seconds" inputmode="numeric" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" ${hasTimerStarted ? 'disabled' : ''} /><p id="timer-status">${current ? `${isRunning ? 'Running' : 'Paused'} · ${escapeHtml(current.project)}${current.title ? ` · ${escapeHtml(current.title)}` : ''}` : 'No saved blocks for today'}</p></div>${quickTaskControls}${timerActions}${quickTaskButton}</div>${primaryNavigation('timer-nav')}<div class="dashboard-grid">${activeBlockCard(current)}${projectCard('Next Block', next?.project || 'End of schedule', next?.title || 'No next block', false, next ? nextIndex : null)}</div>` })}${timerSchedule()}${zenBreakOverlay()}`;
+  return `${section({ id: 'timer', title: 'Timer', eyebrow: 'Execution only', className: 'hero-panel', content: `<div class="timer-control-area"><div class="timer-shell" aria-label="Countdown timer"><input id="timer-display" value="${formatSeconds(remainingSeconds)}" aria-label="Timer duration in hours, minutes, and seconds" inputmode="numeric" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" ${hasTimerStarted ? 'disabled' : ''} /><p id="timer-status">${current ? `${isRunning ? 'Running' : 'Paused'} · ${escapeHtml(current.project)}${current.title ? ` · ${escapeHtml(current.title)}` : ''}` : 'No saved blocks for today'}</p></div>${quickTaskControls}${timerActions}${quickTaskButton}</div>${primaryNavigation('timer-nav')}<div class="block-navigation"><div class="dashboard-grid">${projectCard('Previous Block', previous ? `← ${previous.project}` : 'Start of schedule', previous?.title || 'No previous block', false, previous ? previousIndex : null)}${activeBlockCard(current)}${projectCard('Next Block', next ? `${next.project} →` : 'End of schedule', next?.title || 'No next block', false, next ? nextIndex : null)}</div></div>` })}${timerSchedule()}${zenBreakOverlay()}`;
 }
 
 function timerSchedule() {
-  const blocks = state.schedule.map((block, index) => `<div class="time-block timer-block ${block.isBreak ? 'break-block' : ''} ${!quickTask?.active && index === state.activeIndex ? 'active-task' : ''}" data-index="${index}" role="button" tabindex="0" aria-label="Make ${escapeHtml(block.title || block.project)} active"><input class="schedule-done" data-index="${index}" type="checkbox" ${block.done ? 'checked' : ''} aria-label="Mark ${escapeHtml(block.title || block.project)} complete" /><span class="time">${escapeHtml(formatTime(block.time))}</span><span class="task-copy"><strong>${escapeHtml(block.project || 'Task')}</strong><small>${escapeHtml([block.title || 'Task', block.zenBreakMinutes ? `Zen Break: ${formatMinutes(block.zenBreakMinutes)}` : ''].filter(Boolean).join(' · '))}</small>${block.zenBreakMinutes && !block.isBreak ? `<label class="zen-timing-control">Zen Break Timing <select class="text-input zen-timing-select" data-index="${index}" aria-label="Zen Break Timing"><option value="midpoint" ${block.zenBreakTiming === 'midpoint' ? 'selected' : ''}>Midpoint</option><option value="random" ${block.zenBreakTiming === 'random' ? 'selected' : ''}>Random</option></select></label>` : ''}</span></div>`).join('') || '<p class="empty-state">No saved schedule yet. Plan today on the Today page.</p>';
+  const blocks = state.schedule.map((block, index) => `<div class="time-block timer-block ${block.isBreak ? 'break-block' : ''} ${!quickTask?.active && index === state.activeIndex ? 'active-task' : ''}" data-index="${index}" role="button" tabindex="0" aria-label="Make ${escapeHtml(block.title || block.project)} active"><input class="schedule-done" data-index="${index}" type="checkbox" ${block.done ? 'checked' : ''} aria-label="Mark ${escapeHtml(block.title || block.project)} complete" /><span class="time">${escapeHtml(formatTime(block.time))}</span><span class="task-copy"><strong>${escapeHtml(block.project || 'Task')}</strong><small>${escapeHtml([block.title || 'Task', block.zenBreakMinutes ? `Zen Break: ${formatMinutes(block.zenBreakMinutes)}` : ''].filter(Boolean).join(' · '))}</small></span></div>`).join('') || '<p class="empty-state">No saved schedule yet. Plan today on the Today page.</p>';
   return section({ id: 'timer-schedule', title: 'Today’s Saved Schedule', eyebrow: 'Read-only plan', content: `<div class="schedule-list">${blocks}</div>` });
 }
 
@@ -800,6 +809,35 @@ function bindEvents() {
   document.querySelector('#auto-start-next-task')?.addEventListener('change', (event) => {
     state.autoStartNextTask = event.target.checked;
     saveState();
+  });
+  document.querySelector('#zen-break-enabled')?.addEventListener('change', (event) => {
+    const block = getActiveBlock();
+    if (!block || block.isBreak) return;
+    const oldKey = getZenBreakKey(quickTask?.active ? 'quick' : state.activeIndex);
+    block.zenBreakMinutes = event.target.checked ? Number(document.querySelector('#timer-zen-break-duration')?.value || 5) : 0;
+    zenBreakTriggers.delete(oldKey);
+    zenBreakNotifiedKey = null;
+    if (!quickTask?.active) saveState();
+    render();
+  });
+  document.querySelector('#timer-zen-break-duration')?.addEventListener('change', (event) => {
+    const block = getActiveBlock();
+    if (!block || block.isBreak) return;
+    const oldKey = getZenBreakKey(quickTask?.active ? 'quick' : state.activeIndex);
+    block.zenBreakMinutes = Number(event.target.value);
+    zenBreakTriggers.delete(oldKey);
+    zenBreakNotifiedKey = null;
+    document.querySelector('#zen-break-enabled').checked = true;
+    if (!quickTask?.active) saveState();
+  });
+  document.querySelector('#timer-zen-break-timing')?.addEventListener('change', (event) => {
+    const block = getActiveBlock();
+    if (!block || block.isBreak) return;
+    const oldKey = getZenBreakKey(quickTask?.active ? 'quick' : state.activeIndex);
+    block.zenBreakTiming = event.target.value;
+    zenBreakTriggers.delete(oldKey);
+    zenBreakNotifiedKey = null;
+    if (!quickTask?.active) saveState();
   });
   document.querySelector('#end-zen-break')?.addEventListener('click', endZenBreakNow);
   document.querySelector('#extend-zen-break')?.addEventListener('click', extendZenBreak);

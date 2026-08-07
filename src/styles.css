@@ -39,6 +39,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .section-heading { display: flex; justify-content: space-between; align-items: start; margin-bottom: 1rem; }
 .hero-panel { min-height: 34rem; display: grid; align-content: center; gap: 1.5rem; }
 .dashboard-grid, .two-column, .notes-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1.25rem; }
+.block-navigation .dashboard-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .project-card { background: var(--panel-strong); border: 1px solid var(--line); border-radius: 20px; padding: 1.2rem; }
 .active-card, .active-task { border-color: rgba(255,41,61,.9) !important; background: linear-gradient(135deg, rgba(255,41,61,.22), rgba(21,21,25,.95)) !important; box-shadow: 0 0 0 1px rgba(255,41,61,.22), 0 18px 60px rgba(255,41,61,.13); }
 .project-card p:not(.eyebrow), .task-copy small, .day-view p, .review-card p { color: var(--muted); margin-bottom: 0; }
@@ -59,6 +60,13 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .auto-start-control input:checked { border-color: var(--red); background: var(--red-dark); }
 .auto-start-control input:checked::before { background: #fff; transform: translateX(1.2rem); }
 .auto-start-control input:focus-visible { outline: 2px solid #fff; outline-offset: 3px; }
+.zen-break-control { position: relative; display: inline-flex; align-items: center; color: var(--muted); font-size: .82rem; font-weight: 800; }
+.zen-break-toggle { display: inline-flex; align-items: center; gap: .55rem; padding: .45rem .2rem .45rem .7rem; cursor: pointer; white-space: nowrap; }
+.zen-break-toggle input { width: 1.1rem; height: 1.1rem; margin: 0; }
+.zen-break-menu summary { padding: .45rem .7rem .45rem .35rem; color: #fff; cursor: pointer; list-style: none; font-size: 1.1rem; }
+.zen-break-menu summary::-webkit-details-marker { display: none; }
+.zen-break-options { position: absolute; z-index: 5; top: calc(100% + .4rem); right: 0; width: 13rem; display: grid; gap: .75rem; padding: .85rem; border: 1px solid var(--line); border-radius: 14px; background: var(--panel-strong); box-shadow: 0 14px 40px rgba(0,0,0,.55); }
+.zen-break-options label { display: grid; gap: .35rem; }
 .primary, .active-tab, .add-button { background: var(--red); border-color: var(--red); color: #fff; font-weight: 800; }
 .schedule-list, .project-list { display: grid; gap: .75rem; }
 .time-block, .project-row { display: grid; grid-template-columns: auto auto 1fr; gap: .85rem; align-items: center; border: 1px solid var(--line); border-radius: 18px; padding: .95rem; background: #0a0a0d; }
@@ -84,6 +92,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   .app-header { grid-template-columns: 1fr; }
   .header-meta, .top-nav { justify-content: flex-start; }
   .dashboard-grid, .two-column, .notes-grid, .calendar-layout { grid-template-columns: 1fr; }
+  .block-navigation .dashboard-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 560px) {
