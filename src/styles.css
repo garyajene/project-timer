@@ -524,6 +524,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 }
 
 .calendar-card-fields > label,
+.calendar-timing-summary > label,
 .calendar-card-fields legend,
 .calendar-time-selector label {
   color: var(--muted);
@@ -541,6 +542,34 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   margin: 0;
   padding: 0;
   border: 0;
+}
+
+.calendar-timing-summary {
+  display: grid;
+  gap: .9rem;
+}
+
+.calendar-ends-at {
+  display: grid;
+  gap: .2rem;
+  border-top: 1px solid var(--line);
+  padding-top: .75rem;
+}
+
+.calendar-ends-at span {
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 900;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+}
+
+.calendar-ends-at strong {
+  color: #fff;
+  font-size: 1.5rem;
+  font-weight: 900;
+  letter-spacing: -.02em;
+  line-height: 1;
 }
 
 .optional-label {
