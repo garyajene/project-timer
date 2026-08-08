@@ -2,7 +2,7 @@ import { sounds } from './audio.js';
 const STORAGE_KEY = 'project-timer-state-v1';
 const DEFAULT_BLOCK_MINUTES = 30;
 const DURATION_PRESETS = [5, 10, 15, 30, 45, 60, 120, 180, 240];
-const CALENDAR_DURATION_OPTIONS = [15, 30, 45, 60, 120, 180, 240];
+const CALENDAR_DURATION_OPTIONS = [15, 30, 45, 60, 90, 120, 150, 180, 240];
 const QUICK_START_PROJECT = 'Quick Start';
 const ZEN_BREAK_PRESETS = [0, 2, 5, 10, 15];
 
