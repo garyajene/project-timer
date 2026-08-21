@@ -40,6 +40,7 @@ let projectSaveTimer;
 let scheduleSaveMessage = '';
 let viewedIndex = null;
 let runningIndex = null;
+let projectedEndTime = null;
 let conflictModalOpen = false;
 let pendingStart = false;
 let pendingStartIndex = null;
@@ -252,10 +253,13 @@ function findScheduleConflicts(blocks) {
   return conflicts;
 }
 
-function getStartConflicts(durationSeconds) {
+function getStartConflicts(durationSeconds, excludedIndex = null) {
   const start = currentLocalMinutes();
   const end = start + (Math.max(0, durationSeconds) / 60);
-  return new Set(state.schedule.map((block, index) => ({ index, start: timeToMinutes(block.time), end: timeToMinutes(block.time) + (Number(block.duration) || DEFAULT_BLOCK_MINUTES) })).filter((block) => start < block.end && end > block.start).map((block) => block.index));
+  return new Set(state.schedule
+    .map((block, index) => ({ index, start: timeToMinutes(block.time), end: timeToMinutes(block.time) + (Number(block.duration) || DEFAULT_BLOCK_MINUTES) }))
+    .filter((block) => block.index !== excludedIndex && start < block.end && end > block.start)
+    .map((block) => block.index));
 }
 
 function minutesToTime(totalMinutes) {
@@ -363,9 +367,10 @@ function projectCard(label, title, meta, active = false, selectIndex = null) {
 }
 
 function activeBlockCard(current) {
-  if (!current) return projectCard('Active Block', 'Nothing scheduled right now', 'The timer is waiting for the next block', true);
+  if (!current) return projectCard('Current Scheduled Block', 'Nothing scheduled right now', 'The timer is waiting for the next block', true);
   const scheduledTimes = current.time ? `<div><dt>Start Time</dt><dd>${escapeHtml(formatTime(current.time))}</dd></div><div><dt>End Time</dt><dd>${escapeHtml(formatTime(getNextStartTime(current)))}</dd></div>` : '';
-  return `<article class="project-card active-card active-block-card"><p class="eyebrow">Active Block</p><h3 data-card-title>${escapeHtml(current.project || QUICK_START_PROJECT)}</h3><p data-card-meta>${escapeHtml(current.title || 'Untitled task')}</p><dl class="active-block-details"><div><dt>Duration</dt><dd>${escapeHtml(formatMinutes(current.duration || DEFAULT_BLOCK_MINUTES))}</dd></div>${scheduledTimes}</dl></article>`;
+  const label = isRunning ? 'Running Timer' : 'Current Scheduled Block';
+  return `<article class="project-card active-card active-block-card"><p class="eyebrow">${label}</p><h3 data-card-title>${escapeHtml(current.project || QUICK_START_PROJECT)}</h3><p data-card-meta>${escapeHtml(current.title || 'Untitled task')}</p><dl class="active-block-details"><div><dt>Duration</dt><dd>${escapeHtml(formatMinutes(current.duration || DEFAULT_BLOCK_MINUTES))}</dd></div>${scheduledTimes}</dl></article>`;
 }
 
 function viewedBlockCard(block) {
@@ -377,7 +382,10 @@ function getTimerStatus(current) {
   if (!current) return state.schedule.length ? 'Nothing scheduled right now' : 'Add a schedule block to start timing';
   const paused = isUserPaused ? 'PAUSED · ' : '';
   const name = `${current.project}${current.title ? ` · ${current.title}` : ''}`;
-  const endTime = quickTask?.active ? '' : ` · ENDS AT ${formatTime(getNextStartTime(current))}`;
+  const actualEnd = hasTimerStarted && projectedEndTime
+    ? new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit', hour12: true }).format(projectedEndTime)
+    : null;
+  const endTime = quickTask?.active && !actualEnd ? '' : ` · ENDS AT ${actualEnd || formatTime(getNextStartTime(current))}`;
   return `${paused}${name}${endTime}`;
 }
 
@@ -776,9 +784,10 @@ function startTimer({ playStartSound = true } = {}) {
   }
   const currentIndex = getSchedulePosition().currentIndex;
   const requestedIndex = quickTask?.active ? null : (viewedIndex ?? currentIndex);
-  const isCurrentScheduledBlock = !quickTask?.active && requestedIndex === currentIndex;
-  const requestedDuration = isCurrentScheduledBlock ? remainingSeconds : (quickTask?.active ? configuredDurationSeconds : getBlockDurationSeconds(requestedIndex));
-  const startConflicts = isCurrentScheduledBlock ? new Set() : getStartConflicts(requestedDuration);
+  const requestedDuration = hasTimerStarted
+    ? remainingSeconds
+    : (quickTask?.active ? configuredDurationSeconds : getBlockDurationSeconds(requestedIndex));
+  const startConflicts = quickTask?.active ? getStartConflicts(requestedDuration) : getStartConflicts(requestedDuration, requestedIndex);
   if (startConflicts.size) {
     conflictPreviousCalendarDate = calendarDate;
     conflictPreviousCalendarDraft = cloneSchedule(calendarDraft);
@@ -793,13 +802,12 @@ function startTimer({ playStartSound = true } = {}) {
     return;
   }
   runningIndex = requestedIndex;
-  if (!quickTask?.active && viewedIndex !== null) {
-    configuredDurationSeconds = getBlockDurationSeconds(viewedIndex);
-    remainingSeconds = configuredDurationSeconds;
-  }
+  configuredDurationSeconds = requestedDuration;
+  remainingSeconds = requestedDuration;
   isRunning = true;
   isUserPaused = false;
   hasTimerStarted = true;
+  projectedEndTime = new Date(Date.now() + (remainingSeconds * 1000));
   document.querySelectorAll('#timer-display, #quick-title, .timer-duration-preset, #quick-task-button').forEach((control) => { control.disabled = true; });
   if (playStartSound) sounds.start();
   lastTick = Date.now();
@@ -828,6 +836,7 @@ function resetTimer() {
   zenBreak = null;
   zenBreakNotifiedKey = null;
   hasTimerStarted = false;
+  projectedEndTime = null;
   configuredDurationSeconds = 0;
   remainingSeconds = 0;
   render();
@@ -934,14 +943,13 @@ function syncTimerToClock() {
   state.schedule = cloneSchedule(getScheduleForDate(toDateKey(new Date())));
   if (isRunning || quickTask?.active) return;
   const { currentIndex } = getSchedulePosition();
-  if (currentIndex === null) {
+  const relevantIndex = viewedIndex ?? currentIndex;
+  if (relevantIndex === null) {
     configuredDurationSeconds = 0;
     remainingSeconds = 0;
     return;
   }
-  const block = state.schedule[currentIndex];
-  const endMinutes = timeToMinutes(block.time) + (Number(block.duration) || DEFAULT_BLOCK_MINUTES);
-  remainingSeconds = Math.max(0, (endMinutes - currentLocalMinutes()) * 60);
+  remainingSeconds = getBlockDurationSeconds(relevantIndex);
   configuredDurationSeconds = remainingSeconds;
 }
 
@@ -1044,7 +1052,7 @@ function bindEvents() {
       calendarDraft.forEach((block, index) => {
         const blockStart = timeToMinutes(block.time);
         const blockEnd = blockStart + Number(block.duration);
-        if (start < blockEnd && end > blockStart) conflictIndexes.add(index);
+        if (index !== pendingStartIndex && start < blockEnd && end > blockStart) conflictIndexes.add(index);
       });
     }
     if (conflictIndexes.size) { render(); return; }
