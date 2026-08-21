@@ -38,6 +38,14 @@ const zenBreakTriggers = new Map();
 let pendingSave = Promise.resolve();
 let projectSaveTimer;
 let scheduleSaveMessage = '';
+let viewedIndex = null;
+let runningIndex = null;
+let conflictModalOpen = false;
+let pendingStart = false;
+let pendingStartIndex = null;
+let pendingStartDuration = 0;
+let conflictIndexes = new Set();
+let authorityTimerId;
 
 
 function toDateKey(date) {
@@ -207,6 +215,47 @@ function timeToMinutes(time) {
   return (hours * 60) + minutes;
 }
 
+function currentLocalMinutes(date = new Date()) {
+  return (date.getHours() * 60) + date.getMinutes() + (date.getSeconds() / 60);
+}
+
+function getSchedulePosition(date = new Date()) {
+  const minutes = currentLocalMinutes(date);
+  let currentIndex = null;
+  let previousIndex = null;
+  let nextIndex = null;
+  state.schedule.forEach((block, index) => {
+    const start = timeToMinutes(block.time);
+    const end = start + (Number(block.duration) || DEFAULT_BLOCK_MINUTES);
+    if (minutes >= start && minutes < end) currentIndex = index;
+    else if (end <= minutes) previousIndex = index;
+    else if (start > minutes && nextIndex === null) nextIndex = index;
+  });
+  if (currentIndex !== null) {
+    previousIndex = currentIndex > 0 ? currentIndex - 1 : null;
+    nextIndex = currentIndex < state.schedule.length - 1 ? currentIndex + 1 : null;
+  }
+  return { currentIndex, previousIndex, nextIndex };
+}
+
+function findScheduleConflicts(blocks) {
+  const conflicts = new Set();
+  const sorted = blocks.map((block, index) => ({ index, start: timeToMinutes(block.time), end: timeToMinutes(block.time) + (Number(block.duration) || DEFAULT_BLOCK_MINUTES) })).sort((a, b) => a.start - b.start);
+  for (let left = 0; left < sorted.length; left += 1) {
+    for (let right = left + 1; right < sorted.length && sorted[right].start < sorted[left].end; right += 1) {
+      conflicts.add(sorted[left].index);
+      conflicts.add(sorted[right].index);
+    }
+  }
+  return conflicts;
+}
+
+function getStartConflicts(durationSeconds) {
+  const start = currentLocalMinutes();
+  const end = start + (Math.max(0, durationSeconds) / 60);
+  return new Set(state.schedule.map((block, index) => ({ index, start: timeToMinutes(block.time), end: timeToMinutes(block.time) + (Number(block.duration) || DEFAULT_BLOCK_MINUTES) })).filter((block) => start < block.end && end > block.start).map((block) => block.index));
+}
+
 function minutesToTime(totalMinutes) {
   const minutesInDay = 24 * 60;
   const safeMinutes = ((totalMinutes % minutesInDay) + minutesInDay) % minutesInDay;
@@ -307,18 +356,23 @@ function section({ id, title, eyebrow, className = '', content }) {
 }
 
 function projectCard(label, title, meta, active = false, selectIndex = null) {
-  const selectionAttributes = selectIndex === null ? '' : ` data-select-block="${selectIndex}" role="button" tabindex="0" aria-label="Make ${escapeHtml(title)} active"`;
+  const selectionAttributes = selectIndex === null ? '' : ` data-select-block="${selectIndex}" role="button" tabindex="0" aria-label="View ${escapeHtml(title)}"`;
   return `<article class="project-card ${active ? 'active-card' : ''}"${selectionAttributes}><p class="eyebrow">${label}</p><h3 data-card-title>${escapeHtml(title)}</h3><p data-card-meta>${escapeHtml(meta)}</p></article>`;
 }
 
 function activeBlockCard(current) {
-  if (!current) return projectCard('Active Block', 'No block selected', 'Save today’s schedule to begin', true);
+  if (!current) return projectCard('Active Block', 'Nothing scheduled right now', 'The timer is waiting for the next block', true);
   const scheduledTimes = current.time ? `<div><dt>Start Time</dt><dd>${escapeHtml(formatTime(current.time))}</dd></div><div><dt>End Time</dt><dd>${escapeHtml(formatTime(getNextStartTime(current)))}</dd></div>` : '';
   return `<article class="project-card active-card active-block-card"><p class="eyebrow">Active Block</p><h3 data-card-title>${escapeHtml(current.project || QUICK_START_PROJECT)}</h3><p data-card-meta>${escapeHtml(current.title || 'Untitled task')}</p><dl class="active-block-details"><div><dt>Duration</dt><dd>${escapeHtml(formatMinutes(current.duration || DEFAULT_BLOCK_MINUTES))}</dd></div>${scheduledTimes}</dl></article>`;
 }
 
+function viewedBlockCard(block) {
+  if (!block) return '';
+  return `<article class="project-card viewed-block-card"><p class="eyebrow">This Block</p><h3>${escapeHtml(block.project || 'Task')}</h3><p>${escapeHtml(block.title || 'Untitled task')}</p><dl class="active-block-details"><div><dt>Starts</dt><dd>${escapeHtml(formatTime(block.time))}</dd></div><div><dt>Ends</dt><dd>${escapeHtml(formatTime(getNextStartTime(block)))}</dd></div><div><dt>Duration</dt><dd>${escapeHtml(formatMinutes(block.duration))}</dd></div></dl></article>`;
+}
+
 function getTimerStatus(current) {
-  if (!current) return 'Add a schedule block to start timing';
+  if (!current) return state.schedule.length ? 'Nothing scheduled right now' : 'Add a schedule block to start timing';
   const paused = isUserPaused ? 'PAUSED · ' : '';
   const name = `${current.project}${current.title ? ` · ${current.title}` : ''}`;
   const endTime = quickTask?.active ? '' : ` · ENDS AT ${formatTime(getNextStartTime(current))}`;
@@ -334,7 +388,9 @@ function header() {
 }
 
 function getActiveBlock() {
-  return quickTask?.active ? quickTask : state.schedule[state.activeIndex];
+  if (quickTask?.active) return quickTask;
+  if (runningIndex !== null) return state.schedule[runningIndex];
+  return state.schedule[getSchedulePosition().currentIndex];
 }
 
 function getActiveLabel() {
@@ -355,21 +411,30 @@ function zenBreakControl(current) {
 
 function timerPage() {
   const current = getActiveBlock();
-  const previousIndex = quickTask?.active ? null : state.activeIndex - 1;
+  const position = getSchedulePosition();
+  const previousIndex = quickTask?.active ? null : position.previousIndex;
   const previous = previousIndex === null ? null : state.schedule[previousIndex];
-  const nextIndex = quickTask?.active ? state.activeIndex : state.activeIndex + 1;
-  const next = state.schedule[nextIndex];
-  const canStart = quickTask?.active || state.schedule.length;
+  const nextIndex = position.nextIndex;
+  const next = nextIndex === null ? null : state.schedule[nextIndex];
+  const inspected = viewedIndex === null ? null : state.schedule[viewedIndex];
+  const canStart = Boolean(quickTask?.active || inspected || current);
   const quickTaskControls = quickTask?.active ? `${quickTaskNameField()}<fieldset class="preset-group timer-presets"><legend>Duration</legend>${DURATION_PRESETS.map((minutes) => `<button type="button" class="preset-button timer-duration-preset ${configuredDurationSeconds === minutes * 60 ? 'active-preset' : ''}" data-minutes="${minutes}" ${hasTimerStarted ? 'disabled' : ''}>${formatMinutes(minutes)}</button>`).join('')}</fieldset>` : '';
   const autoStartControl = `<label class="auto-start-control"><span>Auto-Start</span><input id="auto-start-next-task" type="checkbox" role="switch" aria-label="Auto-Start Next Task" ${state.autoStartNextTask ? 'checked' : ''} /></label>`;
-  const timerActions = `<div class="actions timer-actions"><button id="start-button" class="primary" ${canStart ? '' : 'disabled'}>Start</button><button id="stop-button">Pause</button><button id="reset-button" ${canStart ? '' : 'disabled'} aria-label="Clear timer to zero">Reset</button><button id="skip-button">Skip</button>${autoStartControl}${zenBreakControl(current)}</div>`;
+  const timerActions = `<div class="actions timer-actions"><button id="start-button" class="primary" ${canStart ? '' : 'disabled'}>Start</button><button id="stop-button">Pause</button><button id="reset-button" ${canStart ? '' : 'disabled'} aria-label="Clear timer to zero">Reset</button><button id="skip-button">Skip</button>${autoStartControl}${zenBreakControl(inspected || current)}</div>`;
   const quickTaskButton = quickTask?.active ? '' : `<button id="quick-task-button" class="quick-task-button" ${hasTimerStarted ? 'disabled' : ''}>${icon.plus} Quick Task</button>`;
-  return `${section({ id: 'timer', title: 'Timer', eyebrow: 'Execution only', className: 'hero-panel', content: `<div class="timer-control-area"><div class="timer-shell" aria-label="Countdown timer"><input id="timer-display" value="${formatSeconds(remainingSeconds)}" aria-label="Timer duration in hours, minutes, and seconds" inputmode="numeric" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" ${hasTimerStarted ? 'disabled' : ''} /><p id="timer-status">${escapeHtml(getTimerStatus(current))}</p></div>${quickTaskControls}${timerActions}${quickTaskButton}</div>${primaryNavigation('timer-nav')}<div class="block-navigation"><div class="dashboard-grid">${projectCard('Previous Block', previous ? `← ${previous.project}` : 'Start of schedule', previous?.title || 'No previous block', false, previous ? previousIndex : null)}${activeBlockCard(current)}${projectCard('Next Block', next ? `${next.project} →` : 'End of schedule', next?.title || 'No next block', false, next ? nextIndex : null)}</div></div>` })}${timerSchedule()}${zenBreakOverlay()}`;
+  return `${section({ id: 'timer', title: 'Timer', eyebrow: 'Execution only', className: 'hero-panel', content: `<div class="timer-control-area"><div class="timer-shell" data-inactive="${current ? 'false' : 'true'}" aria-label="Countdown timer"><input id="timer-display" value="${formatSeconds(remainingSeconds)}" aria-label="Timer duration in hours, minutes, and seconds" inputmode="numeric" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" ${hasTimerStarted ? 'disabled' : ''} /><p id="timer-status">${escapeHtml(getTimerStatus(current))}</p></div>${quickTaskControls}${timerActions}${quickTaskButton}</div>${primaryNavigation('timer-nav')}<div class="block-navigation"><div class="dashboard-grid">${projectCard('Previous Block', previous ? `← ${previous.project}` : 'Start of schedule', previous?.title || 'No previous block', false, previous ? previousIndex : null)}${activeBlockCard(current)}${projectCard('Next Block', next ? `${next.project} →` : 'End of schedule', next?.title || 'No next block', false, next ? nextIndex : null)}</div>${viewedBlockCard(inspected)}</div>` })}${timerSchedule()}${conflictModal()}${zenBreakOverlay()}`;
 }
 
 function timerSchedule() {
-  const blocks = state.schedule.map((block, index) => `<div class="time-block timer-block ${block.isBreak ? 'break-block' : ''} ${!quickTask?.active && index === state.activeIndex ? 'active-task' : ''}" data-index="${index}" role="button" tabindex="0" aria-label="Make ${escapeHtml(block.title || block.project)} active"><input class="schedule-done" data-index="${index}" type="checkbox" ${block.done ? 'checked' : ''} aria-label="Mark ${escapeHtml(block.title || block.project)} complete" /><span class="time">${escapeHtml(formatTime(block.time))}</span><span class="task-copy"><strong>${escapeHtml(block.project || 'Task')}</strong><small>${escapeHtml([block.title || 'Task', block.zenBreakMinutes ? `Zen Break: ${formatMinutes(block.zenBreakMinutes)}` : ''].filter(Boolean).join(' · '))}</small></span></div>`).join('') || '<p class="empty-state">No saved schedule yet. Plan today on the Today page.</p>';
+  const currentIndex = getSchedulePosition().currentIndex;
+  const blocks = state.schedule.map((block, index) => `<div class="time-block timer-block ${block.isBreak ? 'break-block' : ''} ${!quickTask?.active && index === currentIndex ? 'active-task' : ''} ${index === viewedIndex ? 'viewed-task' : ''}" data-index="${index}" role="button" tabindex="0" aria-label="View ${escapeHtml(block.title || block.project)}"><input class="schedule-done" data-index="${index}" type="checkbox" ${block.done ? 'checked' : ''} aria-label="Mark ${escapeHtml(block.title || block.project)} complete" /><span class="time">${escapeHtml(formatTime(block.time))}</span><span class="task-copy"><strong>${escapeHtml(block.project || 'Task')}</strong><small>${escapeHtml([block.title || 'Task', block.zenBreakMinutes ? `Zen Break: ${formatMinutes(block.zenBreakMinutes)}` : ''].filter(Boolean).join(' · '))}</small></span></div>`).join('') || '<p class="empty-state">No saved schedule yet. Plan today on the Today page.</p>';
   return section({ id: 'timer-schedule', title: 'Today’s Saved Schedule', eyebrow: 'Read-only plan', content: `<div class="schedule-list">${blocks}</div>` });
+}
+
+function conflictModal() {
+  if (!conflictModalOpen) return '';
+  const rows = calendarDraft.map((block, index) => `<article class="calendar-block-card ${conflictIndexes.has(index) ? 'conflict-block' : ''}" data-index="${index}">${conflictIndexes.has(index) ? '<strong class="conflict-label">CONFLICT</strong>' : ''}<div class="calendar-card-fields"><label>Project<select class="text-input" disabled>${projectOptions(block.project)}</select></label><label>Task<input class="text-input" value="${escapeHtml(block.title)}" disabled /></label><fieldset><legend>Start Time</legend>${calendarTimeSelector(block, index).replaceAll('calendar-hour', 'conflict-hour').replaceAll('calendar-minute', 'conflict-minute').replaceAll('calendar-period', 'conflict-period')}</fieldset><div class="calendar-timing-summary"><label>Block Length<select class="text-input conflict-duration" data-index="${index}">${CALENDAR_DURATION_OPTIONS.map((minutes) => `<option value="${minutes}" ${Number(block.duration) === minutes ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label><div class="calendar-ends-at"><span>Ends At</span><strong>${escapeHtml(formatTime(getNextStartTime(block)))}</strong></div></div></div></article>`).join('');
+  return `<div class="conflict-overlay" role="dialog" aria-modal="true" aria-labelledby="conflict-title"><section class="conflict-dialog"><p class="eyebrow">Schedule Conflict</p><h2 id="conflict-title">This block conflicts with another scheduled block.</h2><p>Please readjust your schedule before continuing.</p><div class="conflict-schedule">${rows}</div><button id="conflict-save" class="primary">Save Schedule</button><p id="conflict-status" class="helper-text" role="status">${conflictIndexes.size ? 'Resolve every highlighted overlap.' : '✓ No conflicts'}</p></section></div>`;
 }
 
 function zenBreakOverlay() {
@@ -457,8 +522,9 @@ function calendarTimeSelector(block, index) {
 }
 
 function calendarPlanner() {
+  const draftConflicts = findScheduleConflicts(calendarDraft);
   const rows = calendarDraft.map((block, index) => {
-    return `<article class="calendar-block-card" data-index="${index}"><div class="calendar-card-fields"><label>Project<select class="text-input calendar-project project-select" data-index="${index}" required>${projectOptions(block.project)}</select></label><label>Task <span class="optional-label">(optional)</span><input class="text-input calendar-title" data-index="${index}" value="${escapeHtml(block.title)}" placeholder="Task description" /></label><fieldset><legend>Start Time</legend>${calendarTimeSelector(block, index)}</fieldset><div class="calendar-timing-summary"><label>Block Length<select class="text-input calendar-duration" data-index="${index}" aria-label="Block Length">${CALENDAR_DURATION_OPTIONS.map((minutes) => `<option value="${minutes}" ${block.duration === minutes ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label><div class="calendar-ends-at" aria-live="polite"><span>Ends At</span><strong data-calendar-end-time="${index}">${escapeHtml(formatTime(getNextStartTime(block)))}</strong></div></div></div><button class="calendar-delete-block" data-index="${index}" aria-label="Delete project block">${icon.trash} Delete</button></article>`;
+    return `<article class="calendar-block-card ${draftConflicts.has(index) ? 'conflict-block' : ''}" data-index="${index}">${draftConflicts.has(index) ? '<strong class="conflict-label">OVERLAPS ANOTHER BLOCK</strong>' : ''}<div class="calendar-card-fields"><label>Project<select class="text-input calendar-project project-select" data-index="${index}" required>${projectOptions(block.project)}</select></label><label>Task <span class="optional-label">(optional)</span><input class="text-input calendar-title" data-index="${index}" value="${escapeHtml(block.title)}" placeholder="Task description" /></label><fieldset><legend>Start Time</legend>${calendarTimeSelector(block, index)}</fieldset><div class="calendar-timing-summary"><label>Block Length<select class="text-input calendar-duration" data-index="${index}" aria-label="Block Length">${CALENDAR_DURATION_OPTIONS.map((minutes) => `<option value="${minutes}" ${block.duration === minutes ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label><div class="calendar-ends-at" aria-live="polite"><span>Ends At</span><strong data-calendar-end-time="${index}">${escapeHtml(formatTime(getNextStartTime(block)))}</strong></div></div></div><button class="calendar-delete-block" data-index="${index}" aria-label="Delete project block">${icon.trash} Delete</button></article>`;
   }).join('') || '<p class="empty-state">No blocks planned for this date.</p>';
   return `<div class="calendar-planner"><div class="schedule-list">${rows}</div><div class="calendar-editor-actions"><button id="calendar-add-block" class="add-button"><span>${icon.plus}</span> Add Project Block</button><button id="calendar-save" class="primary save-button">Save Schedule</button></div>${saveStatus()}</div>`;
 }
@@ -676,6 +742,27 @@ function startTimer({ playStartSound = true } = {}) {
     document.querySelector('#quick-title')?.focus();
     return;
   }
+  const currentIndex = getSchedulePosition().currentIndex;
+  const requestedIndex = quickTask?.active ? null : (viewedIndex ?? currentIndex);
+  const isCurrentScheduledBlock = !quickTask?.active && requestedIndex === currentIndex;
+  const requestedDuration = isCurrentScheduledBlock ? remainingSeconds : (quickTask?.active ? configuredDurationSeconds : getBlockDurationSeconds(requestedIndex));
+  const startConflicts = isCurrentScheduledBlock ? new Set() : getStartConflicts(requestedDuration);
+  if (startConflicts.size) {
+    conflictModalOpen = true;
+    pendingStart = true;
+    pendingStartIndex = requestedIndex;
+    pendingStartDuration = requestedDuration;
+    calendarDate = toDateKey(new Date());
+    calendarDraft = cloneSchedule(state.schedule.filter((block) => !block.isBreak));
+    conflictIndexes = new Set([...findScheduleConflicts(calendarDraft), ...startConflicts]);
+    render();
+    return;
+  }
+  runningIndex = requestedIndex;
+  if (!quickTask?.active && viewedIndex !== null) {
+    configuredDurationSeconds = getBlockDurationSeconds(viewedIndex);
+    remainingSeconds = configuredDurationSeconds;
+  }
   isRunning = true;
   isUserPaused = false;
   hasTimerStarted = true;
@@ -718,7 +805,10 @@ function activateQuickTask() {
   clearInterval(timerId);
   zenBreak = null;
   hasTimerStarted = false;
+  if (configuredDurationSeconds <= 0) configuredDurationSeconds = DEFAULT_BLOCK_MINUTES * 60;
   quickTask = { active: true, project: QUICK_START_PROJECT, title: '', duration: configuredDurationSeconds / 60, zenBreakMinutes: 0, zenBreakTiming: 'midpoint' };
+  viewedIndex = null;
+  runningIndex = null;
   remainingSeconds = configuredDurationSeconds;
   zenBreakNotifiedKey = null;
   render();
@@ -733,12 +823,12 @@ function selectActiveBlock(index) {
   clearInterval(timerId);
   zenBreak = null;
   quickTask = null;
+  viewedIndex = nextIndex;
   state.activeIndex = nextIndex;
-  resetCurrentDuration();
+  syncTimerToClock();
   hasTimerStarted = false;
   zenBreakNotifiedKey = null;
   lastTick = Date.now();
-  saveState();
   render();
 }
 
@@ -793,8 +883,29 @@ function shiftCalendarDate(amount) {
 }
 
 function bindGlobalEvents() {
-  window.removeEventListener('hashchange', render);
-  window.addEventListener('hashchange', render);
+  window.removeEventListener('hashchange', handleRouteChange);
+  window.addEventListener('hashchange', handleRouteChange);
+}
+
+function syncTimerToClock() {
+  state.schedule = cloneSchedule(getScheduleForDate(toDateKey(new Date())));
+  if (isRunning || quickTask?.active) return;
+  const { currentIndex } = getSchedulePosition();
+  if (currentIndex === null) {
+    configuredDurationSeconds = 0;
+    remainingSeconds = 0;
+    return;
+  }
+  const block = state.schedule[currentIndex];
+  const endMinutes = timeToMinutes(block.time) + (Number(block.duration) || DEFAULT_BLOCK_MINUTES);
+  remainingSeconds = Math.max(0, (endMinutes - currentLocalMinutes()) * 60);
+  configuredDurationSeconds = remainingSeconds;
+}
+
+function handleRouteChange() {
+  viewedIndex = null;
+  if (getRoute() === 'timer') syncTimerToClock();
+  render();
 }
 
 function validateProjectSelections(selector) {
@@ -861,6 +972,47 @@ function bindEvents() {
   document.querySelector('#extend-zen-break')?.addEventListener('click', extendZenBreak);
   document.querySelector('#quick-task-button')?.addEventListener('click', activateQuickTask);
   document.querySelector('#quick-title')?.addEventListener('input', (event) => { quickTask.title = event.target.value; });
+  const updateConflictTime = (index) => {
+    const hour = Number(document.querySelector(`.conflict-hour[data-index="${index}"]`)?.value || 12);
+    const minute = Number(document.querySelector(`.conflict-minute[data-index="${index}"]`)?.value || 0);
+    const period = document.querySelector(`.conflict-period[data-index="${index}"]`)?.dataset.period || 'AM';
+    calendarDraft[index].time = `${String((hour % 12) + (period === 'PM' ? 12 : 0)).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+    conflictIndexes = findScheduleConflicts(calendarDraft);
+    render();
+  };
+  document.querySelectorAll('.conflict-hour, .conflict-minute').forEach((input) => input.addEventListener('change', (event) => updateConflictTime(Number(event.target.dataset.index))));
+  document.querySelectorAll('.conflict-period').forEach((button) => button.addEventListener('click', (event) => {
+    event.currentTarget.dataset.period = event.currentTarget.dataset.period === 'AM' ? 'PM' : 'AM';
+    updateConflictTime(Number(event.currentTarget.dataset.index));
+  }));
+  document.querySelectorAll('.conflict-duration').forEach((input) => input.addEventListener('change', (event) => {
+    calendarDraft[Number(event.target.dataset.index)].duration = Number(event.target.value);
+    conflictIndexes = findScheduleConflicts(calendarDraft);
+    render();
+  }));
+  document.querySelector('#conflict-save')?.addEventListener('click', async () => {
+    conflictIndexes = findScheduleConflicts(calendarDraft);
+    if (!conflictIndexes.size && pendingStart) {
+      const start = currentLocalMinutes();
+      const end = start + (pendingStartDuration / 60);
+      calendarDraft.forEach((block, index) => {
+        const blockStart = timeToMinutes(block.time);
+        const blockEnd = blockStart + Number(block.duration);
+        if (start < blockEnd && end > blockStart) conflictIndexes.add(index);
+      });
+    }
+    if (conflictIndexes.size) { render(); return; }
+    setScheduleForDate(toDateKey(new Date()), buildSavedSchedule(calendarDraft));
+    await saveState();
+    conflictModalOpen = false;
+    const shouldStart = pendingStart;
+    pendingStart = false;
+    viewedIndex = pendingStartIndex;
+    pendingStartIndex = null;
+    syncTimerToClock();
+    render();
+    if (shouldStart) startTimer();
+  });
   document.querySelector('#timer-display')?.addEventListener('change', (event) => {
     const match = event.target.value.trim().match(/^(\d+):([0-5]\d):([0-5]\d)$/);
     if (!match) { event.target.value = formatSeconds(remainingSeconds); return; }
@@ -919,6 +1071,13 @@ function bindEvents() {
     document.querySelector('#calendar-add-block')?.addEventListener('click', () => { const time = calendarDraft.length ? getNextStartTime(calendarDraft[calendarDraft.length - 1]) : '09:00'; calendarDraft.push(createDraftBlock(time)); render(); });
     document.querySelector('#calendar-save')?.addEventListener('click', async (event) => {
       if (!validateProjectSelections('.calendar-project')) return;
+      const conflicts = findScheduleConflicts(calendarDraft);
+      if (conflicts.size) {
+        conflictIndexes = conflicts;
+        scheduleSaveMessage = 'Resolve every highlighted overlap before saving.';
+        render();
+        return;
+      }
       setScheduleForDate(calendarDate, buildSavedSchedule(calendarDraft)); state.activeIndex = clampActiveIndex(state.activeIndex); resetCurrentDuration();
       const saved = await persistSchedule(event.currentTarget);
       if (saved) loadCalendarDraft();
@@ -962,6 +1121,10 @@ function bindEvents() {
     });
     document.querySelector('#save-today')?.addEventListener('click', async (event) => {
       if (!validateProjectSelections('.schedule-project')) return;
+      if (findScheduleConflicts(todayDraft).size) {
+        scheduleSaveMessage = 'Resolve every schedule overlap before saving.';
+        return render();
+      }
       state.schedule = buildSavedSchedule(todayDraft);
       setScheduleForDate(toDateKey(new Date()), state.schedule);
       state.activeIndex = clampActiveIndex(state.activeIndex);
@@ -1012,8 +1175,16 @@ async function initializeApp() {
     state = await loadState();
     todayDraft = cloneSchedule(state.schedule.filter((block) => !block.isBreak));
     calendarDraft = cloneSchedule(getScheduleForDate(calendarDate).filter((block) => !block.isBreak));
-    remainingSeconds = getBlockDurationSeconds(state.activeIndex);
-    configuredDurationSeconds = remainingSeconds;
+    syncTimerToClock();
+    clearInterval(authorityTimerId);
+    authorityTimerId = setInterval(() => {
+      if (getRoute() !== 'timer' || isRunning || quickTask?.active) return;
+      const before = getSchedulePosition().currentIndex;
+      syncTimerToClock();
+      const after = getSchedulePosition().currentIndex;
+      if (before !== after) render();
+      else updateTimerDisplay();
+    }, 1000);
   } catch (error) {
     console.error('Project Timer startup failed while loading saved state.', error);
     state = structuredClone(defaultState);

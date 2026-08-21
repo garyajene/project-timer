@@ -42,6 +42,10 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .block-navigation .dashboard-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .project-card { background: var(--panel-strong); border: 1px solid var(--line); border-radius: 20px; padding: 1.2rem; }
 .active-card, .active-task { border-color: rgba(255,41,61,.9) !important; background: linear-gradient(135deg, rgba(255,41,61,.22), rgba(21,21,25,.95)) !important; box-shadow: 0 0 0 1px rgba(255,41,61,.22), 0 18px 60px rgba(255,41,61,.13); }
+.viewed-task { border-color: rgba(255,255,255,.55); }
+.viewed-block-card { margin-top: 1rem; border-style: dashed; }
+.timer-shell[data-inactive="true"] { background: #09090b; }
+.timer-shell[data-inactive="true"] input { color: var(--muted); }
 .project-card p:not(.eyebrow), .task-copy small, .day-view p, .review-card p { color: var(--muted); margin-bottom: 0; }
 .timer-shell { text-align: center; border: 1px solid var(--line); border-radius: 28px; padding: clamp(2rem, 7vw, 4rem); background: radial-gradient(circle, rgba(255,41,61,.2), rgba(9,9,11,.9) 62%); }
 .timer-shell input { display: block; width: 100%; padding: 0; border: 0; outline: 0; background: transparent; color: #fff; text-align: center; font: inherit; font-size: clamp(3rem, 13vw, 8rem); font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: -.08em; line-height: .95; }
@@ -404,6 +408,12 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   background: radial-gradient(circle, rgba(255,41,61,.28), rgba(0,0,0,.96) 62%);
   padding: 1rem;
 }
+
+.conflict-overlay { position: fixed; inset: 0; z-index: 60; overflow: auto; padding: clamp(1rem, 4vw, 3rem); background: rgba(0,0,0,.88); backdrop-filter: blur(12px); }
+.conflict-dialog { width: min(1100px, 100%); margin: auto; padding: clamp(1rem, 3vw, 2rem); border: 1px solid var(--red); border-radius: 24px; background: #0d0d10; box-shadow: 0 24px 100px rgba(255,41,61,.2); }
+.conflict-schedule { display: grid; gap: .8rem; margin: 1.5rem 0; }
+.conflict-block { position: relative; border-color: var(--red) !important; background: rgba(127,16,27,.2); }
+.conflict-label { grid-column: 1 / -1; color: var(--red); font-size: .72rem; letter-spacing: .12em; }
 
 .zen-break-overlay h2 {
   font-size: clamp(2.5rem, 8vw, 6rem);
