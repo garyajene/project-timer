@@ -111,7 +111,7 @@ test('scheduled timer status shows end time and only marks an intentional pause'
   const timerStatus = mainSource.slice(mainSource.indexOf('function getTimerStatus('), mainSource.indexOf('function primaryNavigation('));
   const stopTimer = mainSource.slice(mainSource.indexOf('function stopTimer()'), mainSource.indexOf('function resetCurrentDuration()'));
   assert.match(timerStatus, /isUserPaused \? 'PAUSED · ' : ''/);
-  assert.match(timerStatus, /quickTask\?\.active \? '' : ` · ENDS AT/);
+  assert.match(timerStatus, /actualEnd \|\| formatTime\(getNextStartTime\(current\)\)/);
   assert.match(timerStatus, /formatTime\(getNextStartTime\(current\)\)/);
   assert.match(stopTimer, /if \(!isRunning\) return/);
   assert.match(stopTimer, /isUserPaused = true/);
@@ -171,4 +171,20 @@ test('Timer distinguishes real current, viewed, and explicitly running blocks', 
   assert.match(mainSource, /function findScheduleConflicts/);
   assert.match(mainSource, /This block conflicts with another scheduled block/);
   assert.match(mainSource, /conflictModalOpen = true/);
+});
+
+test('clock synchronization selects the relevant block without simulating elapsed work', () => {
+  const syncTimer = mainSource.slice(mainSource.indexOf('function syncTimerToClock()'), mainSource.indexOf('function handleRouteChange()'));
+  assert.match(syncTimer, /const relevantIndex = viewedIndex \?\? currentIndex/);
+  assert.match(syncTimer, /remainingSeconds = getBlockDurationSeconds\(relevantIndex\)/);
+  assert.doesNotMatch(syncTimer, /endMinutes - currentLocalMinutes/);
+  assert.doesNotMatch(syncTimer, /startTimer/);
+});
+
+test('manual scheduled starts use full duration and check the actual interval', () => {
+  const startTimer = mainSource.slice(mainSource.indexOf('function startTimer('), mainSource.indexOf('function stopTimer()'));
+  assert.match(startTimer, /hasTimerStarted\s+\? remainingSeconds\s+: \(quickTask\?\.active \? configuredDurationSeconds : getBlockDurationSeconds\(requestedIndex\)\)/);
+  assert.match(startTimer, /getStartConflicts\(requestedDuration, requestedIndex\)/);
+  assert.match(startTimer, /remainingSeconds = requestedDuration/);
+  assert.match(startTimer, /projectedEndTime = new Date\(Date\.now\(\) \+ \(remainingSeconds \* 1000\)\)/);
 });
