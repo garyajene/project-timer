@@ -436,12 +436,12 @@ function timerSchedule() {
 function conflictModal() {
   if (!conflictModalOpen) return '';
   const rows = calendarDraft.map((block, index) => `<article class="calendar-block-card ${conflictIndexes.has(index) ? 'conflict-block' : ''}" data-index="${index}">${conflictIndexes.has(index) ? '<strong class="conflict-label">CONFLICT</strong>' : ''}<div class="calendar-card-fields"><label>Project<select class="text-input" disabled>${projectOptions(block.project)}</select></label><label>Task<input class="text-input" value="${escapeHtml(block.title)}" disabled /></label><fieldset><legend>Start Time</legend>${calendarTimeSelector(block, index).replaceAll('calendar-hour', 'conflict-hour').replaceAll('calendar-minute', 'conflict-minute').replaceAll('calendar-period', 'conflict-period')}</fieldset><div class="calendar-timing-summary"><label>Block Length<select class="text-input conflict-duration" data-index="${index}">${CALENDAR_DURATION_OPTIONS.map((minutes) => `<option value="${minutes}" ${Number(block.duration) === minutes ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label><div class="calendar-ends-at"><span>Ends At</span><strong>${escapeHtml(formatTime(getNextStartTime(block)))}</strong></div></div></div></article>`).join('');
-  return `<div class="conflict-overlay" role="dialog" aria-modal="true" aria-labelledby="conflict-title"><section class="conflict-dialog"><button id="close-conflict" class="escape-close" type="button" aria-label="Cancel start and close schedule conflict">×</button><p class="eyebrow">Schedule Conflict</p><h2 id="conflict-title">This block conflicts with another scheduled block.</h2><p>Please readjust your schedule before continuing.</p><div class="conflict-schedule">${rows}</div><button id="conflict-save" class="primary">Save Schedule</button><p id="conflict-status" class="helper-text" role="status">${conflictIndexes.size ? 'Resolve every highlighted overlap.' : '✓ No conflicts'}</p></section></div>`;
+  return `<div class="conflict-overlay" role="dialog" aria-modal="true" aria-labelledby="conflict-title"><section class="conflict-dialog"><button id="close-conflict" class="escape-close" type="button" aria-label="Cancel start and close schedule conflict" aria-keyshortcuts="Escape" title="Cancel and close">×</button><p class="eyebrow">Schedule Conflict</p><h2 id="conflict-title">This block conflicts with another scheduled block.</h2><p>Please readjust your schedule before continuing.</p><div class="conflict-schedule">${rows}</div><button id="conflict-save" class="primary">Save Schedule</button><p id="conflict-status" class="helper-text" role="status">${conflictIndexes.size ? 'Resolve every highlighted overlap.' : '✓ No conflicts'}</p></section></div>`;
 }
 
 function zenBreakOverlay() {
   if (!zenBreak?.active) return '';
-  return `<div class="zen-break-overlay" role="dialog" aria-modal="true" aria-label="Zen Break"><div class="zen-break-dialog"><button id="close-zen-break" class="escape-close" type="button" aria-label="Cancel and close Zen Break">×</button><p class="eyebrow">Zen Break</p><h2>Pause and reset</h2><span id="zen-break-countdown">${formatSeconds(zenBreak.remainingSeconds)}</span><div class="actions zen-break-actions"><button id="end-zen-break" type="button">End Break Now</button><button id="extend-zen-break" type="button" class="primary">Extend 2 Minutes</button></div></div></div>`;
+  return `<div class="zen-break-overlay" role="dialog" aria-modal="true" aria-labelledby="zen-break-title"><div class="zen-break-dialog"><button id="close-zen-break" class="escape-close" type="button" aria-label="Cancel and close Zen Break" aria-keyshortcuts="Escape" title="Cancel and close">×</button><p class="eyebrow">Zen Break</p><h2 id="zen-break-title">Pause and reset</h2><span id="zen-break-countdown">${formatSeconds(zenBreak.remainingSeconds)}</span><div class="actions zen-break-actions"><button id="end-zen-break" type="button">End Break Now</button><button id="extend-zen-break" type="button" class="primary">Extend 2 Minutes</button></div></div></div>`;
 }
 
 function projectOptions(selectedProject, includeQuickStart = false) {
@@ -621,6 +621,7 @@ function getZenBreakTriggerSecond(index, block, durationSeconds) {
 }
 
 function startZenBreak(block) {
+  const resumeOnCancel = isRunning;
   isRunning = false;
   clearInterval(timerId);
   sounds.zenBreak();
@@ -628,6 +629,7 @@ function startZenBreak(block) {
     active: true,
     remainingSeconds: Math.max(Number(block.zenBreakMinutes), 1) * 60,
     pausedRemainingSeconds: remainingSeconds,
+    resumeOnCancel,
     lastTick: Date.now(),
   };
   render();
@@ -654,11 +656,14 @@ function endZenBreakNow() {
 function cancelZenBreak() {
   if (!zenBreak?.active) return;
   clearInterval(timerId);
+  const resumeOnCancel = zenBreak.resumeOnCancel;
   remainingSeconds = zenBreak.pausedRemainingSeconds;
   zenBreak = null;
-  isRunning = true;
-  lastTick = Date.now();
-  timerId = setInterval(tick, 250);
+  isRunning = resumeOnCancel;
+  if (isRunning) {
+    lastTick = Date.now();
+    timerId = setInterval(tick, 250);
+  }
   render();
 }
 
