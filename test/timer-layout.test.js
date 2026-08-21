@@ -100,7 +100,8 @@ test('selecting a scheduled block replaces Quick Task and pauses a freshly loade
   assert.match(selectActiveBlock, /clearInterval\(timerId\)/);
   assert.match(selectActiveBlock, /quickTask = null/);
   assert.match(selectActiveBlock, /state\.activeIndex = nextIndex/);
-  assert.match(selectActiveBlock, /resetCurrentDuration\(\)/);
+  assert.match(selectActiveBlock, /viewedIndex = nextIndex/);
+  assert.match(selectActiveBlock, /syncTimerToClock\(\)/);
   assert.match(selectActiveBlock, /hasTimerStarted = false/);
   assert.doesNotMatch(selectActiveBlock, /quickTask\?\.active.*return/);
 });
@@ -122,8 +123,19 @@ test('Next Block and saved schedule blocks use the same selection behavior', () 
 
 test('block navigation exposes both adjacent scheduled blocks', () => {
   const timerPage = mainSource.slice(mainSource.indexOf('function timerPage()'), mainSource.indexOf('function timerSchedule()'));
-  assert.match(timerPage, /const previousIndex = quickTask\?\.active \? null : state\.activeIndex - 1/);
+  assert.match(timerPage, /const position = getSchedulePosition\(\)/);
+  assert.match(timerPage, /const previousIndex = quickTask\?\.active \? null : position\.previousIndex/);
   assert.match(timerPage, /projectCard\('Previous Block'.*previous \? previousIndex : null\)/);
   assert.match(timerPage, /projectCard\('Next Block'.*next \? nextIndex : null\)/);
   assert.match(timerPage, /block-navigation/);
+});
+
+
+test('Timer distinguishes real current, viewed, and explicitly running blocks', () => {
+  assert.match(mainSource, /function getSchedulePosition/);
+  assert.match(mainSource, /let viewedIndex = null/);
+  assert.match(mainSource, /let runningIndex = null/);
+  assert.match(mainSource, /function findScheduleConflicts/);
+  assert.match(mainSource, /This block conflicts with another scheduled block/);
+  assert.match(mainSource, /conflictModalOpen = true/);
 });
