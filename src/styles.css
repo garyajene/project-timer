@@ -81,6 +81,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .escape-close { position: absolute; top: 1rem; right: 1rem; z-index: 2; width: 2.75rem; height: 2.75rem; justify-content: center; padding: 0; border-color: rgba(255,255,255,.35); background: rgba(17,17,21,.92); font-size: 1.75rem; line-height: 1; }
 .escape-close:hover, .escape-close:focus-visible { border-color: var(--red); background: var(--red-dark); }
 .escape-close-small { top: .55rem; right: .55rem; width: 2rem; height: 2rem; font-size: 1.35rem; }
+.quick-task-setup { position: relative; width: min(100%, 58rem); padding: 4.5rem 1rem 1rem; border: 1px solid rgba(255,255,255,.18); border-radius: 18px; background: rgba(255,255,255,.025); }
 .primary, .active-tab, .add-button { background: var(--red); border-color: var(--red); color: #fff; font-weight: 800; }
 .schedule-list, .project-list { display: grid; gap: .75rem; }
 .time-block, .project-row { display: grid; grid-template-columns: auto auto 1fr; gap: .85rem; align-items: center; border: 1px solid var(--line); border-radius: 18px; padding: .95rem; background: #0a0a0d; }
