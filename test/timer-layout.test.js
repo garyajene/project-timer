@@ -77,6 +77,23 @@ test('main timer is editable only before a timer session starts', () => {
   assert.match(mainSource, /hasTimerStarted = false/);
 });
 
+test('scheduled and running timers expose live duration presets', () => {
+  const timerPage = mainSource.slice(mainSource.indexOf('function timerPage()'), mainSource.indexOf('function timerSchedule()'));
+  assert.match(mainSource, /id="change-timer-length"/);
+  assert.match(timerPage, /id="timer-length-editor"/);
+  assert.match(timerPage, /live-duration-preset/);
+  assert.match(mainSource, /function requestTimerDuration\(minutes\)/);
+  assert.match(mainSource, /const elapsedSeconds = hasTimerStarted/);
+  assert.match(mainSource, /remainingSeconds = Math\.max\(0, durationSeconds - elapsedSeconds\)/);
+});
+
+test('live duration conflicts can be rearranged or canceled by block', () => {
+  assert.match(mainSource, /pendingDurationChange = \{ durationSeconds/);
+  assert.match(mainSource, /conflict-delete-block/);
+  assert.match(mainSource, /Move a block, change its length, cancel a block/);
+  assert.match(mainSource, /setScheduleForDate\(toDateKey\(new Date\(\)\), buildSavedSchedule\(calendarDraft\)\)/);
+});
+
 test('Quick Task uses only a name and the shared timer duration controls', () => {
   const quickTaskField = mainSource.slice(mainSource.indexOf('function quickTaskNameField()'), mainSource.indexOf('function zenBreakControl('));
   assert.match(quickTaskField, /Quick Task Name/);
