@@ -366,8 +366,44 @@ function projectCard(label, title, meta, active = false, selectIndex = null) {
   return `<article class="project-card ${active ? 'active-card' : ''}"${selectionAttributes}><p class="eyebrow">${label}</p><h3 data-card-title>${escapeHtml(title)}</h3><p data-card-meta>${escapeHtml(meta)}</p></article>`;
 }
 
-function activeBlockCard(current) {
-  if (!current) return projectCard('Current Scheduled Block', 'Nothing scheduled right now', 'The timer is waiting for the next block', true);
+function getNextScheduledBlock(date = new Date()) {
+  const todayKey = toDateKey(date);
+  const nowMinutes = currentLocalMinutes(date);
+  const todayBlock = state.schedule.find((block) => timeToMinutes(block.time) > nowMinutes);
+  if (todayBlock) {
+    const minutesUntilStart = Math.ceil(timeToMinutes(todayBlock.time) - nowMinutes);
+    return {
+      label: 'Next Scheduled Block',
+      title: todayBlock.project || todayBlock.title || 'Task',
+      meta: minutesUntilStart <= 60
+        ? `Starts in ${minutesUntilStart} ${minutesUntilStart === 1 ? 'minute' : 'minutes'}`
+        : `Starts at ${formatTime(todayBlock.time)}`,
+    };
+  }
+
+  const futureDateKey = Object.keys(state.schedules || {})
+    .filter((dateKey) => dateKey > todayKey && getScheduleForDate(dateKey).length)
+    .sort()[0];
+  if (!futureDateKey) return null;
+
+  const nextBlock = getScheduleForDate(futureDateKey)[0];
+  const tomorrowKey = addDays(todayKey, 1);
+  const dayLabel = formatDateLabel(futureDateKey, { weekday: 'long' });
+  return {
+    label: 'Next Scheduled Block',
+    title: 'NO MORE BLOCKS TODAY',
+    meta: futureDateKey === tomorrowKey
+      ? `See you tomorrow at ${formatTime(nextBlock.time)}`
+      : `Next block: ${dayLabel} at ${formatTime(nextBlock.time)}`,
+  };
+}
+
+function activeBlockCard(current, date = new Date()) {
+  if (!current) {
+    const upcoming = getNextScheduledBlock(date);
+    if (!upcoming) return projectCard('Current Scheduled Block', 'Nothing scheduled right now', 'No future saved blocks', true);
+    return `<article class="project-card active-card" data-upcoming-card><p class="eyebrow" data-upcoming-label>${escapeHtml(upcoming.label)}</p><h3 data-card-title>${escapeHtml(upcoming.title)}</h3><p data-card-meta>${escapeHtml(upcoming.meta)}</p></article>`;
+  }
   const scheduledTimes = current.time ? `<div><dt>Start Time</dt><dd>${escapeHtml(formatTime(current.time))}</dd></div><div><dt>End Time</dt><dd>${escapeHtml(formatTime(getNextStartTime(current)))}</dd></div>` : '';
   const label = isRunning ? 'Running Timer' : 'Current Scheduled Block';
   return `<article class="project-card active-card active-block-card"><p class="eyebrow">${label}</p><h3 data-card-title>${escapeHtml(current.project || QUICK_START_PROJECT)}</h3><p data-card-meta>${escapeHtml(current.title || 'Untitled task')}</p><dl class="active-block-details"><div><dt>Duration</dt><dd>${escapeHtml(formatMinutes(current.duration || DEFAULT_BLOCK_MINUTES))}</dd></div>${scheduledTimes}</dl></article>`;
@@ -608,6 +644,13 @@ function updateTimerDisplay() {
   const current = getActiveBlock();
   if (display) display.value = formatSeconds(remainingSeconds);
   if (status) status.textContent = getTimerStatus(current);
+  const upcomingCard = document.querySelector('[data-upcoming-card]');
+  const upcoming = current ? null : getNextScheduledBlock();
+  if (upcomingCard && upcoming) {
+    upcomingCard.querySelector('[data-upcoming-label]').textContent = upcoming.label;
+    upcomingCard.querySelector('[data-card-title]').textContent = upcoming.title;
+    upcomingCard.querySelector('[data-card-meta]').textContent = upcoming.meta;
+  }
 }
 
 function getZenBreakKey(index) {
@@ -1235,10 +1278,11 @@ async function initializeApp() {
     clearInterval(authorityTimerId);
     authorityTimerId = setInterval(() => {
       if (getRoute() !== 'timer' || isRunning || quickTask?.active) return;
+      const wasShowingUpcoming = Boolean(document.querySelector('[data-upcoming-card]'));
       const before = getSchedulePosition().currentIndex;
       syncTimerToClock();
       const after = getSchedulePosition().currentIndex;
-      if (before !== after) render();
+      if (before !== after || wasShowingUpcoming !== (after === null)) render();
       else updateTimerDisplay();
     }, 1000);
   } catch (error) {

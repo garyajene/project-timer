@@ -107,6 +107,25 @@ test('Active Block shows scheduled duration, start time, and calculated end time
   assert.doesNotMatch(activeBlockCard, /Remaining|Status|Paused/);
 });
 
+test('empty current status previews the next saved block without activating it', () => {
+  const upcomingStatus = mainSource.slice(mainSource.indexOf('function getNextScheduledBlock('), mainSource.indexOf('function viewedBlockCard('));
+  assert.match(upcomingStatus, /state\.schedule\.find\(\(block\) => timeToMinutes\(block\.time\) > nowMinutes\)/);
+  assert.match(upcomingStatus, /minutesUntilStart <= 60/);
+  assert.match(upcomingStatus, /Starts in \$\{minutesUntilStart\}/);
+  assert.match(upcomingStatus, /Starts at \$\{formatTime\(todayBlock\.time\)\}/);
+  assert.match(upcomingStatus, /See you tomorrow at/);
+  assert.match(upcomingStatus, /Next block: \$\{dayLabel\} at/);
+  assert.match(upcomingStatus, /NO MORE BLOCKS TODAY/);
+  assert.doesNotMatch(upcomingStatus, /startTimer|remainingSeconds|configuredDurationSeconds/);
+});
+
+test('upcoming block status refreshes with the existing real-time authority clock', () => {
+  const timerUpdate = mainSource.slice(mainSource.indexOf('function updateTimerDisplay()'), mainSource.indexOf('function getZenBreakKey('));
+  assert.match(timerUpdate, /getNextScheduledBlock\(\)/);
+  assert.match(timerUpdate, /\[data-card-meta\]/);
+  assert.match(mainSource, /authorityTimerId = setInterval\(\(\) =>/);
+});
+
 test('scheduled timer status shows end time and only marks an intentional pause', () => {
   const timerStatus = mainSource.slice(mainSource.indexOf('function getTimerStatus('), mainSource.indexOf('function primaryNavigation('));
   const stopTimer = mainSource.slice(mainSource.indexOf('function stopTimer()'), mainSource.indexOf('function resetCurrentDuration()'));
