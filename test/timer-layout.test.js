@@ -36,6 +36,32 @@ test('Zen Break is restored as a compact, collapsed Timer control', () => {
   assert.match(mainSource, /#timer-zen-break-timing/);
 });
 
+test('temporary Timer interfaces have visible cancel controls and Escape handling', () => {
+  assert.match(mainSource, /id="close-conflict"[^>]+aria-label="Cancel start and close schedule conflict"/);
+  assert.match(mainSource, /id="close-zen-break"[^>]+aria-label="Cancel and close Zen Break"/);
+  assert.match(mainSource, /id="close-zen-break-options"[^>]+aria-label="Close Zen Break options"/);
+  assert.match(mainSource, /#close-conflict'\)\?\.addEventListener\('click', cancelConflictStart\)/);
+  assert.match(mainSource, /#close-zen-break'\)\?\.addEventListener\('click', cancelZenBreak\)/);
+  assert.match(mainSource, /if \(event\.key !== 'Escape'\) return/);
+});
+
+test('canceling a conflict discards its draft and never starts or saves', () => {
+  const cancelConflict = mainSource.slice(mainSource.indexOf('function cancelConflictStart()'), mainSource.indexOf('function extendZenBreak()'));
+  assert.match(cancelConflict, /conflictModalOpen = false/);
+  assert.match(cancelConflict, /pendingStart = false/);
+  assert.match(cancelConflict, /calendarDraft = conflictPreviousCalendarDraft/);
+  assert.doesNotMatch(cancelConflict, /startTimer|saveState|setScheduleForDate/);
+});
+
+test('canceling Zen Break restores and resumes the interrupted timer only', () => {
+  const cancelBreak = mainSource.slice(mainSource.indexOf('function cancelZenBreak()'), mainSource.indexOf('function cancelConflictStart()'));
+  assert.match(cancelBreak, /remainingSeconds = zenBreak\.pausedRemainingSeconds/);
+  assert.match(cancelBreak, /zenBreak = null/);
+  assert.match(cancelBreak, /isRunning = true/);
+  assert.match(cancelBreak, /timerId = setInterval\(tick, 250\)/);
+  assert.doesNotMatch(cancelBreak, /saveState|sounds\.|startTimer/);
+});
+
 test('main timer is editable only before a timer session starts', () => {
   assert.match(mainSource, /id="timer-display"[^>]+\$\{hasTimerStarted \? 'disabled' : ''\}/);
   assert.match(mainSource, /#timer-display'\)\?\.addEventListener\('change'/);

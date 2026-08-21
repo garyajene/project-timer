@@ -45,6 +45,8 @@ let pendingStart = false;
 let pendingStartIndex = null;
 let pendingStartDuration = 0;
 let conflictIndexes = new Set();
+let conflictPreviousCalendarDate = null;
+let conflictPreviousCalendarDraft = null;
 let authorityTimerId;
 
 
@@ -406,7 +408,7 @@ function zenBreakControl(current) {
   const available = Boolean(current && !current.isBreak);
   const enabled = available && Number(current.zenBreakMinutes) > 0;
   const selectedMinutes = enabled ? Number(current.zenBreakMinutes) : 5;
-  return `<div class="zen-break-control"><label class="zen-break-toggle"><span>Zen Break</span><input id="zen-break-enabled" type="checkbox" role="switch" aria-label="Enable Zen Break" ${enabled ? 'checked' : ''} ${available ? '' : 'disabled'} /></label><details class="zen-break-menu" ${available ? '' : 'aria-disabled="true"'}><summary aria-label="Zen Break options" title="Zen Break options">⌄</summary><div class="zen-break-options"><label>Duration<select id="timer-zen-break-duration" class="text-input" ${available ? '' : 'disabled'}>${ZEN_BREAK_PRESETS.filter(Boolean).map((minutes) => `<option value="${minutes}" ${minutes === selectedMinutes ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label>${zenBreakTimingControl({ value: current?.zenBreakTiming || 'midpoint', id: 'timer-zen-break-timing' })}</div></details></div>`;
+  return `<div class="zen-break-control"><label class="zen-break-toggle"><span>Zen Break</span><input id="zen-break-enabled" type="checkbox" role="switch" aria-label="Enable Zen Break" ${enabled ? 'checked' : ''} ${available ? '' : 'disabled'} /></label><details class="zen-break-menu" ${available ? '' : 'aria-disabled="true"'}><summary aria-label="Zen Break options" title="Zen Break options">⌄</summary><div class="zen-break-options"><button id="close-zen-break-options" class="escape-close escape-close-small" type="button" aria-label="Close Zen Break options">×</button><label>Duration<select id="timer-zen-break-duration" class="text-input" ${available ? '' : 'disabled'}>${ZEN_BREAK_PRESETS.filter(Boolean).map((minutes) => `<option value="${minutes}" ${minutes === selectedMinutes ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label>${zenBreakTimingControl({ value: current?.zenBreakTiming || 'midpoint', id: 'timer-zen-break-timing' })}</div></details></div>`;
 }
 
 function timerPage() {
@@ -434,12 +436,12 @@ function timerSchedule() {
 function conflictModal() {
   if (!conflictModalOpen) return '';
   const rows = calendarDraft.map((block, index) => `<article class="calendar-block-card ${conflictIndexes.has(index) ? 'conflict-block' : ''}" data-index="${index}">${conflictIndexes.has(index) ? '<strong class="conflict-label">CONFLICT</strong>' : ''}<div class="calendar-card-fields"><label>Project<select class="text-input" disabled>${projectOptions(block.project)}</select></label><label>Task<input class="text-input" value="${escapeHtml(block.title)}" disabled /></label><fieldset><legend>Start Time</legend>${calendarTimeSelector(block, index).replaceAll('calendar-hour', 'conflict-hour').replaceAll('calendar-minute', 'conflict-minute').replaceAll('calendar-period', 'conflict-period')}</fieldset><div class="calendar-timing-summary"><label>Block Length<select class="text-input conflict-duration" data-index="${index}">${CALENDAR_DURATION_OPTIONS.map((minutes) => `<option value="${minutes}" ${Number(block.duration) === minutes ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label><div class="calendar-ends-at"><span>Ends At</span><strong>${escapeHtml(formatTime(getNextStartTime(block)))}</strong></div></div></div></article>`).join('');
-  return `<div class="conflict-overlay" role="dialog" aria-modal="true" aria-labelledby="conflict-title"><section class="conflict-dialog"><p class="eyebrow">Schedule Conflict</p><h2 id="conflict-title">This block conflicts with another scheduled block.</h2><p>Please readjust your schedule before continuing.</p><div class="conflict-schedule">${rows}</div><button id="conflict-save" class="primary">Save Schedule</button><p id="conflict-status" class="helper-text" role="status">${conflictIndexes.size ? 'Resolve every highlighted overlap.' : '✓ No conflicts'}</p></section></div>`;
+  return `<div class="conflict-overlay" role="dialog" aria-modal="true" aria-labelledby="conflict-title"><section class="conflict-dialog"><button id="close-conflict" class="escape-close" type="button" aria-label="Cancel start and close schedule conflict">×</button><p class="eyebrow">Schedule Conflict</p><h2 id="conflict-title">This block conflicts with another scheduled block.</h2><p>Please readjust your schedule before continuing.</p><div class="conflict-schedule">${rows}</div><button id="conflict-save" class="primary">Save Schedule</button><p id="conflict-status" class="helper-text" role="status">${conflictIndexes.size ? 'Resolve every highlighted overlap.' : '✓ No conflicts'}</p></section></div>`;
 }
 
 function zenBreakOverlay() {
   if (!zenBreak?.active) return '';
-  return `<div class="zen-break-overlay" role="dialog" aria-modal="true" aria-label="Zen Break"><div><p class="eyebrow">Zen Break</p><h2>Pause and reset</h2><span id="zen-break-countdown">${formatSeconds(zenBreak.remainingSeconds)}</span><div class="actions zen-break-actions"><button id="end-zen-break" type="button">End Break Now</button><button id="extend-zen-break" type="button" class="primary">Extend 2 Minutes</button></div></div></div>`;
+  return `<div class="zen-break-overlay" role="dialog" aria-modal="true" aria-label="Zen Break"><div class="zen-break-dialog"><button id="close-zen-break" class="escape-close" type="button" aria-label="Cancel and close Zen Break">×</button><p class="eyebrow">Zen Break</p><h2>Pause and reset</h2><span id="zen-break-countdown">${formatSeconds(zenBreak.remainingSeconds)}</span><div class="actions zen-break-actions"><button id="end-zen-break" type="button">End Break Now</button><button id="extend-zen-break" type="button" class="primary">Extend 2 Minutes</button></div></div></div>`;
 }
 
 function projectOptions(selectedProject, includeQuickStart = false) {
@@ -649,6 +651,31 @@ function endZenBreakNow() {
   render();
 }
 
+function cancelZenBreak() {
+  if (!zenBreak?.active) return;
+  clearInterval(timerId);
+  remainingSeconds = zenBreak.pausedRemainingSeconds;
+  zenBreak = null;
+  isRunning = true;
+  lastTick = Date.now();
+  timerId = setInterval(tick, 250);
+  render();
+}
+
+function cancelConflictStart() {
+  if (!conflictModalOpen) return;
+  conflictModalOpen = false;
+  pendingStart = false;
+  pendingStartIndex = null;
+  pendingStartDuration = 0;
+  conflictIndexes = new Set();
+  if (conflictPreviousCalendarDate !== null) calendarDate = conflictPreviousCalendarDate;
+  if (conflictPreviousCalendarDraft !== null) calendarDraft = conflictPreviousCalendarDraft;
+  conflictPreviousCalendarDate = null;
+  conflictPreviousCalendarDraft = null;
+  render();
+}
+
 function extendZenBreak() {
   if (!zenBreak?.active) return;
   syncZenBreakCountdown();
@@ -748,6 +775,8 @@ function startTimer({ playStartSound = true } = {}) {
   const requestedDuration = isCurrentScheduledBlock ? remainingSeconds : (quickTask?.active ? configuredDurationSeconds : getBlockDurationSeconds(requestedIndex));
   const startConflicts = isCurrentScheduledBlock ? new Set() : getStartConflicts(requestedDuration);
   if (startConflicts.size) {
+    conflictPreviousCalendarDate = calendarDate;
+    conflictPreviousCalendarDraft = cloneSchedule(calendarDraft);
     conflictModalOpen = true;
     pendingStart = true;
     pendingStartIndex = requestedIndex;
@@ -885,6 +914,15 @@ function shiftCalendarDate(amount) {
 function bindGlobalEvents() {
   window.removeEventListener('hashchange', handleRouteChange);
   window.addEventListener('hashchange', handleRouteChange);
+  window.removeEventListener('keydown', handleEscapeKey);
+  window.addEventListener('keydown', handleEscapeKey);
+}
+
+function handleEscapeKey(event) {
+  if (event.key !== 'Escape') return;
+  if (conflictModalOpen) cancelConflictStart();
+  else if (zenBreak?.active) cancelZenBreak();
+  else document.querySelector('.zen-break-menu[open]')?.removeAttribute('open');
 }
 
 function syncTimerToClock() {
@@ -970,6 +1008,9 @@ function bindEvents() {
   });
   document.querySelector('#end-zen-break')?.addEventListener('click', endZenBreakNow);
   document.querySelector('#extend-zen-break')?.addEventListener('click', extendZenBreak);
+  document.querySelector('#close-zen-break')?.addEventListener('click', cancelZenBreak);
+  document.querySelector('#close-zen-break-options')?.addEventListener('click', () => document.querySelector('.zen-break-menu')?.removeAttribute('open'));
+  document.querySelector('#close-conflict')?.addEventListener('click', cancelConflictStart);
   document.querySelector('#quick-task-button')?.addEventListener('click', activateQuickTask);
   document.querySelector('#quick-title')?.addEventListener('input', (event) => { quickTask.title = event.target.value; });
   const updateConflictTime = (index) => {
@@ -1005,6 +1046,8 @@ function bindEvents() {
     setScheduleForDate(toDateKey(new Date()), buildSavedSchedule(calendarDraft));
     await saveState();
     conflictModalOpen = false;
+    conflictPreviousCalendarDate = null;
+    conflictPreviousCalendarDraft = null;
     const shouldStart = pendingStart;
     pendingStart = false;
     viewedIndex = pendingStartIndex;
