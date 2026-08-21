@@ -69,8 +69,11 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .zen-break-toggle input { width: 1.1rem; height: 1.1rem; margin: 0; }
 .zen-break-menu summary { padding: .45rem .7rem .45rem .35rem; color: #fff; cursor: pointer; list-style: none; font-size: 1.1rem; }
 .zen-break-menu summary::-webkit-details-marker { display: none; }
-.zen-break-options { position: absolute; z-index: 5; top: calc(100% + .4rem); right: 0; width: 13rem; display: grid; gap: .75rem; padding: .85rem; border: 1px solid var(--line); border-radius: 14px; background: var(--panel-strong); box-shadow: 0 14px 40px rgba(0,0,0,.55); }
+.zen-break-options { position: absolute; z-index: 5; top: calc(100% + .4rem); right: 0; width: 13rem; display: grid; gap: .75rem; padding: 2.75rem .85rem .85rem; border: 1px solid var(--line); border-radius: 14px; background: var(--panel-strong); box-shadow: 0 14px 40px rgba(0,0,0,.55); }
 .zen-break-options label { display: grid; gap: .35rem; }
+.escape-close { position: absolute; top: 1rem; right: 1rem; z-index: 2; width: 2.75rem; height: 2.75rem; justify-content: center; padding: 0; border-color: rgba(255,255,255,.35); background: rgba(17,17,21,.92); font-size: 1.75rem; line-height: 1; }
+.escape-close:hover, .escape-close:focus-visible { border-color: var(--red); background: var(--red-dark); }
+.escape-close-small { top: .55rem; right: .55rem; width: 2rem; height: 2rem; font-size: 1.35rem; }
 .primary, .active-tab, .add-button { background: var(--red); border-color: var(--red); color: #fff; font-weight: 800; }
 .schedule-list, .project-list { display: grid; gap: .75rem; }
 .time-block, .project-row { display: grid; grid-template-columns: auto auto 1fr; gap: .85rem; align-items: center; border: 1px solid var(--line); border-radius: 18px; padding: .95rem; background: #0a0a0d; }
@@ -410,7 +413,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 }
 
 .conflict-overlay { position: fixed; inset: 0; z-index: 60; overflow: auto; padding: clamp(1rem, 4vw, 3rem); background: rgba(0,0,0,.88); backdrop-filter: blur(12px); }
-.conflict-dialog { width: min(1100px, 100%); margin: auto; padding: clamp(1rem, 3vw, 2rem); border: 1px solid var(--red); border-radius: 24px; background: #0d0d10; box-shadow: 0 24px 100px rgba(255,41,61,.2); }
+.conflict-dialog { position: relative; width: min(1100px, 100%); margin: auto; padding: clamp(1rem, 3vw, 2rem); padding-top: clamp(4.5rem, 7vw, 5.5rem); border: 1px solid var(--red); border-radius: 24px; background: #0d0d10; box-shadow: 0 24px 100px rgba(255,41,61,.2); }
 .conflict-schedule { display: grid; gap: .8rem; margin: 1.5rem 0; }
 .conflict-block { position: relative; border-color: var(--red) !important; background: rgba(127,16,27,.2); }
 .conflict-label { grid-column: 1 / -1; color: var(--red); font-size: .72rem; letter-spacing: .12em; }
@@ -418,6 +421,8 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .zen-break-overlay h2 {
   font-size: clamp(2.5rem, 8vw, 6rem);
 }
+
+.zen-break-dialog { position: relative; width: min(62rem, 100%); padding: clamp(4.5rem, 8vw, 6rem) clamp(1rem, 4vw, 3rem) clamp(2rem, 5vw, 4rem); }
 
 .zen-break-overlay span {
   display: block;
