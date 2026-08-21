@@ -20,6 +20,17 @@ test('Quick Task fields and duration presets render only while Quick Task is act
   assert.match(timerPage, /quickTaskNameField\(\).*timer-presets/);
 });
 
+test('Quick Task setup can be canceled with its close button or Escape', () => {
+  assert.match(mainSource, /id="close-quick-task"[^>]+aria-label="Cancel and close Quick Task"/);
+  assert.match(mainSource, /#close-quick-task'\)\?\.addEventListener\('click', cancelQuickTask\)/);
+  assert.match(mainSource, /else if \(quickTask\?\.active\) cancelQuickTask\(\)/);
+  const cancelQuickTask = mainSource.slice(mainSource.indexOf('function cancelQuickTask()'), mainSource.indexOf('function selectActiveBlock('));
+  assert.match(cancelQuickTask, /quickTask = null/);
+  assert.match(cancelQuickTask, /hasTimerStarted = false/);
+  assert.match(cancelQuickTask, /syncTimerToClock\(\)/);
+  assert.match(cancelQuickTask, /render\(\)/);
+});
+
 test('Auto-Start is a compact Timer control without a separate explanation card', () => {
   const timerPage = mainSource.slice(mainSource.indexOf('function timerPage()'), mainSource.indexOf('function timerSchedule()'));
   assert.match(timerPage, /timer-actions.*\$\{autoStartControl\}/);

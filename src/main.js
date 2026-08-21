@@ -465,7 +465,7 @@ function timerPage() {
   const next = nextIndex === null ? null : state.schedule[nextIndex];
   const inspected = viewedIndex === null ? null : state.schedule[viewedIndex];
   const canStart = Boolean(quickTask?.active || inspected || current);
-  const quickTaskControls = quickTask?.active ? `${quickTaskNameField()}<fieldset class="preset-group timer-presets"><legend>Duration</legend>${DURATION_PRESETS.map((minutes) => `<button type="button" class="preset-button timer-duration-preset ${configuredDurationSeconds === minutes * 60 ? 'active-preset' : ''}" data-minutes="${minutes}" ${hasTimerStarted ? 'disabled' : ''}>${formatMinutes(minutes)}</button>`).join('')}</fieldset>` : '';
+  const quickTaskControls = quickTask?.active ? `<div class="quick-task-setup"><button id="close-quick-task" class="escape-close" type="button" aria-label="Cancel and close Quick Task" aria-keyshortcuts="Escape" title="Cancel and close">×</button>${quickTaskNameField()}<fieldset class="preset-group timer-presets"><legend>Duration</legend>${DURATION_PRESETS.map((minutes) => `<button type="button" class="preset-button timer-duration-preset ${configuredDurationSeconds === minutes * 60 ? 'active-preset' : ''}" data-minutes="${minutes}" ${hasTimerStarted ? 'disabled' : ''}>${formatMinutes(minutes)}</button>`).join('')}</fieldset></div>` : '';
   const lengthEditor = current ? `<div id="timer-length-editor" class="timer-length-editor" hidden><p><strong>Change timer length</strong><span>Changes take effect immediately. Schedule conflicts must be resolved first.</span></p><div class="preset-group">${DURATION_PRESETS.map((minutes) => `<button type="button" class="preset-button live-duration-preset ${Math.round(configuredDurationSeconds / 60) === minutes ? 'active-preset' : ''}" data-minutes="${minutes}">${formatMinutes(minutes)}</button>`).join('')}</div></div>` : '';
   const autoStartControl = `<label class="auto-start-control"><span>Auto-Start</span><input id="auto-start-next-task" type="checkbox" role="switch" aria-label="Auto-Start Next Task" ${state.autoStartNextTask ? 'checked' : ''} /></label>`;
   const timerActions = `<div class="actions timer-actions"><button id="start-button" class="primary" ${canStart ? '' : 'disabled'}>Start</button><button id="stop-button">Pause</button><button id="reset-button" ${canStart ? '' : 'disabled'} aria-label="Clear timer to zero">Reset</button><button id="skip-button">Skip</button>${autoStartControl}${zenBreakControl(inspected || current)}</div>`;
@@ -950,6 +950,21 @@ function activateQuickTask() {
   document.querySelector('#quick-title')?.focus();
 }
 
+function cancelQuickTask() {
+  if (!quickTask?.active) return;
+  isRunning = false;
+  isUserPaused = false;
+  clearInterval(timerId);
+  zenBreak = null;
+  quickTask = null;
+  runningIndex = null;
+  hasTimerStarted = false;
+  projectedEndTime = null;
+  zenBreakNotifiedKey = null;
+  syncTimerToClock();
+  render();
+}
+
 function selectActiveBlock(index) {
   const nextIndex = Number(index);
   if (!Number.isInteger(nextIndex) || !state.schedule[nextIndex]) return;
@@ -1028,6 +1043,7 @@ function handleEscapeKey(event) {
   if (event.key !== 'Escape') return;
   if (conflictModalOpen) cancelConflictStart();
   else if (zenBreak?.active) cancelZenBreak();
+  else if (quickTask?.active) cancelQuickTask();
   else document.querySelector('.zen-break-menu[open]')?.removeAttribute('open');
 }
 
@@ -1120,6 +1136,7 @@ function bindEvents() {
   document.querySelector('#close-zen-break-options')?.addEventListener('click', () => document.querySelector('.zen-break-menu')?.removeAttribute('open'));
   document.querySelector('#close-conflict')?.addEventListener('click', cancelConflictStart);
   document.querySelector('#quick-task-button')?.addEventListener('click', activateQuickTask);
+  document.querySelector('#close-quick-task')?.addEventListener('click', cancelQuickTask);
   document.querySelector('#quick-title')?.addEventListener('input', (event) => { quickTask.title = event.target.value; });
   const updateConflictTime = (index) => {
     const hour = Number(document.querySelector(`.conflict-hour[data-index="${index}"]`)?.value || 12);
