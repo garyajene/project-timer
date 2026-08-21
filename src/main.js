@@ -863,6 +863,7 @@ function stopTimer() {
   if (!isRunning) return;
   isRunning = false;
   isUserPaused = true;
+  projectedEndTime = null;
   clearInterval(timerId);
   updateTimerDisplay();
 }
@@ -984,7 +985,10 @@ function handleEscapeKey(event) {
 
 function syncTimerToClock() {
   state.schedule = cloneSchedule(getScheduleForDate(toDateKey(new Date())));
-  if (isRunning || quickTask?.active) return;
+  // A paused timer is still an active session. Clock synchronization is only
+  // for loading an unstarted scheduled block; it must never replace saved
+  // countdown progress while the user is paused or navigating between pages.
+  if (isRunning || hasTimerStarted || quickTask?.active) return;
   const { currentIndex } = getSchedulePosition();
   const relevantIndex = viewedIndex ?? currentIndex;
   if (relevantIndex === null) {

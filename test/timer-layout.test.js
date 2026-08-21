@@ -134,7 +134,13 @@ test('scheduled timer status shows end time and only marks an intentional pause'
   assert.match(timerStatus, /formatTime\(getNextStartTime\(current\)\)/);
   assert.match(stopTimer, /if \(!isRunning\) return/);
   assert.match(stopTimer, /isUserPaused = true/);
+  assert.match(stopTimer, /projectedEndTime = null/);
   assert.match(mainSource, /<button id="stop-button">Pause<\/button>/);
+});
+
+test('clock synchronization preserves paused countdown progress', () => {
+  const syncTimer = mainSource.slice(mainSource.indexOf('function syncTimerToClock()'), mainSource.indexOf('function handleRouteChange()'));
+  assert.match(syncTimer, /if \(isRunning \|\| hasTimerStarted \|\| quickTask\?\.active\) return/);
 });
 
 test('Reset stops the shared timer and clears both timer values to zero', () => {
