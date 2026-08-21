@@ -57,9 +57,16 @@ test('canceling Zen Break restores and resumes the interrupted timer only', () =
   const cancelBreak = mainSource.slice(mainSource.indexOf('function cancelZenBreak()'), mainSource.indexOf('function cancelConflictStart()'));
   assert.match(cancelBreak, /remainingSeconds = zenBreak\.pausedRemainingSeconds/);
   assert.match(cancelBreak, /zenBreak = null/);
-  assert.match(cancelBreak, /isRunning = true/);
-  assert.match(cancelBreak, /timerId = setInterval\(tick, 250\)/);
+  assert.match(cancelBreak, /const resumeOnCancel = zenBreak\.resumeOnCancel/);
+  assert.match(cancelBreak, /isRunning = resumeOnCancel/);
+  assert.match(cancelBreak, /if \(isRunning\).*timerId = setInterval\(tick, 250\)/s);
   assert.doesNotMatch(cancelBreak, /saveState|sounds\.|startTimer/);
+});
+
+test('Zen Break remembers whether cancel should resume the timer', () => {
+  const startBreak = mainSource.slice(mainSource.indexOf('function startZenBreak('), mainSource.indexOf('function syncZenBreakCountdown()'));
+  assert.match(startBreak, /const resumeOnCancel = isRunning/);
+  assert.match(startBreak, /resumeOnCancel,/);
 });
 
 test('main timer is editable only before a timer session starts', () => {
