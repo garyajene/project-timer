@@ -5,11 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "node server.js",
-    "build": "rm -rf dist && mkdir -p dist/src && cp index.html dist/ && cp src/main.js src/audio.js src/timerPersistence.js src/styles.css dist/src/ && cp -R src/assets dist/src/",
+    "build": "rm -rf dist && mkdir -p dist/src && cp index.html dist/ && cp src/main.js src/audio.js src/styles.css dist/src/ && cp -R src/assets dist/src/",
     "start": "node server.js",
     "preview": "node server.js",
-    "test": "node --test",
-    "migrate:owner": "node scripts/migrate-owner-state.js"
+    "test": "node --test"
   },
   "engines": {
     "node": ">=18"

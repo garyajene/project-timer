@@ -71,8 +71,7 @@ test('canceling Zen Break restores and resumes the interrupted timer only', () =
   assert.match(cancelBreak, /const resumeOnCancel = zenBreak\.resumeOnCancel/);
   assert.match(cancelBreak, /isRunning = resumeOnCancel/);
   assert.match(cancelBreak, /if \(isRunning\).*timerId = setInterval\(tick, 250\)/s);
-  assert.doesNotMatch(cancelBreak, /sounds\.|startTimer/);
-  assert.match(cancelBreak, /saveState\(\)/, 'the restored timer state survives refresh');
+  assert.doesNotMatch(cancelBreak, /saveState|sounds\.|startTimer/);
 });
 
 test('Zen Break remembers whether cancel should resume the timer', () => {
