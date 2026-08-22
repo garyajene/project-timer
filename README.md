@@ -1,6 +1,6 @@
 # Project Timer
 
-A dark, minimal personal productivity web app for a single user, with timer logic, sounds, and shared server-side persistence.
+A dark, minimal personal productivity web app with private accounts, timer logic, sounds, and SQLite persistence.
 
 ## Scripts
 
@@ -11,5 +11,12 @@ A dark, minimal personal productivity web app for a single user, with timer logi
 
 ## Persistence
 
-Projects, schedules, Notes, Auto-Start, Quick Task, and running or paused timer state are loaded from and saved to the server through `/api/state`. The server stores the complete workspace transactionally in the SQLite table `app_state` in `DATA_DIR/project-timer.sqlite` (`.data` by default); browser storage is only a fallback cache for temporary server outages. Running timers use a saved ending timestamp, so restoring a timer does not infer elapsed work from its Calendar start time. In production, set `DATA_DIR` to a durable mounted volume (for example `/data`). This app remains a single-user workspace, so all browsers connected to the deployment intentionally share the same state.
-Railway redeploy
+Projects, schedules, Notes, Auto-Start, Quick Task, and running or paused timer state are loaded from and saved to each account's private workspace through `/api/state`. The server stores all data in `DATA_DIR/project-timer.sqlite` (`.data` by default), and does not use `DATABASE_URL` or require a migration command. In production, keep `DATA_DIR` on a durable mounted volume (for example `/data`).
+
+## Accounts and deployment
+
+Accounts and public registration are available immediately after deployment. No Railway feature flags or owner-email variables are required.
+
+On an upgraded deployment, the first account created receives a verified copy of the existing legacy `app_state` workspace. Later accounts receive empty, independent workspaces. The legacy `app_state` row remains untouched as a safety copy. Keep the existing Railway volume and `DATA_DIR` unchanged when deploying.
+
+Session cookies are opaque, server-managed, `HttpOnly`, `SameSite=Lax`, and `Secure` in production. Passwords use Node's scrypt. Authenticated state writes include a revision and stale writes receive HTTP 409.

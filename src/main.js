@@ -55,6 +55,10 @@ let conflictPreviousCalendarDate = null;
 let conflictPreviousCalendarDraft = null;
 let authorityTimerId;
 let noteSaveTimer;
+let authEnabled = false;
+let currentUser = null;
+let stateRevision = 0;
+let accountGeneration = 0;
 
 
 function toDateKey(date) {
@@ -146,10 +150,13 @@ async function loadState() {
   try {
     const response = await fetch('/api/state', { headers: { Accept: 'application/json' }, cache: 'no-store' });
     if (!response.ok) throw new Error(`Server returned ${response.status}`);
-    const serverState = await response.json();
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(serverState));
+    const payload = await response.json();
+    const serverState = authEnabled ? payload.state : payload;
+    if (authEnabled) stateRevision = payload.revision;
+    else localStorage.setItem(STORAGE_KEY, JSON.stringify(serverState));
     return sanitizeState(serverState);
   } catch (error) {
+    if (authEnabled) throw error;
     console.warn('Server state is temporarily unavailable; using the browser cache.', error);
     return loadCachedState();
   }
@@ -196,15 +203,19 @@ function saveState() {
   state.activeIndex = clampActiveIndex(state.activeIndex);
   captureTimerState();
   const snapshot = structuredClone(state);
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+  if (!authEnabled) localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
+  const generation = accountGeneration;
   pendingSave = pendingSave.catch(() => {}).then(async () => {
+    if (generation !== accountGeneration || (authEnabled && !currentUser)) return false;
     const response = await fetch('/api/state', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(snapshot),
+      body: JSON.stringify(authEnabled ? { state: snapshot, revision: stateRevision } : snapshot),
       keepalive: true,
     });
+    if (response.status === 409) throw new Error('This workspace changed in another tab. Reload before saving again.');
     if (!response.ok) throw new Error(`Server rejected state with status ${response.status}`);
+    if (authEnabled) stateRevision = (await response.json()).revision;
     return true;
   }).catch((error) => {
     console.error('Could not save state to the server.', error);
@@ -491,7 +502,7 @@ function primaryNavigation(className = '') {
 }
 
 function header() {
-  return `<header class="app-header ${getRoute() === 'timer' ? 'timer-header' : ''}"><div><p class="eyebrow">Personal workspace</p><h1>Project Timer</h1></div><div class="header-meta" aria-label="Current date and time"><span>${icon.clock}</span><span>${formatDate()}</span></div>${getRoute() === 'timer' ? '' : primaryNavigation()}</header>`;
+  return `<header class="app-header ${getRoute() === 'timer' ? 'timer-header' : ''}"><div><p class="eyebrow">Personal workspace</p><h1>Project Timer</h1></div><div class="header-meta" aria-label="Current date and time"><span>${icon.clock}</span><span>${formatDate()}</span>${authEnabled && currentUser ? `<span>${escapeHtml(currentUser.email)}</span><button id="logout-button">Log out</button>` : ''}</div>${getRoute() === 'timer' ? '' : primaryNavigation()}</header>`;
 }
 
 function getActiveBlock() {
@@ -687,6 +698,12 @@ function renderShell(content = '') {
 
 function render() {
   try {
+    if (authEnabled && !currentUser) {
+      const app = getAppElement();
+      app.innerHTML = `<main class="auth-page"><section class="panel auth-panel"><p class="eyebrow">Private workspace</p><h1>Project Timer</h1><p class="helper-text">Log in or make an account to open your workspace.</p><form id="auth-form"><label>Email<input class="text-input" name="email" type="email" autocomplete="email" required /></label><label>Password<input class="text-input" name="password" type="password" autocomplete="current-password" minlength="12" required /></label><p id="auth-error" class="auth-error" role="alert"></p><div class="actions"><button class="primary" name="action" value="login">Log in</button><button name="action" value="register">Make an account</button></div></form></section></main>`;
+      bindAuthEvents();
+      return;
+    }
     if (!renderShell(mainContent())) return;
     bindEvents();
   } catch (error) {
@@ -698,6 +715,24 @@ function render() {
       console.error('Project Timer shell render failed.', shellError);
     }
   }
+}
+
+function bindAuthEvents() {
+  document.querySelector('#auth-form')?.addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const submitter = event.submitter;
+    const form = new FormData(event.currentTarget);
+    const response = await fetch(`/api/auth/${submitter?.value === 'register' ? 'register' : 'login'}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: form.get('email'), password: form.get('password') }) });
+    const payload = await response.json();
+    if (!response.ok) { document.querySelector('#auth-error').textContent = payload.error || 'Authentication failed'; return; }
+    accountGeneration += 1;
+    currentUser = payload.user;
+    state = await loadState();
+    todayDraft = cloneSchedule(state.schedule.filter((block) => !block.isBreak));
+    calendarDraft = cloneSchedule(getScheduleForDate(calendarDate).filter((block) => !block.isBreak));
+    restoreTimerState();
+    render();
+  });
 }
 
 function updateTimerDisplay() {
@@ -1112,6 +1147,20 @@ function bindGlobalEvents() {
   window.addEventListener('hashchange', handleRouteChange);
   window.removeEventListener('keydown', handleEscapeKey);
   window.addEventListener('keydown', handleEscapeKey);
+  document.querySelector('#logout-button')?.addEventListener('click', async () => {
+    accountGeneration += 1;
+    currentUser = null;
+    stateRevision = 0;
+    state = structuredClone(defaultState);
+    todayDraft = [];
+    calendarDraft = [];
+    quickTask = null;
+    zenBreak = null;
+    isRunning = false;
+    clearInterval(timerId);
+    render();
+    await fetch('/api/auth/logout', { method: 'POST' });
+  });
 }
 
 function handleEscapeKey(event) {
@@ -1456,6 +1505,12 @@ function bindEvents() {
 
 async function initializeApp() {
   try {
+    const sessionResponse = await fetch('/api/auth/session', { headers: { Accept: 'application/json' }, cache: 'no-store' });
+    if (sessionResponse.status !== 404) {
+      authEnabled = true;
+      if (sessionResponse.ok) currentUser = (await sessionResponse.json()).user;
+      if (!currentUser) return;
+    }
     state = await loadState();
     todayDraft = cloneSchedule(state.schedule.filter((block) => !block.isBreak));
     calendarDraft = cloneSchedule(getScheduleForDate(calendarDate).filter((block) => !block.isBreak));
@@ -1473,6 +1528,7 @@ async function initializeApp() {
     }, 1000);
   } catch (error) {
     console.error('Project Timer startup failed while loading saved state.', error);
+    if (authEnabled) currentUser = null;
     state = structuredClone(defaultState);
     todayDraft = [];
     remainingSeconds = DEFAULT_BLOCK_MINUTES * 60;

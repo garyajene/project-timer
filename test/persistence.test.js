@@ -51,13 +51,16 @@ test('state API shares saved data with independent clients', async (t) => {
   const server = createAppServer(store);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
-  const url = `http://127.0.0.1:${server.address().port}/api/state`;
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const registration = await fetch(`${baseUrl}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'shared@example.com', password: 'correct horse battery staple' }) });
+  const cookie = registration.headers.get('set-cookie').split(';')[0];
+  const url = `${baseUrl}/api/state`;
 
-  const saveResponse = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(sampleState) });
+  const saveResponse = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify({ state: sampleState, revision: 0 }) });
   assert.equal(saveResponse.status, 200);
-  const independentClientResponse = await fetch(url, { cache: 'no-store' });
+  const independentClientResponse = await fetch(url, { cache: 'no-store', headers: { Cookie: cookie } });
   assert.equal(independentClientResponse.status, 200);
-  assert.deepEqual(await independentClientResponse.json(), sampleState);
+  assert.deepEqual((await independentClientResponse.json()).state, sampleState);
 });
 
 test('state API persists create, edit, multiple-block, and delete operations', async (t) => {
@@ -70,9 +73,17 @@ test('state API persists create, edit, multiple-block, and delete operations', a
   const server = createAppServer(store);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
-  const url = `http://127.0.0.1:${server.address().port}/api/state`;
-  const put = (body) => fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
-  const reload = async () => (await (await fetch(url, { cache: 'no-store' })).json());
+  const baseUrl = `http://127.0.0.1:${server.address().port}`;
+  const registration = await fetch(`${baseUrl}/api/auth/register`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'lifecycle@example.com', password: 'correct horse battery staple' }) });
+  const cookie = registration.headers.get('set-cookie').split(';')[0];
+  const url = `${baseUrl}/api/state`;
+  let revision = 0;
+  const put = async (state) => {
+    const response = await fetch(url, { method: 'PUT', headers: { 'Content-Type': 'application/json', Cookie: cookie }, body: JSON.stringify({ state, revision }) });
+    if (response.ok) revision = (await response.json()).revision;
+    return response;
+  };
+  const reload = async () => (await (await fetch(url, { cache: 'no-store', headers: { Cookie: cookie } })).json()).state;
 
   assert.equal((await put(sampleState)).status, 200);
   assert.deepEqual(await reload(), sampleState, 'new block survives an independent reload');
@@ -92,7 +103,7 @@ test('state API persists create, edit, multiple-block, and delete operations', a
   assert.equal((await put(deleted)).status, 200);
   assert.deepEqual(await reload(), deleted, 'deleted blocks remain deleted after reload');
 
-  const persistedJson = await store.query('SELECT state_json FROM app_state WHERE id = 1;');
+  const persistedJson = await store.query("SELECT state_json FROM user_states JOIN users ON users.id=user_states.user_id WHERE users.email='lifecycle@example.com';");
   assert.deepEqual(JSON.parse(persistedJson), deleted, 'the committed database row contains the final state');
 });
 

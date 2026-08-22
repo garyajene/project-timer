@@ -14,6 +14,11 @@
 * { box-sizing: border-box; }
 html { scroll-behavior: smooth; }
 body { margin: 0; min-width: 320px; background: radial-gradient(circle at top right, rgba(255,41,61,.18), transparent 32rem), #000; }
+.auth-page { min-height: 100vh; place-content: center; }
+.auth-panel { width: min(100%, 30rem); margin: auto; }
+.auth-panel form, .auth-panel label { display: grid; gap: .65rem; }
+.auth-panel form { gap: 1rem; margin-top: 1.5rem; }
+.auth-error { min-height: 1.25rem; margin: 0; color: #ff7784; }
 button, input, textarea, select { font: inherit; }
 button { border: 1px solid var(--line); background: #111115; color: #fff; border-radius: 999px; padding: .85rem 1.15rem; cursor: pointer; display: inline-flex; align-items: center; gap: .45rem; transition: border-color .2s, transform .2s, background .2s; }
 button:hover { transform: translateY(-1px); border-color: rgba(255,255,255,.35); }
