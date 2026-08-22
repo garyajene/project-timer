@@ -4,7 +4,51 @@ import { dirname } from 'node:path';
 import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
-export const EMPTY_STATE = { projects: [], schedule: [], schedules: {}, activeIndex: 0, autoStartNextTask: false };
+export const EMPTY_TIMER_STATE = {
+  status: 'idle',
+  mode: 'scheduled',
+  configuredDurationSeconds: 1800,
+  remainingSecondsWhenPaused: 1800,
+  startedAt: null,
+  endsAt: null,
+  activeIndex: null,
+  quickTask: null,
+  zenBreak: null,
+};
+
+export const EMPTY_STATE = {
+  projects: [],
+  schedule: [],
+  schedules: {},
+  activeIndex: 0,
+  autoStartNextTask: false,
+  notes: { parkingLot: '', general: '' },
+  timerState: EMPTY_TIMER_STATE,
+};
+
+function normalizeTimerState(value) {
+  const timer = value && typeof value === 'object' ? value : {};
+  const number = (candidate, fallback) => Number.isFinite(Number(candidate)) ? Math.max(0, Number(candidate)) : fallback;
+  const quickTask = timer.quickTask?.active ? {
+    active: true,
+    project: 'Quick Start',
+    title: String(timer.quickTask.title ?? ''),
+    duration: number(timer.quickTask.duration, 30),
+    zenBreakMinutes: number(timer.quickTask.zenBreakMinutes, 0),
+    zenBreakTiming: timer.quickTask.zenBreakTiming === 'random' ? 'random' : 'midpoint',
+  } : null;
+  return {
+    status: ['idle', 'running', 'paused'].includes(timer.status) ? timer.status : 'idle',
+    mode: timer.mode === 'quick' ? 'quick' : 'scheduled',
+    configuredDurationSeconds: number(timer.configuredDurationSeconds, 1800),
+    remainingSecondsWhenPaused: number(timer.remainingSecondsWhenPaused, 1800),
+    startedAt: typeof timer.startedAt === 'string' ? timer.startedAt : null,
+    endsAt: typeof timer.endsAt === 'string' ? timer.endsAt : null,
+    activeIndex: Number.isInteger(timer.activeIndex) ? timer.activeIndex : null,
+    quickTask,
+    zenBreak: timer.zenBreak && typeof timer.zenBreak === 'object' ? timer.zenBreak : null,
+  };
+}
 
 export function normalizeState(value) {
   if (!value || !Array.isArray(value.projects) || !Array.isArray(value.schedule)) throw new TypeError('State must contain projects and schedule arrays');
@@ -14,6 +58,11 @@ export function normalizeState(value) {
     schedules: value.schedules && typeof value.schedules === 'object' && !Array.isArray(value.schedules) ? value.schedules : {},
     activeIndex: Number.isInteger(value.activeIndex) ? value.activeIndex : 0,
     autoStartNextTask: value.autoStartNextTask === true,
+    notes: {
+      parkingLot: String(value.notes?.parkingLot ?? ''),
+      general: String(value.notes?.general ?? ''),
+    },
+    timerState: normalizeTimerState(value.timerState),
   };
 }
 
