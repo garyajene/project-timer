@@ -1,4 +1,5 @@
 import { sounds } from './audio.js';
+import { remainingFromTimerState } from './timerPersistence.js';
 const STORAGE_KEY = 'project-timer-state-v1';
 const DEFAULT_BLOCK_MINUTES = 30;
 const DURATION_PRESETS = [5, 10, 15, 30, 45, 60, 120, 180, 240];
@@ -15,6 +16,8 @@ const defaultState = {
   schedules: {},
   activeIndex: 0,
   autoStartNextTask: false,
+  notes: { parkingLot: '', general: '' },
+  timerState: { status: 'idle', mode: 'scheduled', configuredDurationSeconds: 1800, remainingSecondsWhenPaused: 1800, startedAt: null, endsAt: null, activeIndex: null, quickTask: null, zenBreak: null },
 };
 
 const icon = { clock: '◷', edit: '✎', trash: '⌫', plus: '+', check: '✓', next: '›' };
@@ -30,6 +33,7 @@ let remainingSeconds = DEFAULT_BLOCK_MINUTES * 60;
 let configuredDurationSeconds = remainingSeconds;
 let hasTimerStarted = false;
 let lastTick = Date.now();
+let timerStartedAt = null;
 let timerId;
 let zenBreakNotifiedKey = null;
 let quickTask = null;
@@ -50,6 +54,7 @@ let conflictIndexes = new Set();
 let conflictPreviousCalendarDate = null;
 let conflictPreviousCalendarDraft = null;
 let authorityTimerId;
+let noteSaveTimer;
 
 
 function toDateKey(date) {
@@ -129,6 +134,8 @@ function loadCachedState() {
       schedule: cloneSchedule(schedules[todayKey] || []),
       activeIndex: Number.isInteger(saved.activeIndex) ? saved.activeIndex : 0,
       autoStartNextTask: saved.autoStartNextTask === true,
+      notes: { parkingLot: String(saved.notes?.parkingLot ?? ''), general: String(saved.notes?.general ?? '') },
+      timerState: { ...structuredClone(defaultState.timerState), ...(saved.timerState || {}) },
     };
   } catch {
     return structuredClone(defaultState);
@@ -164,7 +171,7 @@ function sanitizeState(saved) {
   }
   const schedule = cleanSchedule(saved.schedule);
   if (schedule.length && !schedules[todayKey]) schedules[todayKey] = schedule;
-  return { projects, schedules, schedule: cloneSchedule(schedules[todayKey] || []), activeIndex: Number.isInteger(saved.activeIndex) ? saved.activeIndex : 0, autoStartNextTask: saved.autoStartNextTask === true };
+  return { projects, schedules, schedule: cloneSchedule(schedules[todayKey] || []), activeIndex: Number.isInteger(saved.activeIndex) ? saved.activeIndex : 0, autoStartNextTask: saved.autoStartNextTask === true, notes: { parkingLot: String(saved.notes?.parkingLot ?? ''), general: String(saved.notes?.general ?? '') }, timerState: { ...structuredClone(defaultState.timerState), ...(saved.timerState || {}) } };
 }
 
 function cloneSchedule(schedule) {
@@ -187,6 +194,7 @@ function normalizeBlock(block) {
 
 function saveState() {
   state.activeIndex = clampActiveIndex(state.activeIndex);
+  captureTimerState();
   const snapshot = structuredClone(state);
   localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
   pendingSave = pendingSave.catch(() => {}).then(async () => {
@@ -203,6 +211,58 @@ function saveState() {
     return false;
   });
   return pendingSave;
+}
+
+function captureTimerState() {
+  const now = Date.now();
+  state.timerState = {
+    status: isRunning ? 'running' : (isUserPaused || zenBreak?.active ? 'paused' : 'idle'),
+    mode: quickTask?.active ? 'quick' : 'scheduled',
+    configuredDurationSeconds,
+    remainingSecondsWhenPaused: Math.max(0, remainingSeconds),
+    startedAt: hasTimerStarted && timerStartedAt ? new Date(timerStartedAt).toISOString() : null,
+    endsAt: isRunning && projectedEndTime ? projectedEndTime.toISOString() : null,
+    activeIndex: quickTask?.active ? null : (runningIndex ?? state.activeIndex),
+    quickTask: quickTask?.active ? structuredClone(quickTask) : null,
+    zenBreak: zenBreak?.active ? {
+      active: true,
+      endsAt: new Date(now + (zenBreak.remainingSeconds * 1000)).toISOString(),
+      pausedRemainingSeconds: zenBreak.pausedRemainingSeconds,
+      resumeOnCancel: zenBreak.resumeOnCancel,
+    } : null,
+  };
+}
+
+function restoreTimerState() {
+  const saved = state.timerState || defaultState.timerState;
+  quickTask = saved.quickTask?.active ? structuredClone(saved.quickTask) : null;
+  configuredDurationSeconds = Number(saved.configuredDurationSeconds) || DEFAULT_BLOCK_MINUTES * 60;
+  remainingSeconds = remainingFromTimerState(saved);
+  runningIndex = saved.mode === 'scheduled' && Number.isInteger(saved.activeIndex) ? saved.activeIndex : null;
+  hasTimerStarted = ['running', 'paused'].includes(saved.status);
+  timerStartedAt = hasTimerStarted && saved.startedAt ? Date.parse(saved.startedAt) : null;
+  isUserPaused = saved.status === 'paused';
+  isRunning = saved.status === 'running' && remainingSeconds > 0;
+  projectedEndTime = isRunning && saved.endsAt ? new Date(saved.endsAt) : null;
+
+  if (saved.zenBreak?.active) {
+    const breakRemaining = Math.max(0, (Date.parse(saved.zenBreak.endsAt) - Date.now()) / 1000);
+    if (breakRemaining > 0) {
+      isRunning = false;
+      zenBreak = { active: true, remainingSeconds: breakRemaining, pausedRemainingSeconds: Number(saved.zenBreak.pausedRemainingSeconds) || remainingSeconds, resumeOnCancel: saved.zenBreak.resumeOnCancel === true, lastTick: Date.now() };
+      timerId = setInterval(tickZenBreak, 250);
+      return;
+    }
+  }
+
+  if (isRunning) {
+    lastTick = Date.now();
+    timerId = setInterval(tick, 250);
+  } else if (saved.status === 'running') {
+    hasTimerStarted = false;
+    timerStartedAt = null;
+    remainingSeconds = 0;
+  }
 }
 
 function clampActiveIndex(index) {
@@ -583,7 +643,7 @@ function calendarSection() {
 }
 
 function notesAndReview() {
-  return `<div class="notes-grid">${section({ id: 'parking', title: 'Parking Lot', eyebrow: 'Quick capture', content: '<textarea aria-label="Parking lot notes"></textarea>' })}${section({ id: 'notes', title: 'Project Notes', eyebrow: 'Current project', content: '<textarea aria-label="Project notes"></textarea>' })}${section({ id: 'end-day', title: 'End of Day', eyebrow: 'Review', content: '<div class="review-card"><span>✓</span><div><h3>Accomplishments</h3><p>Summarize completed work and lessons learned.</p></div></div><div class="review-card"><span>›</span><div><h3>First Task for tomorrow</h3><p>Choose the next focused starting point.</p></div></div>' })}</div>`;
+  return `<div class="notes-grid">${section({ id: 'parking', title: 'Parking Lot', eyebrow: 'Quick capture', content: `<textarea id="parking-lot-notes" aria-label="Parking lot notes">${escapeHtml(state.notes.parkingLot)}</textarea>` })}${section({ id: 'notes', title: 'Project Notes', eyebrow: 'Current project', content: `<textarea id="general-notes" aria-label="Project notes">${escapeHtml(state.notes.general)}</textarea>` })}${section({ id: 'end-day', title: 'End of Day', eyebrow: 'Review', content: '<div class="review-card"><span>✓</span><div><h3>Accomplishments</h3><p>Summarize completed work and lessons learned.</p></div></div><div class="review-card"><span>›</span><div><h3>First Task for tomorrow</h3><p>Choose the next focused starting point.</p></div></div>' })}</div>`;
 }
 
 function getRoute() {
@@ -687,6 +747,7 @@ function startZenBreak(block) {
   };
   render();
   timerId = setInterval(tickZenBreak, 250);
+  saveState();
 }
 
 function syncZenBreakCountdown() {
@@ -718,6 +779,7 @@ function cancelZenBreak() {
     timerId = setInterval(tick, 250);
   }
   render();
+  saveState();
 }
 
 function cancelConflictStart() {
@@ -741,6 +803,7 @@ function extendZenBreak() {
   zenBreak.remainingSeconds += 120;
   const display = document.querySelector('#zen-break-countdown');
   if (display) display.textContent = formatSeconds(zenBreak.remainingSeconds);
+  saveState();
 }
 
 function applyTimerDuration(durationSeconds, scheduleIndex = null) {
@@ -823,6 +886,7 @@ function advanceBlock({ completed = false } = {}) {
   isRunning = false;
   isUserPaused = false;
   hasTimerStarted = false;
+  timerStartedAt = null;
   clearInterval(timerId);
   if (quickTask?.active) {
     quickTask = null;
@@ -830,6 +894,7 @@ function advanceBlock({ completed = false } = {}) {
     configuredDurationSeconds = remainingSeconds;
     const resumeSchedule = shouldContinue && Boolean(state.schedule[state.activeIndex]);
     lastTick = Date.now();
+    saveState();
     render();
     if (resumeSchedule) {
       sounds.start();
@@ -898,6 +963,7 @@ function startTimer({ playStartSound = true } = {}) {
   isRunning = true;
   isUserPaused = false;
   hasTimerStarted = true;
+  if (!timerStartedAt) timerStartedAt = Date.now();
   projectedEndTime = new Date(Date.now() + (remainingSeconds * 1000));
   document.querySelectorAll('#timer-display, #quick-title, .timer-duration-preset, #quick-task-button').forEach((control) => { control.disabled = true; });
   if (playStartSound) sounds.start();
@@ -905,6 +971,7 @@ function startTimer({ playStartSound = true } = {}) {
   clearInterval(timerId);
   timerId = setInterval(tick, 250);
   updateTimerDisplay();
+  saveState();
 }
 
 function stopTimer() {
@@ -914,6 +981,7 @@ function stopTimer() {
   projectedEndTime = null;
   clearInterval(timerId);
   updateTimerDisplay();
+  saveState();
 }
 
 function resetCurrentDuration() {
@@ -928,10 +996,12 @@ function resetTimer() {
   zenBreak = null;
   zenBreakNotifiedKey = null;
   hasTimerStarted = false;
+  timerStartedAt = null;
   projectedEndTime = null;
   configuredDurationSeconds = 0;
   remainingSeconds = 0;
   render();
+  saveState();
 }
 
 function activateQuickTask() {
@@ -940,6 +1010,7 @@ function activateQuickTask() {
   clearInterval(timerId);
   zenBreak = null;
   hasTimerStarted = false;
+  timerStartedAt = null;
   if (configuredDurationSeconds <= 0) configuredDurationSeconds = DEFAULT_BLOCK_MINUTES * 60;
   quickTask = { active: true, project: QUICK_START_PROJECT, title: '', duration: configuredDurationSeconds / 60, zenBreakMinutes: 0, zenBreakTiming: 'midpoint' };
   viewedIndex = null;
@@ -947,6 +1018,7 @@ function activateQuickTask() {
   remainingSeconds = configuredDurationSeconds;
   zenBreakNotifiedKey = null;
   render();
+  saveState();
   document.querySelector('#quick-title')?.focus();
 }
 
@@ -959,10 +1031,12 @@ function cancelQuickTask() {
   quickTask = null;
   runningIndex = null;
   hasTimerStarted = false;
+  timerStartedAt = null;
   projectedEndTime = null;
   zenBreakNotifiedKey = null;
   syncTimerToClock();
   render();
+  saveState();
 }
 
 function selectActiveBlock(index) {
@@ -977,6 +1051,7 @@ function selectActiveBlock(index) {
   state.activeIndex = nextIndex;
   syncTimerToClock();
   hasTimerStarted = false;
+  timerStartedAt = null;
   zenBreakNotifiedKey = null;
   lastTick = Date.now();
   render();
@@ -1093,6 +1168,13 @@ async function persistSchedule(button) {
 
 function bindEvents() {
   bindGlobalEvents();
+  const saveNote = (key, value) => {
+    state.notes[key] = value;
+    clearTimeout(noteSaveTimer);
+    noteSaveTimer = setTimeout(saveState, 300);
+  };
+  document.querySelector('#parking-lot-notes')?.addEventListener('input', (event) => saveNote('parkingLot', event.target.value));
+  document.querySelector('#general-notes')?.addEventListener('input', (event) => saveNote('general', event.target.value));
   document.querySelector('#start-button')?.addEventListener('click', startTimer);
   document.querySelector('#stop-button')?.addEventListener('click', stopTimer);
   document.querySelector('#reset-button')?.addEventListener('click', resetTimer);
@@ -1108,7 +1190,7 @@ function bindEvents() {
     block.zenBreakMinutes = event.target.checked ? Number(document.querySelector('#timer-zen-break-duration')?.value || 5) : 0;
     zenBreakTriggers.delete(oldKey);
     zenBreakNotifiedKey = null;
-    if (!quickTask?.active) saveState();
+    saveState();
     render();
   });
   document.querySelector('#timer-zen-break-duration')?.addEventListener('change', (event) => {
@@ -1119,7 +1201,7 @@ function bindEvents() {
     zenBreakTriggers.delete(oldKey);
     zenBreakNotifiedKey = null;
     document.querySelector('#zen-break-enabled').checked = true;
-    if (!quickTask?.active) saveState();
+    saveState();
   });
   document.querySelector('#timer-zen-break-timing')?.addEventListener('change', (event) => {
     const block = getActiveBlock();
@@ -1128,7 +1210,7 @@ function bindEvents() {
     block.zenBreakTiming = event.target.value;
     zenBreakTriggers.delete(oldKey);
     zenBreakNotifiedKey = null;
-    if (!quickTask?.active) saveState();
+    saveState();
   });
   document.querySelector('#end-zen-break')?.addEventListener('click', endZenBreakNow);
   document.querySelector('#extend-zen-break')?.addEventListener('click', extendZenBreak);
@@ -1137,7 +1219,7 @@ function bindEvents() {
   document.querySelector('#close-conflict')?.addEventListener('click', cancelConflictStart);
   document.querySelector('#quick-task-button')?.addEventListener('click', activateQuickTask);
   document.querySelector('#close-quick-task')?.addEventListener('click', cancelQuickTask);
-  document.querySelector('#quick-title')?.addEventListener('input', (event) => { quickTask.title = event.target.value; });
+  document.querySelector('#quick-title')?.addEventListener('input', (event) => { quickTask.title = event.target.value; clearTimeout(noteSaveTimer); noteSaveTimer = setTimeout(saveState, 300); });
   const updateConflictTime = (index) => {
     const hour = Number(document.querySelector(`.conflict-hour[data-index="${index}"]`)?.value || 12);
     const minute = Number(document.querySelector(`.conflict-minute[data-index="${index}"]`)?.value || 0);
@@ -1219,12 +1301,14 @@ function bindEvents() {
     configuredDurationSeconds = (Number(match[1]) * 3600) + (Number(match[2]) * 60) + Number(match[3]);
     remainingSeconds = configuredDurationSeconds;
     if (quickTask?.active) quickTask.duration = configuredDurationSeconds / 60;
+    if (quickTask?.active) saveState();
     updateTimerDisplay();
   });
   document.querySelectorAll('.timer-duration-preset').forEach((button) => button.addEventListener('click', (event) => {
     configuredDurationSeconds = Number(event.currentTarget.dataset.minutes) * 60;
     remainingSeconds = configuredDurationSeconds;
     if (quickTask?.active) quickTask.duration = configuredDurationSeconds / 60;
+    if (quickTask?.active) saveState();
     render();
   }));
   document.querySelector('#add-project')?.addEventListener('click', () => {
@@ -1375,6 +1459,7 @@ async function initializeApp() {
     state = await loadState();
     todayDraft = cloneSchedule(state.schedule.filter((block) => !block.isBreak));
     calendarDraft = cloneSchedule(getScheduleForDate(calendarDate).filter((block) => !block.isBreak));
+    restoreTimerState();
     syncTimerToClock();
     clearInterval(authorityTimerId);
     authorityTimerId = setInterval(() => {

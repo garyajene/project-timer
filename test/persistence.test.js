@@ -3,7 +3,8 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import test from 'node:test';
-import { StateStore } from '../src/server/stateStore.js';
+import { StateStore, normalizeState } from '../src/server/stateStore.js';
+import { remainingFromTimerState } from '../src/timerPersistence.js';
 
 process.env.NODE_ENV = 'test';
 
@@ -13,7 +14,22 @@ const sampleState = {
   schedules: { '2026-08-03': [{ time: '10:00', project: 'Alpha', title: 'Build', duration: 60 }] },
   activeIndex: 0,
   autoStartNextTask: true,
+  notes: { parkingLot: 'Later idea', general: 'Project context' },
+  timerState: {
+    status: 'paused', mode: 'quick', configuredDurationSeconds: 7200, remainingSecondsWhenPaused: 4312,
+    startedAt: '2026-08-03T10:00:00.000Z', endsAt: null, activeIndex: null,
+    quickTask: { active: true, project: 'Quick Start', title: 'Urgent task', duration: 120, zenBreakMinutes: 5, zenBreakTiming: 'midpoint' },
+    zenBreak: null,
+  },
 };
+
+test('legacy workspaces receive empty Notes and an idle timer without losing existing data', () => {
+  const legacy = { projects: ['Existing'], schedule: [], schedules: {}, activeIndex: 0, autoStartNextTask: false };
+  const normalized = normalizeState(legacy);
+  assert.deepEqual(normalized.projects, ['Existing']);
+  assert.deepEqual(normalized.notes, { parkingLot: '', general: '' });
+  assert.equal(normalized.timerState.status, 'idle');
+});
 
 test('StateStore persists projects and dated schedules across instances', async (t) => {
   const directory = await mkdtemp(join(tmpdir(), 'project-timer-'));
@@ -78,4 +94,10 @@ test('state API persists create, edit, multiple-block, and delete operations', a
 
   const persistedJson = await store.query('SELECT state_json FROM app_state WHERE id = 1;');
   assert.deepEqual(JSON.parse(persistedJson), deleted, 'the committed database row contains the final state');
+});
+
+test('running and paused timers restore from actual saved timer timestamps', () => {
+  const now = Date.parse('2026-08-03T10:00:10.000Z');
+  assert.equal(remainingFromTimerState({ status: 'running', endsAt: '2026-08-03T12:00:00.000Z', remainingSecondsWhenPaused: 7200 }, now), 7190);
+  assert.equal(remainingFromTimerState({ status: 'paused', endsAt: null, remainingSecondsWhenPaused: 4312 }, now), 4312);
 });
