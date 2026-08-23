@@ -13,6 +13,8 @@ test('Scheduler replaces daily duration and gap inputs with a custom break toggl
   assert.match(schedulerPage, /scheduler-break-end/);
 });
 
-test('Scheduler day cards stack their controls vertically', () => {
-  assert.match(styles, /\.scheduler-day \{ display: grid; grid-template-columns: minmax\(0, 28rem\)/);
+test('Scheduler shows Monday through Friday across while each day stacks its controls vertically', () => {
+  assert.match(styles, /\.scheduler-days \{ grid-template-columns: repeat\(5, minmax\(0, 1fr\)\)/);
+  assert.match(styles, /\.scheduler-day \{ display: grid; grid-template-columns: minmax\(0, 1fr\)/);
+  assert.match(styles, /\.scheduler-break-times \{ display: grid; grid-template-columns: minmax\(0, 1fr\)/);
 });
