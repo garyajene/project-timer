@@ -46,7 +46,17 @@ test('authentication is enabled by default', async (t) => {
 
 test('auth is closed unless registration is explicitly enabled', async (t) => {
   const { url } = await fixture(t, { registrationEnabled: false });
+  const session = await fetch(url + '/api/auth/session');
+  assert.equal(session.status, 401);
+  assert.deepEqual(await session.json(), { authenticated: false, registrationEnabled: false });
   assert.equal((await post(url, '/api/auth/register', { email: 'a@example.com', password })).status, 403);
+});
+
+test('session advertises when registration is open', async (t) => {
+  const { url } = await fixture(t);
+  const response = await fetch(url + '/api/auth/session');
+  assert.equal(response.status, 401);
+  assert.deepEqual(await response.json(), { authenticated: false, registrationEnabled: true });
 });
 
 test('registration, login, session restoration, logout, and password hashing work', async (t) => {

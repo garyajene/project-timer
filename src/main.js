@@ -56,6 +56,7 @@ let conflictPreviousCalendarDraft = null;
 let authorityTimerId;
 let noteSaveTimer;
 let authEnabled = false;
+let registrationEnabled = false;
 let currentUser = null;
 let stateRevision = 0;
 let accountGeneration = 0;
@@ -700,7 +701,10 @@ function render() {
   try {
     if (authEnabled && !currentUser) {
       const app = getAppElement();
-      app.innerHTML = `<main class="auth-page"><section class="panel auth-panel"><p class="eyebrow">Private workspace</p><h1>Project Timer</h1><p class="helper-text">Log in to open your workspace. Registration is available only while the owner enables it.</p><form id="auth-form"><label>Email<input class="text-input" name="email" type="email" autocomplete="email" required /></label><label>Password<input class="text-input" name="password" type="password" autocomplete="current-password" minlength="12" required /></label><p id="auth-error" class="auth-error" role="alert"></p><div class="actions"><button class="primary" name="action" value="login">Log in</button><button name="action" value="register">Register</button></div></form></section></main>`;
+      const registrationMessage = registrationEnabled
+        ? 'Registration is currently open.'
+        : 'Registration is closed. Ask the owner to set REGISTRATION_ENABLED=true and redeploy.';
+      app.innerHTML = `<main class="auth-page"><section class="panel auth-panel"><p class="eyebrow">Private workspace</p><h1>Project Timer</h1><p class="helper-text">Log in to open your workspace. ${registrationMessage}</p><form id="auth-form"><label>Email<input class="text-input" name="email" type="email" autocomplete="email" required /></label><label>Password<input class="text-input" name="password" type="password" autocomplete="current-password" minlength="12" required /></label><p id="auth-error" class="auth-error" role="alert">${registrationEnabled ? '' : registrationMessage}</p><div class="actions"><button class="primary" name="action" value="login">Log in</button><button name="action" value="register"${registrationEnabled ? '' : ' disabled aria-disabled="true"'}>Register</button></div></form></section></main>`;
       bindAuthEvents();
       return;
     }
@@ -1508,7 +1512,9 @@ async function initializeApp() {
     const sessionResponse = await fetch('/api/auth/session', { headers: { Accept: 'application/json' }, cache: 'no-store' });
     if (sessionResponse.status !== 404) {
       authEnabled = true;
-      if (sessionResponse.ok) currentUser = (await sessionResponse.json()).user;
+      const session = await sessionResponse.json();
+      registrationEnabled = session.registrationEnabled === true;
+      if (sessionResponse.ok) currentUser = session.user;
       if (!currentUser) return;
     }
     state = await loadState();

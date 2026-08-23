@@ -81,7 +81,10 @@ export function createAppServer(stateStore = store, options = {}) {
         const token = cookies(request)[SESSION_COOKIE];
         if (pathname === '/api/auth/session' && request.method === 'GET') {
           const user = await stateStore.sessionUser(token);
-          return user ? sendJson(response, 200, { authenticated: true, user }) : sendJson(response, 401, { authenticated: false });
+          const registration = { registrationEnabled };
+          return user
+            ? sendJson(response, 200, { authenticated: true, user, ...registration })
+            : sendJson(response, 401, { authenticated: false, ...registration });
         }
         if (pathname === '/api/auth/logout' && request.method === 'POST') {
           await stateStore.deleteSession(token);
