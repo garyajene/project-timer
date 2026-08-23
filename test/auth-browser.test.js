@@ -8,6 +8,8 @@ test('account mode confirms a session before loading or rendering a workspace', 
   const sessionCheck = source.indexOf("fetch('/api/auth/session'");
   const stateLoad = source.indexOf('state = await loadState();', sessionCheck);
   assert.ok(sessionCheck > -1 && stateLoad > sessionCheck);
+  assert.match(source, /registrationEnabled = session\.registrationEnabled === true/);
+  assert.match(source, /name="action" value="register".*disabled aria-disabled/);
   assert.match(source, /if \(!currentUser\) return;/);
   assert.match(source, /if \(authEnabled && !currentUser\)/);
 });
