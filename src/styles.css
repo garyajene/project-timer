@@ -93,7 +93,19 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .time-block, .project-row { display: grid; grid-template-columns: auto auto 1fr; gap: .85rem; align-items: center; border: 1px solid var(--line); border-radius: 18px; padding: .95rem; background: #0a0a0d; }
 .time { color: var(--muted); font-variant-numeric: tabular-nums; }
 .task-copy { display: grid; }
-.project-row { grid-template-columns: 1fr auto; }
+.project-row { grid-template-columns: 1fr auto; align-items: start; }
+.project-main { display: grid; grid-template-columns: minmax(12rem, 1fr) auto auto minmax(11rem, auto); gap: .85rem; align-items: end; }
+.priority-control { margin: 0; padding: 0; border: 0; }
+.priority-control legend { margin-bottom: .35rem; font-weight: 800; }
+.priority-control legend small { color: var(--muted); font-weight: 400; }
+.priority-control > div { display: flex; gap: .3rem; }
+.priority-option input { position: absolute; opacity: 0; pointer-events: none; }
+.priority-option span { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border: 1px solid var(--line); border-radius: 50%; cursor: pointer; font-weight: 800; }
+.priority-option input:checked + span { background: var(--red); border-color: var(--red); color: #fff; }
+.priority-option input:focus-visible + span { outline: 2px solid #fff; outline-offset: 2px; }
+.project-duration-toggle, .project-duration-field { display: grid; gap: .35rem; font-weight: 800; }
+.project-duration-toggle { grid-template-columns: auto 1fr; align-items: center; padding-bottom: .65rem; }
+.disabled-field { opacity: .42; }
 .row-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 .add-button { margin-top: 1rem; }
 .calendar-tabs { display: flex; gap: .6rem; margin-bottom: 1rem; }
@@ -126,6 +138,8 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   .row-actions button { flex: 1; justify-content: center; }
   .week-view { grid-template-columns: repeat(2, 1fr); }
 }
+@media (max-width: 1000px) { .project-main { grid-template-columns: 1fr 1fr; } }
+@media (max-width: 620px) { .project-main, .project-row { grid-template-columns: 1fr; } .project-row .row-actions { grid-column: 1; } }
 .text-input, .time-input {
   width: 100%;
   border: 1px solid var(--line);

@@ -9,7 +9,7 @@ import { createAppServer } from '../server.js';
 process.env.NODE_ENV = 'test';
 const password = 'correct horse battery staple';
 const richState = {
-  projects: ['Private'], schedule: [{ time: '08:00', project: 'Private', title: 'Secret', duration: 45, zenBreakMinutes: 5 }],
+  projects: ['Private'], projectSettings: { Private: { priority: 2, defaultDuration: 45 } }, schedule: [{ time: '08:00', project: 'Private', title: 'Secret', duration: 45, zenBreakMinutes: 5 }],
   schedules: { '2026-08-22': [{ time: '08:00', project: 'Private', title: 'Secret', duration: 45 }] }, activeIndex: 0,
   autoStartNextTask: true, notes: { parkingLot: 'private parking', general: 'private notes' },
   timerState: { status: 'paused', mode: 'quick', configuredDurationSeconds: 2700, remainingSecondsWhenPaused: 1200, startedAt: '2026-08-22T08:00:00.000Z', endsAt: null, activeIndex: null, quickTask: { active: true, project: 'Quick Start', title: 'Private quick task', duration: 45, zenBreakMinutes: 5, zenBreakTiming: 'random' }, zenBreak: { active: true } },

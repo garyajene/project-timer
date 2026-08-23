@@ -11,7 +11,7 @@ export const EMPTY_TIMER_STATE = {
   startedAt: null, endsAt: null, activeIndex: null, quickTask: null, zenBreak: null,
 };
 export const EMPTY_STATE = {
-  projects: [], schedule: [], schedules: {}, activeIndex: 0, autoStartNextTask: false,
+  projects: [], projectSettings: {}, schedule: [], schedules: {}, activeIndex: 0, autoStartNextTask: false,
   notes: { parkingLot: '', general: '' }, timerState: EMPTY_TIMER_STATE,
 };
 
@@ -33,8 +33,16 @@ function normalizeTimerState(value) {
 
 export function normalizeState(value) {
   if (!value || !Array.isArray(value.projects) || !Array.isArray(value.schedule)) throw new TypeError('State must contain projects and schedule arrays');
+  const projects = value.projects.filter((project) => typeof project === 'string');
+  const settings = value.projectSettings && typeof value.projectSettings === 'object' && !Array.isArray(value.projectSettings) ? value.projectSettings : {};
+  const projectSettings = Object.fromEntries(projects.map((project) => {
+    const candidate = settings[project] || {};
+    const priority = Math.min(5, Math.max(1, Number(candidate.priority) || 3));
+    const defaultDuration = candidate.defaultDuration == null ? null : Math.max(1, Number(candidate.defaultDuration) || 30);
+    return [project, { priority, defaultDuration }];
+  }));
   return {
-    projects: value.projects.filter((project) => typeof project === 'string'), schedule: value.schedule,
+    projects, projectSettings, schedule: value.schedule,
     schedules: value.schedules && typeof value.schedules === 'object' && !Array.isArray(value.schedules) ? value.schedules : {},
     activeIndex: Number.isInteger(value.activeIndex) ? value.activeIndex : 0, autoStartNextTask: value.autoStartNextTask === true,
     notes: { parkingLot: String(value.notes?.parkingLot ?? ''), general: String(value.notes?.general ?? '') }, timerState: normalizeTimerState(value.timerState),
