@@ -32,6 +32,18 @@ async function post(url, path, body, cookie = '') {
 }
 const cookieOf = (response) => response.headers.get('set-cookie').split(';')[0];
 
+test('authentication is enabled by default', async (t) => {
+  const directory = await mkdtemp(join(tmpdir(), 'project-timer-auth-default-'));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const store = new StateStore(join(directory, 'state.sqlite'));
+  await store.initialize();
+  const server = createAppServer(store, { registrationEnabled: false });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/auth/session`);
+  assert.equal(response.status, 401);
+});
+
 test('auth is closed unless registration is explicitly enabled', async (t) => {
   const { url } = await fixture(t, { registrationEnabled: false });
   assert.equal((await post(url, '/api/auth/register', { email: 'a@example.com', password })).status, 403);

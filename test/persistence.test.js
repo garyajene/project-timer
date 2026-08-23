@@ -48,7 +48,7 @@ test('state API shares saved data with independent clients', async (t) => {
   const store = new StateStore(join(directory, 'state.sqlite'));
   await store.initialize();
   const { createAppServer } = await import('../server.js');
-  const server = createAppServer(store);
+  const server = createAppServer(store, { authEnabled: false });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
   const url = `http://127.0.0.1:${server.address().port}/api/state`;
@@ -67,7 +67,7 @@ test('state API persists create, edit, multiple-block, and delete operations', a
   const store = new StateStore(file);
   await store.initialize();
   const { createAppServer } = await import('../server.js');
-  const server = createAppServer(store);
+  const server = createAppServer(store, { authEnabled: false });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
   const url = `http://127.0.0.1:${server.address().port}/api/state`;

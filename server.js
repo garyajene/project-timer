@@ -68,7 +68,9 @@ async function readJson(request) {
 }
 
 export function createAppServer(stateStore = store, options = {}) {
-  const authEnabled = options.authEnabled ?? flag(process.env.AUTH_ENABLED);
+  // Account protection is the production default. Tests and explicit legacy
+  // integrations can still opt out through the programmatic server option.
+  const authEnabled = options.authEnabled ?? true;
   const registrationEnabled = options.registrationEnabled ?? flag(process.env.REGISTRATION_ENABLED);
   const ownerEmail = options.ownerEmail ?? process.env.OWNER_EMAIL ?? '';
   return createServer(async (request, response) => {
