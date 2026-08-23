@@ -1,6 +1,6 @@
 # Project Timer
 
-A dark, minimal personal productivity web app for a single user, with timer logic, sounds, and shared server-side persistence.
+A dark, minimal personal productivity web app with private accounts, timer logic, sounds, and SQLite persistence.
 
 ## Scripts
 
@@ -11,7 +11,7 @@ A dark, minimal personal productivity web app for a single user, with timer logi
 
 ## Persistence
 
-Projects, schedules, Notes, Auto-Start, Quick Task, and running or paused timer state are loaded from and saved to the server through `/api/state`. The server stores the complete workspace transactionally in the SQLite table `app_state` in `DATA_DIR/project-timer.sqlite` (`.data` by default); browser storage is only a fallback cache for temporary server outages. Running timers use a saved ending timestamp, so restoring a timer does not infer elapsed work from its Calendar start time. In production, set `DATA_DIR` to a durable mounted volume (for example `/data`). By default the app remains a single-user workspace, so all browsers connected to the deployment intentionally share the same state. Account mode adds tables in that same SQLite file and does not use `DATABASE_URL` or require a migration command.
+Projects, schedules, Notes, Auto-Start, Quick Task, and running or paused timer state are loaded from and saved to the server through `/api/state`. The server stores the complete workspace transactionally in `DATA_DIR/project-timer.sqlite` (`.data` by default); browser storage is only a fallback cache for temporary server outages. Running timers use a saved ending timestamp, so restoring a timer does not infer elapsed work from its Calendar start time. In production, set `DATA_DIR` to a durable mounted volume (for example `/data`). With account mode enabled, every account has a private workspace in the same SQLite file. With account mode disabled, the legacy `app_state` workspace remains shared by all browsers connected to the deployment. The application does not use `DATABASE_URL` or require a migration command.
 
 ## Safe Railway account activation
 
