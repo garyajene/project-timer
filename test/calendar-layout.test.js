@@ -20,3 +20,13 @@ test('Calendar refreshes Ends At when start time or Block Length changes', () =>
   assert.match(handlers, /calendar-duration[\s\S]*updateCalendarEndTime\(index\)/);
   assert.match(handlers, /const updateCalendarTime[\s\S]*updateCalendarEndTime\(index\)/);
 });
+
+test('Week view lays Monday through Sunday across a vertical time axis', () => {
+  const week = mainSource.slice(mainSource.indexOf('function weekView('), mainSource.indexOf('function monthView('));
+
+  assert.match(week, /weekDays\.map/);
+  assert.match(week, /week-header/);
+  assert.match(week, /week-time-axis/);
+  assert.match(week, /week-day-column/);
+  assert.match(week, /--task-top/);
+});
