@@ -736,15 +736,20 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 }
 
 .scheduler-days, .blackout-list { display: grid; gap: .75rem; }
+.scheduler-days { grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: start; }
 .scheduler-day, .blackout-row { padding: 1rem; border: 1px solid var(--line); border-radius: 14px; }
-.scheduler-day { display: grid; grid-template-columns: minmax(0, 28rem); gap: .85rem; align-items: start; }
+.scheduler-day { display: grid; grid-template-columns: minmax(0, 1fr); gap: .85rem; align-items: start; }
 .scheduler-day header { padding-bottom: .65rem; border-bottom: 1px solid var(--line); }
 .scheduler-day label, .blackout-row label, .generate-controls label { display: grid; gap: .35rem; }
 .scheduler-day strong { font-size: 1.2rem; }
 .scheduler-break-toggle { grid-template-columns: auto 1fr; align-items: center; justify-content: start; font-weight: 800; }
-.scheduler-break-times { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .75rem; }
+.scheduler-break-times { display: grid; grid-template-columns: minmax(0, 1fr); gap: .75rem; }
 .blackout-row { display: grid; grid-template-columns: repeat(4, minmax(8rem, 1fr)) minmax(12rem, 2fr) auto; gap: .75rem; align-items: end; }
 .generate-controls { display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; }
+
+@media (max-width: 1050px) {
+  .scheduler-days { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 
 @media (max-width: 900px) {
   .calendar-view-heading,
@@ -758,9 +763,13 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   .blackout-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
+@media (max-width: 760px) {
+  .scheduler-days { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 @media (max-width: 560px) {
   .calendar-block-card,
   .calendar-card-fields { grid-template-columns: 1fr; }
-  .scheduler-break-times { grid-template-columns: 1fr; }
+  .scheduler-days { grid-template-columns: 1fr; }
   .calendar-block-card > button { justify-content: center; }
 }
