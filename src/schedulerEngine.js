@@ -21,13 +21,12 @@ const minutes = (time) => { const [hour, minute] = time.split(':').map(Number); 
 const time = (value) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
 const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
-function overlaps(start, end, blackout) {
-  return start < minutes(blackout.end) && end > minutes(blackout.start);
-}
-
 export function generateSchedule({ weekStart, dayRules, blackouts = [], projects, seed = Date.now() }) {
   const random = seededRandom(seed);
-  const slots = [];
+  const schedules = {};
+  const eligible = projects.filter((project) => project.name && project.duration > 0);
+  const counts = Object.fromEntries(eligible.map((project) => [project.name, 0]));
+  const unfilled = [];
   const startDate = new Date(`${weekStart}T12:00:00`);
   for (let offset = 0; offset < 7; offset += 1) {
     const date = new Date(startDate); date.setDate(date.getDate() + offset);
@@ -35,39 +34,34 @@ export function generateSchedule({ weekStart, dayRules, blackouts = [], projects
     const rule = dayRules[DAY_NAMES[date.getDay()]];
     if (!rule?.enabled || rule.type === 'off') continue;
     let cursor = minutes(rule.start);
-    const duration = Number(rule.duration);
-    const dayBlackouts = blackouts.filter((item) => item.date === dateValue || (item.recurring && item.days?.includes(DAY_NAMES[date.getDay()])));
-    for (let index = 0; index < Number(rule.blocks); index += 1) {
-      while (dayBlackouts.some((item) => overlaps(cursor, cursor + duration, item))) {
-        cursor = Math.max(...dayBlackouts.filter((item) => overlaps(cursor, cursor + duration, item)).map((item) => minutes(item.end)));
+    const dayEnd = minutes(rule.end);
+    const scheduledBreak = rule.breakEnabled ? [{ start: rule.breakStart, end: rule.breakEnd }] : [];
+    const dayBlackouts = [...blackouts.filter((item) => item.date === dateValue || (item.recurring && item.days?.includes(DAY_NAMES[date.getDay()]))), ...scheduledBreak]
+      .filter((item) => item.start && item.end && minutes(item.end) > minutes(item.start))
+      .sort((a, b) => minutes(a.start) - minutes(b.start));
+    for (let index = 0; index < Number(rule.blocks) && cursor < dayEnd;) {
+      const activeBlackout = dayBlackouts.find((item) => cursor >= minutes(item.start) && cursor < minutes(item.end));
+      if (activeBlackout) { cursor = minutes(activeBlackout.end); continue; }
+
+      const nextBlackout = dayBlackouts.find((item) => minutes(item.start) > cursor);
+      const availableUntil = Math.min(dayEnd, nextBlackout ? minutes(nextBlackout.start) : dayEnd);
+      const candidates = eligible.filter((project) => cursor + Number(project.duration) <= availableUntil);
+      if (!candidates.length) {
+        if (nextBlackout) { cursor = minutes(nextBlackout.end); continue; }
+        unfilled.push({ date: dateValue, time: time(cursor), capacity: Math.max(0, dayEnd - cursor) });
+        break;
       }
-      if (cursor + duration > minutes(rule.end)) break;
-      slots.push({ date: dateValue, time: time(cursor), capacity: duration });
-      cursor += duration + Number(rule.gap || 0);
+      const ranked = candidates.map((project) => ({
+        project,
+        score: (counts[project.name] + 1) / (6 - project.priority),
+        tie: random(),
+      })).sort((a, b) => a.score - b.score || a.tie - b.tie);
+      const chosen = ranked[0].project;
+      counts[chosen.name] += 1;
+      (schedules[dateValue] ||= []).push({ time: time(cursor), project: chosen.name, title: '', duration: chosen.duration, done: false });
+      cursor += Number(chosen.duration) + 60;
+      index += 1;
     }
-  }
-
-  const eligible = projects.filter((project) => project.name && project.duration > 0 && slots.some((slot) => project.duration <= slot.capacity));
-  const counts = Object.fromEntries(eligible.map((project) => [project.name, 0]));
-  const unfilled = [];
-  const orderedSlots = [...slots].sort((a, b) => a.capacity - b.capacity || random() - .5);
-  for (const slot of orderedSlots) {
-    const candidates = eligible.filter((project) => project.duration <= slot.capacity);
-    if (!candidates.length) { unfilled.push(slot); continue; }
-    const ranked = candidates.map((project) => ({
-      project,
-      score: (counts[project.name] + 1) / (6 - project.priority),
-      tie: random(),
-    })).sort((a, b) => a.score - b.score || a.tie - b.tie);
-    const chosen = ranked[0].project;
-    counts[chosen.name] += 1;
-    slot.block = { time: slot.time, project: chosen.name, title: '', duration: chosen.duration, done: false };
-  }
-
-  const schedules = {};
-  for (const slot of slots) {
-    if (!slot.block) continue;
-    (schedules[slot.date] ||= []).push(slot.block);
   }
   Object.values(schedules).forEach((blocks) => blocks.sort((a, b) => a.time.localeCompare(b.time)));
   return { schedules, counts, unfilled, seed: String(seed) };
