@@ -115,7 +115,7 @@ test('Quick Task uses only a name and the shared timer duration controls', () =>
 });
 
 test('Timer navigation keeps all existing destinations and is moved rather than duplicated', () => {
-  assert.match(mainSource, /\['Today', 'Timer', 'Projects', 'Calendar', 'Notes'\]/);
+  assert.match(mainSource, /\['Today', 'Timer', 'Projects', 'Scheduler', 'Calendar', 'Notes'\]/);
   assert.match(mainSource, /href="#\$\{route\}"/);
   assert.match(mainSource, /getRoute\(\) === 'timer' \? '' : primaryNavigation\(\)/);
   assert.match(mainSource, /primaryNavigation\('timer-nav'\)/);
