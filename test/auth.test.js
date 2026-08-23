@@ -37,14 +37,15 @@ test('authentication is enabled by default', async (t) => {
   t.after(() => rm(directory, { recursive: true, force: true }));
   const store = new StateStore(join(directory, 'state.sqlite'));
   await store.initialize();
-  const server = createAppServer(store, { registrationEnabled: false });
+  const server = createAppServer(store);
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   t.after(() => new Promise((resolve) => server.close(resolve)));
   const response = await fetch(`http://127.0.0.1:${server.address().port}/api/auth/session`);
   assert.equal(response.status, 401);
+  assert.equal((await response.json()).registrationEnabled, true);
 });
 
-test('auth is closed unless registration is explicitly enabled', async (t) => {
+test('a programmatic override can close registration for private integrations', async (t) => {
   const { url } = await fixture(t, { registrationEnabled: false });
   const session = await fetch(url + '/api/auth/session');
   assert.equal(session.status, 401);

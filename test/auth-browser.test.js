@@ -10,6 +10,8 @@ test('account mode confirms a session before loading or rendering a workspace', 
   assert.ok(sessionCheck > -1 && stateLoad > sessionCheck);
   assert.match(source, /registrationEnabled = session\.registrationEnabled === true/);
   assert.match(source, /name="action" value="register".*disabled aria-disabled/);
+  assert.match(source, /Registration is closed; existing users can still log in\./);
+  assert.match(source, /id="auth-error" class="auth-error" role="alert" aria-live="polite"><\/p>/);
   assert.match(source, /if \(!currentUser\) return;/);
   assert.match(source, /if \(authEnabled && !currentUser\)/);
 });
