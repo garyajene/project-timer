@@ -1,5 +1,6 @@
 import { sounds } from './audio.js';
 import { remainingFromTimerState } from './timerPersistence.js';
+import { generateSchedule } from './schedulerEngine.js';
 const STORAGE_KEY = 'project-timer-state-v1';
 const DEFAULT_BLOCK_MINUTES = 30;
 const DURATION_PRESETS = [5, 10, 15, 30, 45, 60, 120, 180, 240];
@@ -15,6 +16,10 @@ const defaultState = {
   projectSettings: {},
   schedule: [],
   schedules: {},
+  schedulerSettings: {
+    days: Object.fromEntries(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => [day, { enabled: !['Saturday', 'Sunday'].includes(day), type: day === 'Wednesday' ? 'light' : 'normal', start: '10:30', end: day === 'Wednesday' ? '13:00' : '23:30', blocks: day === 'Wednesday' ? 2 : 3, duration: day === 'Wednesday' ? 60 : 120, gap: 15 }])),
+    blackouts: [], lastSeed: null,
+  },
   activeIndex: 0,
   autoStartNextTask: false,
   notes: { parkingLot: '', general: '' },
@@ -137,6 +142,7 @@ function loadCachedState() {
     return {
       projects,
       projectSettings: normalizeProjectSettings(saved.projectSettings, projects),
+      schedulerSettings: normalizeSchedulerSettings(saved.schedulerSettings),
       schedules,
       schedule: cloneSchedule(schedules[todayKey] || []),
       activeIndex: Number.isInteger(saved.activeIndex) ? saved.activeIndex : 0,
@@ -181,7 +187,20 @@ function sanitizeState(saved) {
   }
   const schedule = cleanSchedule(saved.schedule);
   if (schedule.length && !schedules[todayKey]) schedules[todayKey] = schedule;
-  return { projects, projectSettings: normalizeProjectSettings(saved.projectSettings, projects), schedules, schedule: cloneSchedule(schedules[todayKey] || []), activeIndex: Number.isInteger(saved.activeIndex) ? saved.activeIndex : 0, autoStartNextTask: saved.autoStartNextTask === true, notes: { parkingLot: String(saved.notes?.parkingLot ?? ''), general: String(saved.notes?.general ?? '') }, timerState: { ...structuredClone(defaultState.timerState), ...(saved.timerState || {}) } };
+  return { projects, projectSettings: normalizeProjectSettings(saved.projectSettings, projects), schedulerSettings: normalizeSchedulerSettings(saved.schedulerSettings), schedules, schedule: cloneSchedule(schedules[todayKey] || []), activeIndex: Number.isInteger(saved.activeIndex) ? saved.activeIndex : 0, autoStartNextTask: saved.autoStartNextTask === true, notes: { parkingLot: String(saved.notes?.parkingLot ?? ''), general: String(saved.notes?.general ?? '') }, timerState: { ...structuredClone(defaultState.timerState), ...(saved.timerState || {}) } };
+}
+
+function normalizeSchedulerSettings(settings) {
+  const normalized = structuredClone(defaultState.schedulerSettings);
+  if (!settings || typeof settings !== 'object') return normalized;
+  for (const day of weekDays) {
+    const value = settings.days?.[day];
+    if (!value) continue;
+    normalized.days[day] = { ...normalized.days[day], ...value, enabled: value.enabled === true, blocks: Math.max(0, Number(value.blocks) || 0), duration: Math.max(15, Number(value.duration) || 60), gap: Math.max(0, Number(value.gap) || 0) };
+  }
+  normalized.blackouts = Array.isArray(settings.blackouts) ? settings.blackouts : [];
+  normalized.lastSeed = settings.lastSeed || null;
+  return normalized;
 }
 
 function normalizeProjectSettings(settings, projects) {
@@ -511,7 +530,7 @@ function getTimerStatus(current) {
 }
 
 function primaryNavigation(className = '') {
-  return `<nav class="top-nav ${className}" aria-label="Primary navigation">${['Today', 'Timer', 'Projects', 'Calendar', 'Notes'].map((item) => { const route = item.toLowerCase().replaceAll(' ', '-'); return `<a href="#${route}" ${getRoute() === route ? 'aria-current="page"' : ''}>${item}</a>`; }).join('')}</nav>`;
+  return `<nav class="top-nav ${className}" aria-label="Primary navigation">${['Today', 'Timer', 'Projects', 'Scheduler', 'Calendar', 'Notes'].map((item) => { const route = item.toLowerCase().replaceAll(' ', '-'); return `<a href="#${route}" ${getRoute() === route ? 'aria-current="page"' : ''}>${item}</a>`; }).join('')}</nav>`;
 }
 
 function header() {
@@ -678,6 +697,17 @@ function calendarSection() {
   return section({ id: 'calendar', title: 'Calendar', eyebrow: 'Planning', content: `<div class="calendar-controls"><label>Planning Date <input id="calendar-date" class="text-input" type="date" value="${calendarDate}" /></label></div><div class="calendar-tabs"><button class="${calendarView === 'day' ? 'active-tab' : ''}" data-calendar-view="day">Day</button><button class="${calendarView === 'week' ? 'active-tab' : ''}" data-calendar-view="week">Week</button><button class="${calendarView === 'month' ? 'active-tab' : ''}" data-calendar-view="month">Month</button></div><div class="calendar-layout single-calendar-view">${selectedView}</div>` });
 }
 
+function schedulerPage() {
+  const settings = state.schedulerSettings;
+  const nextMonday = addDays(getWeekStart(toDateKey(new Date())), 7);
+  const dayRows = weekDays.map((day) => {
+    const rule = settings.days[day];
+    return `<article class="scheduler-day" data-day="${day}"><div><strong>${day}</strong><select class="text-input scheduler-type"><option value="normal" ${rule.type === 'normal' ? 'selected' : ''}>Normal</option><option value="light" ${rule.type === 'light' ? 'selected' : ''}>Light</option><option value="off" ${rule.type === 'off' ? 'selected' : ''}>Off</option></select></div><label>Start<input class="text-input scheduler-start" type="time" value="${rule.start}"></label><label>End<input class="text-input scheduler-end" type="time" value="${rule.end}"></label><label>Blocks<input class="text-input scheduler-blocks" type="number" min="0" max="12" value="${rule.blocks}"></label><label>Block length<select class="text-input scheduler-duration">${CALENDAR_DURATION_OPTIONS.map((value) => `<option value="${value}" ${rule.duration === value ? 'selected' : ''}>${formatMinutes(value)}</option>`).join('')}</select></label><label>Gap<input class="text-input scheduler-gap" type="number" min="0" step="5" value="${rule.gap}"></label></article>`;
+  }).join('');
+  const blackoutRows = settings.blackouts.map((item, index) => `<article class="blackout-row"><label>When<select class="text-input blackout-recurring" data-index="${index}"><option value="date" ${item.recurring ? '' : 'selected'}>This date</option><option value="daily" ${item.recurring ? 'selected' : ''}>Every day</option></select></label><label>Date<input class="text-input blackout-date" data-index="${index}" type="date" value="${escapeHtml(item.date || '')}" ${item.recurring ? 'disabled' : ''}></label><label>Starts<input class="text-input blackout-start" data-index="${index}" type="time" value="${escapeHtml(item.start || '16:00')}"></label><label>Ends<input class="text-input blackout-end" data-index="${index}" type="time" value="${escapeHtml(item.end || '19:00')}"></label><label>Name<input class="text-input blackout-name" data-index="${index}" value="${escapeHtml(item.name || '')}" placeholder="Food, trip, meeting…"></label><button class="delete-blackout" data-index="${index}">${icon.trash} Delete</button></article>`).join('') || '<p class="empty-state">No blackout dates yet.</p>';
+  return `${section({ id: 'scheduler', title: 'Build My Week', eyebrow: 'You shape the time. The scheduler chooses the work.', content: `<p class="helper-text">Set each day before generating. Priority automatically means more often; there is no frequency setting.</p><div class="scheduler-days">${dayRows}</div>` })}${section({ id: 'blackouts', title: 'Blackout Dates', eyebrow: 'Protected time', content: `<div class="blackout-list">${blackoutRows}</div><button id="add-blackout" class="add-button">${icon.plus} Add Blackout</button>` })}${section({ id: 'generate-week', title: 'Generate Schedule', eyebrow: 'Priority-weighted random picker', content: `<div class="generate-controls"><label>Week beginning<input id="scheduler-week" class="text-input" type="date" value="${nextMonday}"></label><button id="generate-schedule" class="primary">Make My Schedule</button></div><p id="scheduler-status" class="helper-text" role="status"></p>` })}`;
+}
+
 function notesAndReview() {
   return `<div class="notes-grid">${section({ id: 'parking', title: 'Parking Lot', eyebrow: 'Quick capture', content: `<textarea id="parking-lot-notes" aria-label="Parking lot notes">${escapeHtml(state.notes.parkingLot)}</textarea>` })}${section({ id: 'notes', title: 'Project Notes', eyebrow: 'Current project', content: `<textarea id="general-notes" aria-label="Project notes">${escapeHtml(state.notes.general)}</textarea>` })}${section({ id: 'end-day', title: 'End of Day', eyebrow: 'Review', content: '<div class="review-card"><span>✓</span><div><h3>Accomplishments</h3><p>Summarize completed work and lessons learned.</p></div></div><div class="review-card"><span>›</span><div><h3>First Task for tomorrow</h3><p>Choose the next focused starting point.</p></div></div>' })}</div>`;
 }
@@ -691,6 +721,7 @@ function mainContent() {
   const route = getRoute();
   if (route === 'projects') return masterProjectList();
   if (route === 'timer') return timerPage();
+  if (route === 'scheduler') return schedulerPage();
   if (route === 'calendar') return calendarSection();
   if (route === 'notes') return notesAndReview();
   return todayPlanner();
@@ -1454,6 +1485,32 @@ function bindEvents() {
     saveState();
     render();
   }));
+  if (document.querySelector('#scheduler')) {
+    const saveDay = (row) => {
+      const day = row.dataset.day;
+      const type = row.querySelector('.scheduler-type').value;
+      state.schedulerSettings.days[day] = { enabled: type !== 'off', type, start: row.querySelector('.scheduler-start').value, end: row.querySelector('.scheduler-end').value, blocks: Number(row.querySelector('.scheduler-blocks').value), duration: Number(row.querySelector('.scheduler-duration').value), gap: Number(row.querySelector('.scheduler-gap').value) };
+      saveState();
+    };
+    document.querySelectorAll('.scheduler-day').forEach((row) => row.querySelectorAll('input, select').forEach((input) => input.addEventListener('change', () => saveDay(row))));
+    document.querySelector('#add-blackout')?.addEventListener('click', () => { state.schedulerSettings.blackouts.push({ date: toDateKey(new Date()), start: '16:00', end: '19:00', name: '', recurring: false, days: [] }); saveState(); render(); });
+    document.querySelectorAll('.blackout-row input, .blackout-row select').forEach((input) => input.addEventListener('change', (event) => { const item = state.schedulerSettings.blackouts[Number(event.target.dataset.index)]; const key = event.target.className.match(/blackout-(date|start|end|name|recurring)/)?.[1]; if (key === 'recurring') { item.recurring = event.target.value === 'daily'; item.days = item.recurring ? [...weekDays] : []; render(); } else if (key) item[key] = event.target.value; saveState(); }));
+    document.querySelectorAll('.delete-blackout').forEach((button) => button.addEventListener('click', (event) => { state.schedulerSettings.blackouts.splice(Number(event.currentTarget.dataset.index), 1); saveState(); render(); }));
+    document.querySelector('#generate-schedule')?.addEventListener('click', async (event) => {
+      const weekStart = document.querySelector('#scheduler-week').value;
+      if (!state.projects.length) { document.querySelector('#scheduler-status').textContent = 'Add at least one project first.'; return; }
+      const seed = `${Date.now()}-${Math.random()}`;
+      const result = generateSchedule({ weekStart, dayRules: state.schedulerSettings.days, blackouts: state.schedulerSettings.blackouts, projects: state.projects.map((name) => ({ name, priority: projectSettings(name).priority, duration: projectSettings(name).defaultDuration || DEFAULT_BLOCK_MINUTES })), seed });
+      Object.entries(result.schedules).forEach(([date, blocks]) => setScheduleForDate(date, blocks));
+      state.schedulerSettings.lastSeed = result.seed;
+      await persistSchedule(event.currentTarget);
+      const total = Object.values(result.schedules).reduce((sum, blocks) => sum + blocks.length, 0);
+      render();
+      const status = document.querySelector('#scheduler-status');
+      if (status) status.textContent = `Scheduled ${total} blocks. Open Calendar to review or override them.`;
+    });
+    return;
+  }
   if (document.querySelector('#calendar')) {
     document.querySelectorAll('[data-calendar-view]').forEach((button) => button.addEventListener('click', (event) => { calendarView = event.currentTarget.dataset.calendarView; render(); }));
     document.querySelector('#calendar-date')?.addEventListener('change', (event) => { calendarDate = event.target.value || toDateKey(new Date()); loadCalendarDraft(); render(); });

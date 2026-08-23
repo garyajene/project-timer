@@ -43,6 +43,7 @@ export function normalizeState(value) {
   }));
   return {
     projects, projectSettings, schedule: value.schedule,
+    ...(value.schedulerSettings && typeof value.schedulerSettings === 'object' ? { schedulerSettings: value.schedulerSettings } : {}),
     schedules: value.schedules && typeof value.schedules === 'object' && !Array.isArray(value.schedules) ? value.schedules : {},
     activeIndex: Number.isInteger(value.activeIndex) ? value.activeIndex : 0, autoStartNextTask: value.autoStartNextTask === true,
     notes: { parkingLot: String(value.notes?.parkingLot ?? ''), general: String(value.notes?.general ?? '') }, timerState: normalizeTimerState(value.timerState),
