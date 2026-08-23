@@ -47,7 +47,6 @@ function sendJson(response, status, body) {
   response.end(JSON.stringify(body));
 }
 
-function flag(value) { return String(value ?? '').toLowerCase() === 'true'; }
 function cookies(request) {
   return Object.fromEntries(String(request.headers.cookie ?? '').split(';').map((part) => part.trim().split(/=(.*)/s)).filter(([key]) => key).map(([key, value]) => [key, decodeURIComponent(value ?? '')]));
 }
@@ -71,7 +70,9 @@ export function createAppServer(stateStore = store, options = {}) {
   // Account protection is the production default. Tests and explicit legacy
   // integrations can still opt out through the programmatic server option.
   const authEnabled = options.authEnabled ?? true;
-  const registrationEnabled = options.registrationEnabled ?? flag(process.env.REGISTRATION_ENABLED);
+  // Public deployments accept new accounts by default. The programmatic
+  // override remains available for tests and private integrations.
+  const registrationEnabled = options.registrationEnabled ?? true;
   const ownerEmail = options.ownerEmail ?? process.env.OWNER_EMAIL ?? '';
   return createServer(async (request, response) => {
     const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;

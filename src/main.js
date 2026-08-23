@@ -703,8 +703,8 @@ function render() {
       const app = getAppElement();
       const registrationMessage = registrationEnabled
         ? 'Registration is currently open.'
-        : 'Registration is closed. Ask the owner to set REGISTRATION_ENABLED=true and redeploy.';
-      app.innerHTML = `<main class="auth-page"><section class="panel auth-panel"><p class="eyebrow">Private workspace</p><h1>Project Timer</h1><p class="helper-text">Log in to open your workspace. ${registrationMessage}</p><form id="auth-form"><label>Email<input class="text-input" name="email" type="email" autocomplete="email" required /></label><label>Password<input class="text-input" name="password" type="password" autocomplete="current-password" minlength="12" required /></label><p id="auth-error" class="auth-error" role="alert">${registrationEnabled ? '' : registrationMessage}</p><div class="actions"><button class="primary" name="action" value="login">Log in</button><button name="action" value="register"${registrationEnabled ? '' : ' disabled aria-disabled="true"'}>Register</button></div></form></section></main>`;
+        : 'Registration is closed; existing users can still log in.';
+      app.innerHTML = `<main class="auth-page"><section class="panel auth-panel"><p class="eyebrow">Private workspace</p><h1>Project Timer</h1><p class="helper-text">Log in to open your workspace.</p><form id="auth-form"><label>Email<input class="text-input" name="email" type="email" autocomplete="email" required /></label><label>Password<input class="text-input" name="password" type="password" autocomplete="current-password" minlength="12" required /></label><p class="auth-status">${registrationMessage}</p><p id="auth-error" class="auth-error" role="alert" aria-live="polite"></p><div class="actions"><button class="primary" name="action" value="login">Log in</button><button name="action" value="register"${registrationEnabled ? '' : ' disabled aria-disabled="true"'}>Register</button></div></form></section></main>`;
       bindAuthEvents();
       return;
     }
