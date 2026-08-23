@@ -12,6 +12,7 @@ const DEMO_TITLES = new Set(['Plan daily priorities', 'Use Project Timer', 'Revi
 
 const defaultState = {
   projects: [],
+  projectSettings: {},
   schedule: [],
   schedules: {},
   activeIndex: 0,
@@ -135,6 +136,7 @@ function loadCachedState() {
     if (schedule.length && !schedules[todayKey]) schedules[todayKey] = schedule;
     return {
       projects,
+      projectSettings: normalizeProjectSettings(saved.projectSettings, projects),
       schedules,
       schedule: cloneSchedule(schedules[todayKey] || []),
       activeIndex: Number.isInteger(saved.activeIndex) ? saved.activeIndex : 0,
@@ -179,7 +181,17 @@ function sanitizeState(saved) {
   }
   const schedule = cleanSchedule(saved.schedule);
   if (schedule.length && !schedules[todayKey]) schedules[todayKey] = schedule;
-  return { projects, schedules, schedule: cloneSchedule(schedules[todayKey] || []), activeIndex: Number.isInteger(saved.activeIndex) ? saved.activeIndex : 0, autoStartNextTask: saved.autoStartNextTask === true, notes: { parkingLot: String(saved.notes?.parkingLot ?? ''), general: String(saved.notes?.general ?? '') }, timerState: { ...structuredClone(defaultState.timerState), ...(saved.timerState || {}) } };
+  return { projects, projectSettings: normalizeProjectSettings(saved.projectSettings, projects), schedules, schedule: cloneSchedule(schedules[todayKey] || []), activeIndex: Number.isInteger(saved.activeIndex) ? saved.activeIndex : 0, autoStartNextTask: saved.autoStartNextTask === true, notes: { parkingLot: String(saved.notes?.parkingLot ?? ''), general: String(saved.notes?.general ?? '') }, timerState: { ...structuredClone(defaultState.timerState), ...(saved.timerState || {}) } };
+}
+
+function normalizeProjectSettings(settings, projects) {
+  const source = settings && typeof settings === 'object' && !Array.isArray(settings) ? settings : {};
+  return Object.fromEntries(projects.map((name) => {
+    const value = source[name] || {};
+    const priority = Math.min(5, Math.max(1, Number(value.priority) || 3));
+    const defaultDuration = value.defaultDuration == null ? null : Math.max(1, Number(value.defaultDuration) || DEFAULT_BLOCK_MINUTES);
+    return [name, { priority, defaultDuration }];
+  }));
 }
 
 function cloneSchedule(schedule) {
@@ -576,8 +588,15 @@ function zenBreakTimingControl({ value = 'midpoint', className = '', index = '',
 function addProjectToMasterList(name) {
   const project = name.trim();
   if (!project) return '';
-  if (!state.projects.includes(project)) state.projects.push(project);
+  if (!state.projects.includes(project)) {
+    state.projects.push(project);
+    state.projectSettings[project] = { priority: 3, defaultDuration: null };
+  }
   return project;
+}
+
+function projectSettings(project) {
+  return state.projectSettings[project] || { priority: 3, defaultDuration: null };
 }
 
 function saveStatus() {
@@ -596,7 +615,12 @@ function todayPlanner() {
 
 
 function masterProjectList() {
-  return section({ id: 'projects', title: 'Master Project List', eyebrow: 'Backlog', content: `<div class="project-list">${state.projects.map((project, index) => `<div class="project-row"><input class="text-input project-name" data-index="${index}" value="${escapeHtml(project)}" aria-label="Project name" /><div class="row-actions"><button class="delete-project" data-index="${index}" aria-label="Delete ${escapeHtml(project)}">${icon.trash} Delete</button></div></div>`).join('') || '<p class="empty-state">No projects yet.</p>'}</div><button id="add-project" class="add-button"><span>${icon.plus}</span> Add Project</button>` });
+  return section({ id: 'projects', title: 'Master Project List', eyebrow: 'Backlog', content: `<div class="project-list">${state.projects.map((project, index) => {
+    const settings = projectSettings(project);
+    const durationEnabled = settings.defaultDuration !== null;
+    const priorities = [1, 2, 3, 4, 5].map((priority) => `<label class="priority-option"><input class="project-priority" data-index="${index}" type="radio" name="project-priority-${index}" value="${priority}" ${settings.priority === priority ? 'checked' : ''} required /><span>${priority}</span></label>`).join('');
+    return `<div class="project-row"><div class="project-main"><input class="text-input project-name" data-index="${index}" value="${escapeHtml(project)}" aria-label="Project name" /><fieldset class="priority-control"><legend>Priority <small>1 highest · 5 lowest</small></legend><div>${priorities}</div></fieldset><label class="project-duration-toggle"><input class="project-duration-enabled" data-index="${index}" type="checkbox" role="switch" ${durationEnabled ? 'checked' : ''} /> Set default block length</label><label class="project-duration-field ${durationEnabled ? '' : 'disabled-field'}">Default block length <span class="optional-label">(optional)</span><select class="text-input project-duration" data-index="${index}" ${durationEnabled ? '' : 'disabled'}>${CALENDAR_DURATION_OPTIONS.map((minutes) => `<option value="${minutes}" ${settings.defaultDuration === minutes || (!durationEnabled && minutes === DEFAULT_BLOCK_MINUTES) ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label></div><div class="row-actions"><button class="delete-project" data-index="${index}" aria-label="Delete ${escapeHtml(project)}">${icon.trash} Delete</button></div></div>`;
+  }).join('') || '<p class="empty-state">No projects yet.</p>'}</div><button id="add-project" class="add-button"><span>${icon.plus}</span> Add Project</button>` });
 }
 
 function calendarTaskSummary(block) {
@@ -1104,7 +1128,13 @@ function handleProjectSelectChange(event) {
     return;
   }
   if (select.classList.contains('schedule-project')) todayDraft[select.dataset.index].project = select.value;
-  if (select.classList.contains('calendar-project')) calendarDraft[select.dataset.index].project = select.value;
+  if (select.classList.contains('calendar-project')) {
+    calendarDraft[select.dataset.index].project = select.value;
+    const defaultDuration = projectSettings(select.value).defaultDuration;
+    if (defaultDuration !== null) calendarDraft[select.dataset.index].duration = defaultDuration;
+    render();
+    return;
+  }
   if (select.id === 'quick-project') quickTaskDraft.project = select.value;
 }
 
@@ -1369,6 +1399,7 @@ function bindEvents() {
     let suffix = 2;
     while (state.projects.includes(name)) name = `New Project ${suffix++}`;
     state.projects.push(name);
+    state.projectSettings[name] = { priority: 3, defaultDuration: null };
     saveState();
     render();
     const input = document.querySelector(`.project-name[data-index="${state.projects.length - 1}"]`);
@@ -1381,6 +1412,8 @@ function bindEvents() {
       const previousName = state.projects[index];
       const nextName = event.target.value;
       state.projects[index] = nextName;
+      state.projectSettings[nextName] = state.projectSettings[previousName] || { priority: 3, defaultDuration: null };
+      if (previousName !== nextName) delete state.projectSettings[previousName];
       state.schedule.forEach((block) => { if (block.project === previousName) block.project = nextName; });
       Object.values(state.schedules || {}).forEach((schedule) => schedule.forEach((block) => { if (block.project === previousName) block.project = nextName; }));
       todayDraft.forEach((block) => { if (block.project === previousName) block.project = nextName; });
@@ -1398,7 +1431,29 @@ function bindEvents() {
     });
     input.addEventListener('keydown', (event) => { if (event.key === 'Enter') event.target.blur(); });
   });
-  document.querySelectorAll('.delete-project').forEach((button) => button.addEventListener('click', (event) => { state.projects.splice(event.currentTarget.dataset.index, 1); saveState(); render(); }));
+  document.querySelectorAll('.project-priority').forEach((input) => input.addEventListener('change', (event) => {
+    const project = state.projects[Number(event.target.dataset.index)];
+    state.projectSettings[project] = { ...projectSettings(project), priority: Number(event.target.value) };
+    saveState();
+  }));
+  document.querySelectorAll('.project-duration-enabled').forEach((input) => input.addEventListener('change', (event) => {
+    const project = state.projects[Number(event.target.dataset.index)];
+    state.projectSettings[project] = { ...projectSettings(project), defaultDuration: event.target.checked ? DEFAULT_BLOCK_MINUTES : null };
+    saveState();
+    render();
+  }));
+  document.querySelectorAll('.project-duration').forEach((input) => input.addEventListener('change', (event) => {
+    const project = state.projects[Number(event.target.dataset.index)];
+    state.projectSettings[project] = { ...projectSettings(project), defaultDuration: Number(event.target.value) };
+    saveState();
+  }));
+  document.querySelectorAll('.delete-project').forEach((button) => button.addEventListener('click', (event) => {
+    const index = Number(event.currentTarget.dataset.index);
+    delete state.projectSettings[state.projects[index]];
+    state.projects.splice(index, 1);
+    saveState();
+    render();
+  }));
   if (document.querySelector('#calendar')) {
     document.querySelectorAll('[data-calendar-view]').forEach((button) => button.addEventListener('click', (event) => { calendarView = event.currentTarget.dataset.calendarView; render(); }));
     document.querySelector('#calendar-date')?.addEventListener('change', (event) => { calendarDate = event.target.value || toDateKey(new Date()); loadCalendarDraft(); render(); });
