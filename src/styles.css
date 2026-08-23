@@ -111,9 +111,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .calendar-tabs { display: flex; gap: .6rem; margin-bottom: 1rem; }
 .calendar-layout { display: grid; grid-template-columns: 1fr 1fr 1.2fr; gap: 1rem; }
 .day-view, .week-view, .month-view { background: #08080a; border: 1px solid var(--line); border-radius: 18px; padding: 1rem; }
-.week-view { display: grid; grid-template-columns: repeat(7, 1fr); gap: .5rem; }
-.week-view div { min-height: 8rem; border: 1px solid var(--line); border-radius: 14px; padding: .6rem; }
-.week-view span { display: block; margin-top: 1rem; height: 2.25rem; border-radius: 10px; background: rgba(255,41,61,.45); }
+.week-view { overflow-x: auto; }
 .month-view { display: grid; grid-template-columns: repeat(7, 1fr); gap: .45rem; }
 .month-view span { aspect-ratio: 1; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); }
 .today-dot { color: #fff !important; background: var(--red); border-color: var(--red) !important; }
@@ -136,7 +134,6 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   .time { grid-column: 2; }
   .row-actions { grid-column: 1 / -1; }
   .row-actions button { flex: 1; justify-content: center; }
-  .week-view { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 1000px) { .project-main { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 620px) { .project-main, .project-row { grid-template-columns: 1fr; } .project-row .row-actions { grid-column: 1; } }
@@ -577,17 +574,28 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   background: rgba(255,41,61,.16);
 }
 
-.week-view div {
-  display: flex;
-  flex-direction: column;
-}
+.week-scroll { min-width: 62rem; }
 
-.week-view span {
-  display: inline;
-  margin-top: 0;
-  height: auto;
-  background: transparent;
-}
+.week-header,
+.week-timeline { display: grid; grid-template-columns: 5rem repeat(7, minmax(7.5rem, 1fr)); }
+
+.week-header { position: sticky; top: 0; z-index: 3; background: #08080a; }
+
+.week-day-heading { display: grid; gap: .2rem; padding: .65rem .5rem; border-bottom: 1px solid var(--line); text-align: center; }
+
+.week-timeline { height: calc(var(--week-hours) * 5rem); min-height: 5rem; }
+
+.week-time-axis { position: relative; }
+
+.week-time-axis time { position: absolute; top: calc((var(--hour-row) - 1) / var(--week-hours) * 100%); right: .75rem; color: var(--muted); font-size: .72rem; font-variant-numeric: tabular-nums; transform: translateY(-50%); }
+
+.week-day-column { position: relative; min-width: 0; border-left: 1px solid var(--line); background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(100% / var(--week-hours) - 1px), var(--line) calc(100% / var(--week-hours))); }
+
+.week-day-column:last-child { border-right: 1px solid var(--line); }
+
+.calendar-task.week-task { position: absolute; top: var(--task-top); left: .2rem; right: .2rem; height: var(--task-height); min-height: 1.75rem; margin: 0; padding: .35rem .45rem; overflow: hidden; z-index: 1; }
+
+.week-task .time { font-size: .7rem; }
 
 .month-view span {
   aspect-ratio: auto;

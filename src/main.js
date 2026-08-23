@@ -648,18 +648,37 @@ function calendarTaskSummary(block) {
   return `<button type="button" class="calendar-task" data-calendar-task-time="${escapeHtml(block.time)}"><span class="time">${escapeHtml(formatTime(block.time))}</span><strong>${escapeHtml(block.project || 'Task')}</strong>${block.title ? `<small>${escapeHtml(block.title)}</small>` : ''}</button>`;
 }
 
+function getWeekTimelineBounds(days) {
+  const blocks = days.flatMap((day) => day.blocks);
+  if (!blocks.length) return { start: 8 * 60, end: 18 * 60 };
+  const earliest = Math.min(...blocks.map((block) => timeToMinutes(block.time)));
+  const latest = Math.max(...blocks.map((block) => timeToMinutes(getNextStartTime(block))));
+  const start = Math.max(0, Math.floor(earliest / 60) * 60);
+  return { start, end: Math.min(24 * 60, Math.max(Math.ceil(latest / 60) * 60, start + 60)) };
+}
+
 function dayView(dateKey) {
   return `<div class="day-view calendar-full-view"><div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(dateKey))}</h3><div class="actions"><button id="calendar-prev">Previous Day</button><button id="calendar-next">Next Day</button></div></div>${calendarPlanner()}</div>`;
 }
 
 function weekView(dateKey) {
   const weekStart = getWeekStart(dateKey);
-  const columns = weekDays.map((day, index) => {
+  const days = weekDays.map((day, index) => {
     const columnDate = addDays(weekStart, index);
-    const blocks = getScheduleForDate(columnDate).map(calendarTaskSummary).join('') || '<p class="empty-state">No tasks</p>';
-    return `<div><strong>${day}</strong><small>${escapeHtml(formatDateLabel(columnDate, { month: 'short', day: 'numeric' }))}</small>${blocks}</div>`;
-  }).join('');
-  return `<div class="calendar-full-view"><div class="calendar-view-heading"><h3>Week of ${escapeHtml(formatDateLabel(weekStart, { month: 'long', day: 'numeric', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Week</button><button id="calendar-next">Next Week</button></div></div><div class="week-view">${columns}</div></div>`;
+    return { day, columnDate, blocks: getScheduleForDate(columnDate) };
+  });
+  const { start, end } = getWeekTimelineBounds(days);
+  const hourCount = (end - start) / 60;
+  const headers = days.map(({ day, columnDate }) => `<div class="week-day-heading"><strong>${day}</strong><small>${escapeHtml(formatDateLabel(columnDate, { month: 'short', day: 'numeric' }))}</small></div>`).join('');
+  const times = Array.from({ length: hourCount + 1 }, (_, index) => `<time style="--hour-row: ${index + 1}">${escapeHtml(formatTime(minutesToTime(start + index * 60)))}</time>`).join('');
+  const columns = days.map(({ day, blocks }) => `<div class="week-day-column" aria-label="${day}">${blocks.map((block) => {
+    const blockStart = Math.max(start, timeToMinutes(block.time));
+    const blockEnd = Math.min(end, timeToMinutes(getNextStartTime(block)));
+    const top = ((blockStart - start) / (end - start)) * 100;
+    const height = Math.max(((blockEnd - blockStart) / (end - start)) * 100, 2);
+    return `<button type="button" class="calendar-task week-task" data-calendar-task-time="${escapeHtml(block.time)}" style="--task-top: ${top}%; --task-height: ${height}%" aria-label="${escapeHtml(`${block.project || 'Task'}, ${formatTime(block.time)}`)}"><span class="time">${escapeHtml(formatTime(block.time))}</span><strong>${escapeHtml(block.project || 'Task')}</strong>${block.title ? `<small>${escapeHtml(block.title)}</small>` : ''}</button>`;
+  }).join('')}</div>`).join('');
+  return `<div class="calendar-full-view"><div class="calendar-view-heading"><h3>Week of ${escapeHtml(formatDateLabel(weekStart, { month: 'long', day: 'numeric', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Week</button><button id="calendar-next">Next Week</button></div></div><div class="week-view" style="--week-hours: ${hourCount}"><div class="week-scroll"><div class="week-header"><span aria-hidden="true"></span>${headers}</div><div class="week-timeline"><div class="week-time-axis">${times}</div>${columns}</div></div></div></div>`;
 }
 
 function monthView(dateKey) {
