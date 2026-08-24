@@ -211,10 +211,18 @@ test('Next Block and saved schedule blocks use the same selection behavior', () 
 test('block navigation exposes both adjacent scheduled blocks', () => {
   const timerPage = mainSource.slice(mainSource.indexOf('function timerPage()'), mainSource.indexOf('function timerSchedule()'));
   assert.match(timerPage, /const position = getSchedulePosition\(\)/);
-  assert.match(timerPage, /const previousIndex = quickTask\?\.active \? null : position\.previousIndex/);
+  assert.match(timerPage, /viewedIndex \?\? runningIndex \?\? position\.currentIndex/);
+  assert.match(timerPage, /navigationIndex > 0 \? navigationIndex - 1 : null/);
+  assert.match(timerPage, /navigationIndex < state\.schedule\.length - 1 \? navigationIndex \+ 1 : null/);
   assert.match(timerPage, /projectCard\('Previous Block'.*previous \? previousIndex : null\)/);
   assert.match(timerPage, /projectCard\('Next Block'.*next \? nextIndex : null\)/);
   assert.match(timerPage, /block-navigation/);
+});
+
+test('selecting another block releases the old running-block navigation anchor', () => {
+  const selectActiveBlock = mainSource.slice(mainSource.indexOf('function selectActiveBlock('), mainSource.indexOf('function handleProjectSelectChange'));
+  assert.match(selectActiveBlock, /runningIndex = null/);
+  assert.match(selectActiveBlock, /viewedIndex = nextIndex/);
 });
 
 

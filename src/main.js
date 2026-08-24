@@ -564,9 +564,20 @@ function zenBreakControl(current) {
 function timerPage() {
   const current = getActiveBlock();
   const position = getSchedulePosition();
-  const previousIndex = quickTask?.active ? null : position.previousIndex;
+  // Once a block has been selected (or a timer session has been restored), the
+  // navigation cards must be relative to that block rather than to wall-clock
+  // time. Otherwise an early/late timer session can show the active block as
+  // its own "Next Block" and hide the actual following block.
+  const navigationIndex = quickTask?.active
+    ? null
+    : (viewedIndex ?? runningIndex ?? position.currentIndex);
+  const previousIndex = navigationIndex === null
+    ? position.previousIndex
+    : (navigationIndex > 0 ? navigationIndex - 1 : null);
   const previous = previousIndex === null ? null : state.schedule[previousIndex];
-  const nextIndex = position.nextIndex;
+  const nextIndex = navigationIndex === null
+    ? position.nextIndex
+    : (navigationIndex < state.schedule.length - 1 ? navigationIndex + 1 : null);
   const next = nextIndex === null ? null : state.schedule[nextIndex];
   const inspected = viewedIndex === null ? null : state.schedule[viewedIndex];
   const canStart = Boolean(quickTask?.active || inspected || current);
@@ -1162,6 +1173,7 @@ function selectActiveBlock(index) {
   clearInterval(timerId);
   zenBreak = null;
   quickTask = null;
+  runningIndex = null;
   viewedIndex = nextIndex;
   state.activeIndex = nextIndex;
   syncTimerToClock();
