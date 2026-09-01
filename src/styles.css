@@ -103,8 +103,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .priority-option span { display: grid; place-items: center; width: 2.25rem; height: 2.25rem; border: 1px solid var(--line); border-radius: 50%; cursor: pointer; font-weight: 800; }
 .priority-option input:checked + span { background: var(--red); border-color: var(--red); color: #fff; }
 .priority-option input:focus-visible + span { outline: 2px solid #fff; outline-offset: 2px; }
-.project-duration-toggle, .project-duration-field { display: grid; gap: .35rem; font-weight: 800; }
-.project-duration-toggle { grid-template-columns: auto 1fr; align-items: center; padding-bottom: .65rem; }
+.project-duration-field { display: grid; gap: .35rem; font-weight: 800; }
 .disabled-field { opacity: .42; }
 .row-actions { display: flex; gap: .5rem; flex-wrap: wrap; }
 .add-button { margin-top: 1rem; }
