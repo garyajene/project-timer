@@ -1585,7 +1585,14 @@ function bindEvents() {
       }
       const previousSchedules = Object.fromEntries(rangeDates.map((date) => [date, cloneSchedule(getScheduleForDate(date))]));
       const seed = `${Date.now()}-${Math.random()}`;
-      const result = generateSchedule({ weekStart, rangeEnd: weekEnd, dayRules: state.schedulerSettings.days, blackouts: state.schedulerSettings.blackouts, projects: state.projects.map((name) => ({ name, priority: projectSettings(name).priority, duration: projectSettings(name).defaultDuration || DEFAULT_BLOCK_MINUTES })), seed });
+      let result;
+      try {
+        result = generateSchedule({ weekStart, rangeEnd: weekEnd, dayRules: state.schedulerSettings.days, blackouts: state.schedulerSettings.blackouts, projects: state.projects.map((name) => ({ name, priority: projectSettings(name).priority, duration: projectSettings(name).defaultDuration || DEFAULT_BLOCK_MINUTES })), seed });
+      } catch (error) {
+        const status = document.querySelector('#scheduler-status');
+        if (status) status.textContent = error instanceof Error ? error.message : 'The schedule could not be generated safely. Please review your hours and try again.';
+        return;
+      }
       rangeDates.forEach((date) => setScheduleForDate(date, []));
       Object.entries(result.schedules).forEach(([date, blocks]) => setScheduleForDate(date, blocks));
       state.schedulerSettings.lastSeed = result.seed;
