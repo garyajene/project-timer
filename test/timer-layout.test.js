@@ -89,21 +89,29 @@ test('main timer is editable only before a timer session starts', () => {
   assert.match(mainSource, /hasTimerStarted = false/);
 });
 
-test('scheduled and running timers expose live duration presets', () => {
+test('selected schedule blocks expose a complete editor without Change Length', () => {
   const timerPage = mainSource.slice(mainSource.indexOf('function timerPage()'), mainSource.indexOf('function timerSchedule()'));
-  assert.match(mainSource, /id="change-timer-length"/);
-  assert.match(timerPage, /id="timer-length-editor"/);
-  assert.match(timerPage, /live-duration-preset/);
-  assert.match(mainSource, /function requestTimerDuration\(minutes\)/);
-  assert.match(mainSource, /const elapsedSeconds = hasTimerStarted/);
-  assert.match(mainSource, /remainingSeconds = Math\.max\(0, durationSeconds - elapsedSeconds\)/);
+  const editor = mainSource.slice(mainSource.indexOf('function viewedBlockCard('), mainSource.indexOf('function getTimerStatus('));
+  assert.doesNotMatch(mainSource, /change-timer-length|Change length|timer-length-editor|live-duration-preset/);
+  assert.match(editor, /id="selected-block-project"/);
+  assert.match(editor, /id="selected-block-title"/);
+  assert.match(editor, /id="selected-block-time"/);
+  assert.match(editor, /id="selected-block-duration"/);
+  assert.match(editor, /id="selected-block-zen-duration"/);
+  assert.match(editor, /id: 'selected-block-zen-timing'/);
+  assert.match(editor, /id="selected-block-done"/);
+  assert.match(editor, /id="save-selected-block"/);
+  assert.doesNotMatch(timerPage, /lengthEditor/);
 });
 
-test('live duration conflicts can be rearranged or canceled by block', () => {
-  assert.match(mainSource, /pendingDurationChange = \{ durationSeconds/);
-  assert.match(mainSource, /conflict-delete-block/);
-  assert.match(mainSource, /Move a block, change its length, cancel a block/);
-  assert.match(mainSource, /setScheduleForDate\(toDateKey\(new Date\(\)\), buildSavedSchedule\(calendarDraft\)\)/);
+test('selected block changes save only when they do not conflict', () => {
+  const saveSelectedBlock = mainSource.slice(mainSource.indexOf('async function saveSelectedBlock('), mainSource.indexOf('function bindEvents()'));
+  assert.match(saveSelectedBlock, /candidateSchedule\[viewedIndex\] = savedBlock/);
+  assert.match(saveSelectedBlock, /findScheduleConflicts\(candidateSchedule\)/);
+  assert.match(saveSelectedBlock, /conflicts\.has\(viewedIndex\)/);
+  assert.match(saveSelectedBlock, /timerBlockConflictOpen = true/);
+  assert.match(saveSelectedBlock, /setScheduleForDate\(toDateKey\(new Date\(\)\), state\.schedule\)/);
+  assert.match(mainSource, /This change overlaps another scheduled project/);
 });
 
 test('Quick Task uses only a name and the shared timer duration controls', () => {
@@ -188,9 +196,29 @@ test('selecting a scheduled block replaces Quick Task and pauses a freshly loade
   assert.match(selectActiveBlock, /quickTask = null/);
   assert.match(selectActiveBlock, /state\.activeIndex = nextIndex/);
   assert.match(selectActiveBlock, /viewedIndex = nextIndex/);
+  assert.match(selectActiveBlock, /viewedBlockDraft = \{ \.\.\.state\.schedule\[nextIndex\] \}/);
   assert.match(selectActiveBlock, /syncTimerToClock\(\)/);
   assert.match(selectActiveBlock, /hasTimerStarted = false/);
   assert.doesNotMatch(selectActiveBlock, /quickTask\?\.active.*return/);
+});
+
+test('the clicked block becomes red, replaces the center block, and loads into the large timer', () => {
+  const activeBlock = mainSource.slice(mainSource.indexOf('function getActiveBlock()'), mainSource.indexOf('function getActiveLabel()'));
+  const timerSchedule = mainSource.slice(mainSource.indexOf('function timerSchedule()'), mainSource.indexOf('function timerBlockConflictDialog()'));
+  const timerInput = mainSource.slice(mainSource.indexOf("document.querySelector('#timer-display')"), mainSource.indexOf("document.querySelectorAll('.timer-duration-preset')"));
+  assert.match(activeBlock, /if \(viewedIndex !== null\) return viewedBlockDraft \|\| state\.schedule\[viewedIndex\]/);
+  assert.match(timerSchedule, /const selectedIndex = viewedIndex \?\? currentIndex/);
+  assert.match(timerSchedule, /index === selectedIndex \? 'active-task'/);
+  assert.match(mainSource, /const relevantIndex = viewedIndex \?\? currentIndex/);
+  assert.match(timerInput, /viewedBlockDraft\.duration = configuredDurationSeconds \/ 60/);
+  assert.match(timerInput, /markTimerBlockUnsaved\(\)/);
+});
+
+test('completion checkboxes select the block and show a visible completed state', () => {
+  assert.match(mainSource, /class="schedule-done"/);
+  assert.match(mainSource, /if \(viewedIndex !== index\) selectActiveBlock\(index\)/);
+  assert.match(mainSource, /viewedBlockDraft\.done = checked/);
+  assert.match(mainSource, /completed-task/);
 });
 
 test('creating a Quick Task pauses the timer and loads its configured duration', () => {

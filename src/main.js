@@ -52,13 +52,15 @@ let pendingSave = Promise.resolve();
 let projectSaveTimer;
 let scheduleSaveMessage = '';
 let viewedIndex = null;
+let viewedBlockDraft = null;
+let timerBlockSaveMessage = '';
+let timerBlockConflictOpen = false;
 let runningIndex = null;
 let projectedEndTime = null;
 let conflictModalOpen = false;
 let pendingStart = false;
 let pendingStartIndex = null;
 let pendingStartDuration = 0;
-let pendingDurationChange = null;
 let conflictIndexes = new Set();
 let conflictPreviousCalendarDate = null;
 let conflictPreviousCalendarDraft = null;
@@ -514,13 +516,15 @@ function activeBlockCard(current, date = new Date()) {
     return `<article class="project-card active-card" data-upcoming-card><p class="eyebrow" data-upcoming-label>${escapeHtml(upcoming.label)}</p><h3 data-card-title>${escapeHtml(upcoming.title)}</h3><p data-card-meta>${escapeHtml(upcoming.meta)}</p></article>`;
   }
   const scheduledTimes = current.time ? `<div><dt>Start Time</dt><dd>${escapeHtml(formatTime(current.time))}</dd></div><div><dt>End Time</dt><dd>${escapeHtml(formatTime(getNextStartTime(current)))}</dd></div>` : '';
-  const label = isRunning ? 'Running Timer' : 'Current Scheduled Block';
-  return `<article class="project-card active-card active-block-card"><p class="eyebrow">${label}</p><h3 data-card-title>${escapeHtml(current.project || QUICK_START_PROJECT)}</h3><p data-card-meta>${escapeHtml(current.title || 'Untitled task')}</p><dl class="active-block-details"><div><dt>Duration</dt><dd>${escapeHtml(formatMinutes(current.duration || DEFAULT_BLOCK_MINUTES))}</dd></div>${scheduledTimes}</dl><button id="change-timer-length" class="change-length-button" type="button" aria-expanded="false">Change length</button></article>`;
+  const label = isRunning ? 'Running Timer' : (viewedIndex !== null ? 'Selected Project Block' : 'Current Scheduled Block');
+  return `<article class="project-card active-card active-block-card"><p class="eyebrow">${label}</p><h3 data-card-title>${escapeHtml(current.project || QUICK_START_PROJECT)}</h3><p data-card-meta>${escapeHtml(current.title || 'Untitled task')}</p><dl class="active-block-details"><div><dt>Duration</dt><dd>${escapeHtml(formatMinutes(current.duration || DEFAULT_BLOCK_MINUTES))}</dd></div>${scheduledTimes}</dl></article>`;
 }
 
 function viewedBlockCard(block) {
   if (!block) return '';
-  return `<article class="project-card viewed-block-card"><p class="eyebrow">This Block</p><h3>${escapeHtml(block.project || 'Task')}</h3><p>${escapeHtml(block.title || 'Untitled task')}</p><dl class="active-block-details"><div><dt>Starts</dt><dd>${escapeHtml(formatTime(block.time))}</dd></div><div><dt>Ends</dt><dd>${escapeHtml(formatTime(getNextStartTime(block)))}</dd></div><div><dt>Duration</dt><dd>${escapeHtml(formatMinutes(block.duration))}</dd></div></dl></article>`;
+  const draft = viewedBlockDraft || block;
+  const projectChoices = state.projects.map((project) => `<option value="${escapeHtml(project)}" ${project === draft.project ? 'selected' : ''}>${escapeHtml(project)}</option>`).join('');
+  return `<article class="project-card viewed-block-card selected-block-editor"><div class="selected-block-heading"><div><p class="eyebrow">Edit Selected Project</p><h3>${escapeHtml(draft.project || 'Task')}</h3></div><label class="selected-done"><input id="selected-block-done" type="checkbox" ${draft.done ? 'checked' : ''} /> Completed</label></div><div class="selected-block-fields"><label>Project<select id="selected-block-project" class="text-input">${projectChoices}</select></label><label>Task<input id="selected-block-title" class="text-input" value="${escapeHtml(draft.title || '')}" placeholder="Task description" /></label><label>Start Time<input id="selected-block-time" class="text-input" type="time" value="${escapeHtml(draft.time)}" /></label><label>Timer Length<select id="selected-block-duration" class="text-input">${CALENDAR_DURATION_OPTIONS.map((minutes) => `<option value="${minutes}" ${Number(draft.duration) === minutes ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label><label>Zen Break<select id="selected-block-zen-duration" class="text-input">${ZEN_BREAK_PRESETS.map((minutes) => `<option value="${minutes}" ${Number(draft.zenBreakMinutes) === minutes ? 'selected' : ''}>${minutes ? formatMinutes(minutes) : 'Off'}</option>`).join('')}</select></label>${zenBreakTimingControl({ value: draft.zenBreakTiming || 'midpoint', id: 'selected-block-zen-timing' })}</div><div class="selected-block-actions"><button id="save-selected-block" class="primary" type="button">Save Changes</button><p id="timer-block-save-status" class="helper-text" role="status" aria-live="polite">${escapeHtml(timerBlockSaveMessage)}</p></div></article>`;
 }
 
 function getTimerStatus(current) {
@@ -545,6 +549,7 @@ function header() {
 function getActiveBlock() {
   if (quickTask?.active) return quickTask;
   if (runningIndex !== null) return state.schedule[runningIndex];
+  if (viewedIndex !== null) return viewedBlockDraft || state.schedule[viewedIndex];
   return state.schedule[getSchedulePosition().currentIndex];
 }
 
@@ -585,17 +590,25 @@ function timerPage() {
   const inspected = viewedIndex === null ? null : state.schedule[viewedIndex];
   const canStart = Boolean(quickTask?.active || inspected || current);
   const quickTaskControls = quickTask?.active ? `<div class="quick-task-setup"><button id="close-quick-task" class="escape-close" type="button" aria-label="Cancel and close Quick Task" aria-keyshortcuts="Escape" title="Cancel and close">×</button>${quickTaskNameField()}<fieldset class="preset-group timer-presets"><legend>Duration</legend>${DURATION_PRESETS.map((minutes) => `<button type="button" class="preset-button timer-duration-preset ${configuredDurationSeconds === minutes * 60 ? 'active-preset' : ''}" data-minutes="${minutes}" ${hasTimerStarted ? 'disabled' : ''}>${formatMinutes(minutes)}</button>`).join('')}</fieldset></div>` : '';
-  const lengthEditor = current ? `<div id="timer-length-editor" class="timer-length-editor" hidden><p><strong>Change timer length</strong><span>Changes take effect immediately. Schedule conflicts must be resolved first.</span></p><div class="preset-group">${DURATION_PRESETS.map((minutes) => `<button type="button" class="preset-button live-duration-preset ${Math.round(configuredDurationSeconds / 60) === minutes ? 'active-preset' : ''}" data-minutes="${minutes}">${formatMinutes(minutes)}</button>`).join('')}</div></div>` : '';
   const autoStartControl = `<label class="auto-start-control"><span>Auto-Start</span><input id="auto-start-next-task" type="checkbox" role="switch" aria-label="Auto-Start Next Task" ${state.autoStartNextTask ? 'checked' : ''} /></label>`;
   const timerActions = `<div class="actions timer-actions"><button id="start-button" class="primary" ${canStart ? '' : 'disabled'}>Start</button><button id="stop-button">Pause</button><button id="reset-button" ${canStart ? '' : 'disabled'} aria-label="Clear timer to zero">Reset</button><button id="skip-button">Skip</button>${autoStartControl}${zenBreakControl(inspected || current)}</div>`;
   const quickTaskButton = quickTask?.active ? '' : `<button id="quick-task-button" class="quick-task-button" ${hasTimerStarted ? 'disabled' : ''}>${icon.plus} Quick Task</button>`;
-  return `${section({ id: 'timer', title: 'Timer', eyebrow: 'Execution only', className: 'hero-panel', content: `<div class="timer-control-area"><div class="timer-shell" data-inactive="${current ? 'false' : 'true'}" aria-label="Countdown timer"><input id="timer-display" value="${formatSeconds(remainingSeconds)}" aria-label="Timer duration in hours, minutes, and seconds" inputmode="numeric" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" ${hasTimerStarted ? 'disabled' : ''} /><p id="timer-status">${escapeHtml(getTimerStatus(current))}</p></div>${lengthEditor}${quickTaskControls}${timerActions}${quickTaskButton}</div>${primaryNavigation('timer-nav')}<div class="block-navigation"><div class="dashboard-grid">${projectCard('Previous Block', previous ? `← ${previous.project}` : 'Start of schedule', previous?.title || 'No previous block', false, previous ? previousIndex : null)}${activeBlockCard(current)}${projectCard('Next Block', next ? `${next.project} →` : 'End of schedule', next?.title || 'No next block', false, next ? nextIndex : null)}</div>${viewedBlockCard(inspected)}</div>` })}${timerSchedule()}${conflictModal()}${zenBreakOverlay()}`;
+  return `${section({ id: 'timer', title: 'Timer', eyebrow: 'Execution only', className: 'hero-panel', content: `<div class="timer-control-area"><div class="timer-shell" data-inactive="${current ? 'false' : 'true'}" aria-label="Countdown timer"><input id="timer-display" value="${formatSeconds(remainingSeconds)}" aria-label="Timer duration in hours, minutes, and seconds" inputmode="numeric" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" ${hasTimerStarted ? 'disabled' : ''} /><p id="timer-status">${escapeHtml(getTimerStatus(current))}</p></div>${quickTaskControls}${timerActions}${quickTaskButton}</div>${primaryNavigation('timer-nav')}<div class="block-navigation"><div class="dashboard-grid">${projectCard('Previous Block', previous ? `← ${previous.project}` : 'Start of schedule', previous?.title || 'No previous block', false, previous ? previousIndex : null)}${activeBlockCard(current)}${projectCard('Next Block', next ? `${next.project} →` : 'End of schedule', next?.title || 'No next block', false, next ? nextIndex : null)}</div>${viewedBlockCard(inspected)}</div>` })}${timerSchedule()}${timerBlockConflictDialog()}${conflictModal()}${zenBreakOverlay()}`;
 }
 
 function timerSchedule() {
   const currentIndex = getSchedulePosition().currentIndex;
-  const blocks = state.schedule.map((block, index) => `<div class="time-block timer-block ${block.isBreak ? 'break-block' : ''} ${!quickTask?.active && index === currentIndex ? 'active-task' : ''} ${index === viewedIndex ? 'viewed-task' : ''}" data-index="${index}" role="button" tabindex="0" aria-label="View ${escapeHtml(block.title || block.project)}"><input class="schedule-done" data-index="${index}" type="checkbox" ${block.done ? 'checked' : ''} aria-label="Mark ${escapeHtml(block.title || block.project)} complete" /><span class="time">${escapeHtml(formatTime(block.time))}</span><span class="task-copy"><strong>${escapeHtml(block.project || 'Task')}</strong><small>${escapeHtml([block.title || 'Task', block.zenBreakMinutes ? `Zen Break: ${formatMinutes(block.zenBreakMinutes)}` : ''].filter(Boolean).join(' · '))}</small></span></div>`).join('') || '<p class="empty-state">No saved schedule yet. Plan today on the Today page.</p>';
-  return section({ id: 'timer-schedule', title: 'Today’s Saved Schedule', eyebrow: 'Read-only plan', content: `<div class="schedule-list">${blocks}</div>` });
+  const selectedIndex = viewedIndex ?? currentIndex;
+  const blocks = state.schedule.map((block, index) => {
+    const displayBlock = index === viewedIndex && viewedBlockDraft ? viewedBlockDraft : block;
+    return `<div class="time-block timer-block ${displayBlock.isBreak ? 'break-block' : ''} ${!quickTask?.active && index === selectedIndex ? 'active-task' : ''} ${displayBlock.done ? 'completed-task' : ''}" data-index="${index}" role="button" tabindex="0" aria-label="Edit ${escapeHtml(displayBlock.title || displayBlock.project)}"><input class="schedule-done" data-index="${index}" type="checkbox" ${displayBlock.done ? 'checked' : ''} aria-label="Mark ${escapeHtml(displayBlock.title || displayBlock.project)} complete" /><span class="time">${escapeHtml(formatTime(displayBlock.time))}</span><span class="task-copy"><strong>${escapeHtml(displayBlock.project || 'Task')}</strong><small>${escapeHtml([displayBlock.title || 'Task', formatMinutes(displayBlock.duration), displayBlock.zenBreakMinutes ? `Zen Break: ${formatMinutes(displayBlock.zenBreakMinutes)}` : ''].filter(Boolean).join(' · '))}</small></span></div>`;
+  }).join('') || '<p class="empty-state">No saved schedule yet. Plan today on the Today page.</p>';
+  return section({ id: 'timer-schedule', title: 'Today’s Saved Schedule', eyebrow: 'Click any project to edit it', content: `<div class="schedule-list">${blocks}</div>` });
+}
+
+function timerBlockConflictDialog() {
+  if (!timerBlockConflictOpen) return '';
+  return `<div class="conflict-overlay" role="dialog" aria-modal="true" aria-labelledby="timer-block-conflict-title"><section class="conflict-dialog timer-block-conflict-dialog"><button id="close-timer-block-conflict" class="escape-close" type="button" aria-label="Close conflict warning" title="Close">×</button><p class="eyebrow">Schedule Conflict</p><h2 id="timer-block-conflict-title">This change overlaps another scheduled project.</h2><p>Change the start time or timer length, then save again.</p><button id="acknowledge-timer-block-conflict" class="primary" type="button">Go Back and Fix It</button></section></div>`;
 }
 
 function conflictModal() {
@@ -920,7 +933,6 @@ function cancelConflictStart() {
   pendingStart = false;
   pendingStartIndex = null;
   pendingStartDuration = 0;
-  pendingDurationChange = null;
   conflictIndexes = new Set();
   if (conflictPreviousCalendarDate !== null) calendarDate = conflictPreviousCalendarDate;
   if (conflictPreviousCalendarDraft !== null) calendarDraft = conflictPreviousCalendarDraft;
@@ -936,51 +948,6 @@ function extendZenBreak() {
   const display = document.querySelector('#zen-break-countdown');
   if (display) display.textContent = formatSeconds(zenBreak.remainingSeconds);
   saveState();
-}
-
-function applyTimerDuration(durationSeconds, scheduleIndex = null) {
-  const previousDuration = Math.max(configuredDurationSeconds, 0);
-  const elapsedSeconds = hasTimerStarted ? Math.max(0, previousDuration - remainingSeconds) : 0;
-  configuredDurationSeconds = durationSeconds;
-  remainingSeconds = Math.max(0, durationSeconds - elapsedSeconds);
-  if (quickTask?.active) quickTask.duration = durationSeconds / 60;
-  if (scheduleIndex !== null && state.schedule[scheduleIndex]) state.schedule[scheduleIndex].duration = durationSeconds / 60;
-  projectedEndTime = hasTimerStarted ? new Date(Date.now() + (remainingSeconds * 1000)) : null;
-  if (remainingSeconds <= 0 && isRunning) advanceBlock({ completed: true });
-  else updateTimerDisplay();
-}
-
-function requestTimerDuration(minutes) {
-  const durationSeconds = Math.max(1, Number(minutes)) * 60;
-  if (quickTask?.active) {
-    applyTimerDuration(durationSeconds);
-    render();
-    return;
-  }
-  const scheduleIndex = runningIndex ?? viewedIndex ?? getSchedulePosition().currentIndex;
-  if (!state.schedule[scheduleIndex]) return;
-  const draft = cloneSchedule(state.schedule.filter((block) => !block.isBreak));
-  const target = state.schedule[scheduleIndex];
-  const draftIndex = draft.findIndex((block) => block.time === target.time && block.project === target.project && block.title === target.title);
-  if (draftIndex < 0) return;
-  draft[draftIndex].duration = durationSeconds / 60;
-  const conflicts = findScheduleConflicts(draft);
-  if (conflicts.size) {
-    conflictPreviousCalendarDate = calendarDate;
-    conflictPreviousCalendarDraft = cloneSchedule(calendarDraft);
-    calendarDate = toDateKey(new Date());
-    calendarDraft = draft;
-    conflictIndexes = conflicts;
-    conflictModalOpen = true;
-    pendingDurationChange = { durationSeconds, draftIndex, target: { time: target.time, project: target.project, title: target.title } };
-    render();
-    return;
-  }
-  state.schedule[scheduleIndex].duration = durationSeconds / 60;
-  setScheduleForDate(toDateKey(new Date()), state.schedule);
-  applyTimerDuration(durationSeconds, scheduleIndex);
-  saveState();
-  render();
 }
 
 function tickZenBreak() {
@@ -1066,6 +1033,11 @@ function tick() {
 function startTimer({ playStartSound = true } = {}) {
   if (!quickTask?.active && !state.schedule.length) return;
   if (isRunning) return;
+  if (viewedBlockHasUnsavedChanges()) {
+    timerBlockSaveMessage = 'Save your changes before starting the timer.';
+    render();
+    return;
+  }
   if (quickTask?.active && !quickTask.title.trim()) {
     document.querySelector('#quick-title')?.focus();
     return;
@@ -1146,6 +1118,8 @@ function activateQuickTask() {
   if (configuredDurationSeconds <= 0) configuredDurationSeconds = DEFAULT_BLOCK_MINUTES * 60;
   quickTask = { active: true, project: QUICK_START_PROJECT, title: '', duration: configuredDurationSeconds / 60, zenBreakMinutes: 0, zenBreakTiming: 'midpoint' };
   viewedIndex = null;
+  viewedBlockDraft = null;
+  timerBlockSaveMessage = '';
   runningIndex = null;
   remainingSeconds = configuredDurationSeconds;
   zenBreakNotifiedKey = null;
@@ -1181,12 +1155,15 @@ function selectActiveBlock(index) {
   quickTask = null;
   runningIndex = null;
   viewedIndex = nextIndex;
+  viewedBlockDraft = { ...state.schedule[nextIndex] };
+  timerBlockSaveMessage = '';
+  timerBlockConflictOpen = false;
   state.activeIndex = nextIndex;
-  syncTimerToClock();
   hasTimerStarted = false;
   timerStartedAt = null;
   zenBreakNotifiedKey = null;
   lastTick = Date.now();
+  syncTimerToClock();
   render();
 }
 
@@ -1269,7 +1246,8 @@ function bindGlobalEvents() {
 
 function handleEscapeKey(event) {
   if (event.key !== 'Escape') return;
-  if (conflictModalOpen) cancelConflictStart();
+  if (timerBlockConflictOpen) { timerBlockConflictOpen = false; render(); }
+  else if (conflictModalOpen) cancelConflictStart();
   else if (zenBreak?.active) cancelZenBreak();
   else if (quickTask?.active) cancelQuickTask();
   else document.querySelector('.zen-break-menu[open]')?.removeAttribute('open');
@@ -1294,6 +1272,9 @@ function syncTimerToClock() {
 
 function handleRouteChange() {
   viewedIndex = null;
+  viewedBlockDraft = null;
+  timerBlockSaveMessage = '';
+  timerBlockConflictOpen = false;
   const route = getRoute();
   if (route === 'scheduler') {
     schedulerRangeStart = getWeekStart(toDateKey(new Date()));
@@ -1324,6 +1305,43 @@ async function persistSchedule(button) {
   return saved;
 }
 
+function markTimerBlockUnsaved() {
+  timerBlockSaveMessage = 'Unsaved changes';
+  const status = document.querySelector('#timer-block-save-status');
+  if (status) status.textContent = timerBlockSaveMessage;
+}
+
+function viewedBlockHasUnsavedChanges() {
+  if (viewedIndex === null || !viewedBlockDraft || !state.schedule[viewedIndex]) return false;
+  return JSON.stringify(normalizeBlock(viewedBlockDraft)) !== JSON.stringify(normalizeBlock(state.schedule[viewedIndex]));
+}
+
+async function saveSelectedBlock() {
+  if (viewedIndex === null || !viewedBlockDraft || !state.schedule[viewedIndex]) return;
+  const savedBlock = normalizeBlock(viewedBlockDraft);
+  const candidateSchedule = cloneSchedule(state.schedule);
+  candidateSchedule[viewedIndex] = savedBlock;
+  const conflicts = findScheduleConflicts(candidateSchedule);
+  if (conflicts.has(viewedIndex)) {
+    timerBlockConflictOpen = true;
+    timerBlockSaveMessage = 'Not saved because this project overlaps another project.';
+    render();
+    return;
+  }
+  state.schedule = candidateSchedule;
+  setScheduleForDate(toDateKey(new Date()), state.schedule);
+  const savedIndex = state.schedule.findIndex((block) => block.time === savedBlock.time && block.project === savedBlock.project && block.title === savedBlock.title);
+  viewedIndex = savedIndex < 0 ? viewedIndex : savedIndex;
+  state.activeIndex = viewedIndex;
+  viewedBlockDraft = { ...savedBlock };
+  timerBlockConflictOpen = false;
+  configuredDurationSeconds = savedBlock.duration * 60;
+  remainingSeconds = configuredDurationSeconds;
+  const saved = await saveState();
+  timerBlockSaveMessage = saved ? '✓ Changes saved' : 'Could not save. Please try again.';
+  render();
+}
+
 function bindEvents() {
   bindGlobalEvents();
   const saveNote = (key, value) => {
@@ -1348,6 +1366,11 @@ function bindEvents() {
     block.zenBreakMinutes = event.target.checked ? Number(document.querySelector('#timer-zen-break-duration')?.value || 5) : 0;
     zenBreakTriggers.delete(oldKey);
     zenBreakNotifiedKey = null;
+    if (viewedIndex !== null) {
+      markTimerBlockUnsaved();
+      render();
+      return;
+    }
     saveState();
     render();
   });
@@ -1359,6 +1382,7 @@ function bindEvents() {
     zenBreakTriggers.delete(oldKey);
     zenBreakNotifiedKey = null;
     document.querySelector('#zen-break-enabled').checked = true;
+    if (viewedIndex !== null) { markTimerBlockUnsaved(); return; }
     saveState();
   });
   document.querySelector('#timer-zen-break-timing')?.addEventListener('change', (event) => {
@@ -1368,6 +1392,7 @@ function bindEvents() {
     block.zenBreakTiming = event.target.value;
     zenBreakTriggers.delete(oldKey);
     zenBreakNotifiedKey = null;
+    if (viewedIndex !== null) { markTimerBlockUnsaved(); return; }
     saveState();
   });
   document.querySelector('#end-zen-break')?.addEventListener('click', endZenBreakNow);
@@ -1375,6 +1400,12 @@ function bindEvents() {
   document.querySelector('#close-zen-break')?.addEventListener('click', cancelZenBreak);
   document.querySelector('#close-zen-break-options')?.addEventListener('click', () => document.querySelector('.zen-break-menu')?.removeAttribute('open'));
   document.querySelector('#close-conflict')?.addEventListener('click', cancelConflictStart);
+  const closeTimerBlockConflict = () => {
+    timerBlockConflictOpen = false;
+    render();
+  };
+  document.querySelector('#close-timer-block-conflict')?.addEventListener('click', closeTimerBlockConflict);
+  document.querySelector('#acknowledge-timer-block-conflict')?.addEventListener('click', closeTimerBlockConflict);
   document.querySelector('#quick-task-button')?.addEventListener('click', activateQuickTask);
   document.querySelector('#close-quick-task')?.addEventListener('click', cancelQuickTask);
   document.querySelector('#quick-title')?.addEventListener('input', (event) => { quickTask.title = event.target.value; clearTimeout(noteSaveTimer); noteSaveTimer = setTimeout(saveState, 300); });
@@ -1413,7 +1444,6 @@ function bindEvents() {
       });
     }
     if (conflictIndexes.size) { render(); return; }
-    const durationChange = pendingDurationChange;
     setScheduleForDate(toDateKey(new Date()), buildSavedSchedule(calendarDraft));
     await saveState();
     conflictModalOpen = false;
@@ -1421,44 +1451,36 @@ function bindEvents() {
     conflictPreviousCalendarDraft = null;
     const shouldStart = pendingStart;
     pendingStart = false;
-    pendingDurationChange = null;
     viewedIndex = pendingStartIndex;
     pendingStartIndex = null;
-    if (durationChange) {
-      const nextIndex = state.schedule.findIndex((block) => block.time === durationChange.target.time && block.project === durationChange.target.project && block.title === durationChange.target.title);
-      if (nextIndex < 0) {
-        isRunning = false;
-        isUserPaused = false;
-        hasTimerStarted = false;
-        runningIndex = null;
-        clearInterval(timerId);
-        remainingSeconds = 0;
-        configuredDurationSeconds = 0;
-      } else {
-        runningIndex = runningIndex === null ? null : nextIndex;
-        viewedIndex = nextIndex;
-        applyTimerDuration(state.schedule[nextIndex].duration * 60, nextIndex);
-      }
-    } else syncTimerToClock();
+    syncTimerToClock();
     render();
     if (shouldStart) startTimer();
   });
-  document.querySelector('#change-timer-length')?.addEventListener('click', (event) => {
-    const editor = document.querySelector('#timer-length-editor');
-    if (!editor) return;
-    editor.hidden = !editor.hidden;
-    event.currentTarget.setAttribute('aria-expanded', String(!editor.hidden));
-    if (!editor.hidden) editor.querySelector('button')?.focus();
+  document.querySelector('#selected-block-project')?.addEventListener('change', (event) => { viewedBlockDraft.project = event.target.value; markTimerBlockUnsaved(); });
+  document.querySelector('#selected-block-title')?.addEventListener('input', (event) => { viewedBlockDraft.title = event.target.value; markTimerBlockUnsaved(); });
+  document.querySelector('#selected-block-time')?.addEventListener('change', (event) => { viewedBlockDraft.time = event.target.value; markTimerBlockUnsaved(); });
+  document.querySelector('#selected-block-duration')?.addEventListener('change', (event) => {
+    viewedBlockDraft.duration = Number(event.target.value);
+    configuredDurationSeconds = viewedBlockDraft.duration * 60;
+    remainingSeconds = configuredDurationSeconds;
+    markTimerBlockUnsaved();
+    updateTimerDisplay();
   });
-  document.querySelectorAll('.live-duration-preset').forEach((button) => button.addEventListener('click', (event) => {
-    requestTimerDuration(Number(event.currentTarget.dataset.minutes));
-  }));
+  document.querySelector('#selected-block-zen-duration')?.addEventListener('change', (event) => { viewedBlockDraft.zenBreakMinutes = Number(event.target.value); markTimerBlockUnsaved(); });
+  document.querySelector('#selected-block-zen-timing')?.addEventListener('change', (event) => { viewedBlockDraft.zenBreakTiming = event.target.value; markTimerBlockUnsaved(); });
+  document.querySelector('#selected-block-done')?.addEventListener('change', (event) => { viewedBlockDraft.done = event.target.checked; markTimerBlockUnsaved(); });
+  document.querySelector('#save-selected-block')?.addEventListener('click', saveSelectedBlock);
   document.querySelector('#timer-display')?.addEventListener('change', (event) => {
     const match = event.target.value.trim().match(/^(\d+):([0-5]\d):([0-5]\d)$/);
     if (!match) { event.target.value = formatSeconds(remainingSeconds); return; }
     configuredDurationSeconds = (Number(match[1]) * 3600) + (Number(match[2]) * 60) + Number(match[3]);
     remainingSeconds = configuredDurationSeconds;
     if (quickTask?.active) quickTask.duration = configuredDurationSeconds / 60;
+    if (viewedBlockDraft) {
+      viewedBlockDraft.duration = configuredDurationSeconds / 60;
+      markTimerBlockUnsaved();
+    }
     if (quickTask?.active) saveState();
     updateTimerDisplay();
   });
@@ -1700,7 +1722,7 @@ function bindEvents() {
   }
   document.querySelectorAll('.time-block').forEach((block) => {
     block.addEventListener('click', (event) => {
-      if (event.target.closest('.delete-block')) return;
+      if (event.target.closest('.delete-block, .schedule-done')) return;
       selectActiveBlock(block.dataset.index);
     });
     block.addEventListener('keydown', (event) => {
@@ -1719,7 +1741,15 @@ function bindEvents() {
       }
     });
   });
-  document.querySelectorAll('.schedule-done').forEach((input) => input.addEventListener('change', (event) => { state.schedule[event.target.dataset.index].done = event.target.checked; saveState(); render(); }));
+  document.querySelectorAll('.schedule-done').forEach((input) => input.addEventListener('change', (event) => {
+    const index = Number(event.target.dataset.index);
+    const checked = event.target.checked;
+    if (viewedIndex !== index) selectActiveBlock(index);
+    if (!viewedBlockDraft) return;
+    viewedBlockDraft.done = checked;
+    markTimerBlockUnsaved();
+    render();
+  }));
   document.querySelectorAll('.zen-timing-select').forEach((input) => input.addEventListener('change', (event) => { const index = Number(event.target.dataset.index); state.schedule[index].zenBreakTiming = event.target.value; zenBreakTriggers.delete(getZenBreakKey(index)); zenBreakNotifiedKey = null; saveState(); render(); }));
   document.querySelectorAll('.time-input').forEach((input) => input.addEventListener('change', (event) => { state.schedule[event.target.dataset.index].time = event.target.value; resetCurrentDuration(); render(); }));
   document.querySelectorAll('.move-block').forEach((button) => button.addEventListener('click', (event) => { const index = Number(event.currentTarget.dataset.index); const offset = event.currentTarget.dataset.direction === 'up' ? -1 : 1; const nextIndex = index + offset; if (!state.schedule[index] || !state.schedule[nextIndex]) return; const [block] = state.schedule.splice(index, 1); state.schedule.splice(nextIndex, 0, block); state.activeIndex = nextIndex; resetCurrentDuration(); render(); }));
