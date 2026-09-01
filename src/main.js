@@ -32,6 +32,8 @@ let state = structuredClone(defaultState);
 let todayDraft = [];
 let calendarView = 'day';
 let calendarDate = toDateKey(new Date());
+let schedulerRangeStart = getWeekStart(toDateKey(new Date()));
+let scheduleGenerationMessage = '';
 let calendarDraft = [];
 let isRunning = false;
 let isUserPaused = false;
@@ -697,6 +699,7 @@ function monthView(dateKey) {
   const first = new Date(date.getFullYear(), date.getMonth(), 1);
   const gridStart = getWeekStart(toDateKey(first));
   const currentMonth = date.getMonth();
+  const weekdayHeaders = weekDays.map((day) => `<div class="month-weekday">${escapeHtml(day)}</div>`).join('');
   const cells = Array.from({ length: 42 }, (_, index) => {
     const cellDate = addDays(gridStart, index);
     const parsed = parseDateKey(cellDate);
@@ -704,7 +707,7 @@ function monthView(dateKey) {
     const blocks = getScheduleForDate(cellDate).map((block) => `<span class="month-task"><strong>${escapeHtml(block.project || 'Task')}</strong>${block.title ? ` <small>${escapeHtml(block.title)}</small>` : ''}</span>`).join('');
     return `<button type="button" class="month-day ${classes}" data-calendar-date="${cellDate}"><strong>${parsed.getDate()}</strong>${blocks || '<small class="empty-month-day">No tasks</small>'}</button>`;
   }).join('');
-  return `<div class="calendar-full-view"><div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(dateKey, { month: 'long', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Month</button><button id="calendar-next">Next Month</button></div></div><div class="month-view">${cells}</div></div>`;
+  return `<div class="calendar-full-view"><div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(dateKey, { month: 'long', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Month</button><button id="calendar-next">Next Month</button></div></div><div class="month-view">${weekdayHeaders}${cells}</div></div>`;
 }
 
 function calendarTimeSelector(block, index) {
@@ -726,18 +729,20 @@ function calendarPlanner() {
 
 function calendarSection() {
   const selectedView = calendarView === 'week' ? weekView(calendarDate) : calendarView === 'month' ? monthView(calendarDate) : dayView(calendarDate);
-  return section({ id: 'calendar', title: 'Calendar', eyebrow: 'Planning', content: `<div class="calendar-controls"><label>Planning Date <input id="calendar-date" class="text-input" type="date" value="${calendarDate}" /></label></div><div class="calendar-tabs"><button class="${calendarView === 'day' ? 'active-tab' : ''}" data-calendar-view="day">Day</button><button class="${calendarView === 'week' ? 'active-tab' : ''}" data-calendar-view="week">Week</button><button class="${calendarView === 'month' ? 'active-tab' : ''}" data-calendar-view="month">Month</button></div><div class="calendar-layout single-calendar-view">${selectedView}</div>` });
+  const generationNotice = scheduleGenerationMessage ? `<p class="schedule-generation-notice" role="status">${escapeHtml(scheduleGenerationMessage)}</p>` : '';
+  return section({ id: 'calendar', title: 'Calendar', eyebrow: 'Planning', content: `${generationNotice}<div class="calendar-controls"><label>Planning Date <input id="calendar-date" class="text-input" type="date" value="${calendarDate}" /></label></div><div class="calendar-tabs"><button class="${calendarView === 'day' ? 'active-tab' : ''}" data-calendar-view="day">Day</button><button class="${calendarView === 'week' ? 'active-tab' : ''}" data-calendar-view="week">Week</button><button class="${calendarView === 'month' ? 'active-tab' : ''}" data-calendar-view="month">Month</button></div><div class="calendar-layout single-calendar-view">${selectedView}</div>` });
 }
 
 function schedulerPage() {
   const settings = state.schedulerSettings;
-  const nextMonday = addDays(getWeekStart(toDateKey(new Date())), 7);
+  const weekStart = schedulerRangeStart || getWeekStart(toDateKey(new Date()));
+  const weekEnd = addDays(weekStart, 6);
   const dayRows = weekDays.map((day) => {
     const rule = settings.days[day];
     return `<article class="scheduler-day" data-day="${day}"><header><strong>${day}</strong></header><label>Day type<select class="text-input scheduler-type"><option value="normal" ${rule.type === 'normal' ? 'selected' : ''}>Normal</option><option value="light" ${rule.type === 'light' ? 'selected' : ''}>Light</option><option value="off" ${rule.type === 'off' ? 'selected' : ''}>Off</option></select></label><label>Start<input class="text-input scheduler-start" type="time" value="${rule.start}"></label><label>End<input class="text-input scheduler-end" type="time" value="${rule.end}"></label><label>Blocks<input class="text-input scheduler-blocks" type="number" min="0" max="12" value="${rule.blocks}"></label><label class="scheduler-break-toggle"><input class="scheduler-break-enabled" type="checkbox" role="switch" ${rule.breakEnabled ? 'checked' : ''}> Add a break</label><div class="scheduler-break-times ${rule.breakEnabled ? '' : 'disabled-field'}"><label>Break starts<input class="text-input scheduler-break-start" type="time" value="${rule.breakStart}" ${rule.breakEnabled ? '' : 'disabled'}></label><label>Break ends<input class="text-input scheduler-break-end" type="time" value="${rule.breakEnd}" ${rule.breakEnabled ? '' : 'disabled'}></label></div></article>`;
   }).join('');
   const blackoutRows = settings.blackouts.map((item, index) => `<article class="blackout-row"><label>When<select class="text-input blackout-recurring" data-index="${index}"><option value="date" ${item.recurring ? '' : 'selected'}>This date</option><option value="daily" ${item.recurring ? 'selected' : ''}>Every day</option></select></label><label>Date<input class="text-input blackout-date" data-index="${index}" type="date" value="${escapeHtml(item.date || '')}" ${item.recurring ? 'disabled' : ''}></label><label>Starts<input class="text-input blackout-start" data-index="${index}" type="time" value="${escapeHtml(item.start || '16:00')}"></label><label>Ends<input class="text-input blackout-end" data-index="${index}" type="time" value="${escapeHtml(item.end || '19:00')}"></label><label>Name<input class="text-input blackout-name" data-index="${index}" value="${escapeHtml(item.name || '')}" placeholder="Food, trip, meeting…"></label><button class="delete-blackout" data-index="${index}">${icon.trash} Delete</button></article>`).join('') || '<p class="empty-state">No blackout dates yet.</p>';
-  return `${section({ id: 'scheduler', title: 'Build My Week', eyebrow: 'You shape the time. The scheduler chooses the work.', content: `<p class="helper-text">Set each day before generating. Block lengths come from Projects, and the scheduler leaves at least one hour between blocks. Priority automatically means more often.</p><div class="scheduler-days">${dayRows}</div>` })}${section({ id: 'blackouts', title: 'Blackout Dates', eyebrow: 'Protected time', content: `<div class="blackout-list">${blackoutRows}</div><button id="add-blackout" class="add-button">${icon.plus} Add Blackout</button>` })}${section({ id: 'generate-week', title: 'Generate Schedule', eyebrow: 'Priority-weighted random picker', content: `<div class="generate-controls"><label>Week beginning<input id="scheduler-week" class="text-input" type="date" value="${nextMonday}"></label><button id="generate-schedule" class="primary">Make My Schedule</button></div><p id="scheduler-status" class="helper-text" role="status"></p>` })}`;
+  return `${section({ id: 'scheduler', title: 'Build My Week', eyebrow: 'You shape the time. The scheduler chooses the work.', content: `<p class="helper-text">Set each day before generating. Block lengths come from Projects, and the scheduler leaves at least one hour between blocks. Priority automatically means more often.</p><div class="scheduler-days">${dayRows}</div>` })}${section({ id: 'blackouts', title: 'Blackout Dates', eyebrow: 'Protected time', content: `<div class="blackout-list">${blackoutRows}</div><button id="add-blackout" class="add-button">${icon.plus} Add Blackout</button>` })}${section({ id: 'generate-week', title: 'Generate Schedule', eyebrow: 'Priority-weighted random picker', content: `<div class="generate-controls"><label>Start date<input id="scheduler-week" class="text-input" type="date" value="${weekStart}"></label><label>End date<input id="scheduler-week-end" class="text-input" type="date" value="${weekEnd}" readonly aria-readonly="true"></label><button id="generate-schedule" class="primary">Make My Schedule</button></div><p class="helper-text">This schedule covers ${escapeHtml(formatDateLabel(weekStart, { month: 'long', day: 'numeric', year: 'numeric' }))} through ${escapeHtml(formatDateLabel(weekEnd, { month: 'long', day: 'numeric', year: 'numeric' }))}.</p><p id="scheduler-status" class="helper-text" role="status"></p>` })}`;
 }
 
 function notesAndReview() {
@@ -1529,18 +1534,32 @@ function bindEvents() {
     document.querySelector('#add-blackout')?.addEventListener('click', () => { state.schedulerSettings.blackouts.push({ date: toDateKey(new Date()), start: '16:00', end: '19:00', name: '', recurring: false, days: [] }); saveState(); render(); });
     document.querySelectorAll('.blackout-row input, .blackout-row select').forEach((input) => input.addEventListener('change', (event) => { const item = state.schedulerSettings.blackouts[Number(event.target.dataset.index)]; const key = event.target.className.match(/blackout-(date|start|end|name|recurring)/)?.[1]; if (key === 'recurring') { item.recurring = event.target.value === 'daily'; item.days = item.recurring ? [...weekDays] : []; render(); } else if (key) item[key] = event.target.value; saveState(); }));
     document.querySelectorAll('.delete-blackout').forEach((button) => button.addEventListener('click', (event) => { state.schedulerSettings.blackouts.splice(Number(event.currentTarget.dataset.index), 1); saveState(); render(); }));
+    document.querySelector('#scheduler-week')?.addEventListener('change', (event) => {
+      schedulerRangeStart = event.target.value || getWeekStart(toDateKey(new Date()));
+      const endInput = document.querySelector('#scheduler-week-end');
+      if (endInput) endInput.value = addDays(schedulerRangeStart, 6);
+    });
     document.querySelector('#generate-schedule')?.addEventListener('click', async (event) => {
       const weekStart = document.querySelector('#scheduler-week').value;
+      const weekEnd = addDays(weekStart, 6);
+      schedulerRangeStart = weekStart;
       if (!state.projects.length) { document.querySelector('#scheduler-status').textContent = 'Add at least one project first.'; return; }
       const seed = `${Date.now()}-${Math.random()}`;
       const result = generateSchedule({ weekStart, dayRules: state.schedulerSettings.days, blackouts: state.schedulerSettings.blackouts, projects: state.projects.map((name) => ({ name, priority: projectSettings(name).priority, duration: projectSettings(name).defaultDuration || DEFAULT_BLOCK_MINUTES })), seed });
       Object.entries(result.schedules).forEach(([date, blocks]) => setScheduleForDate(date, blocks));
       state.schedulerSettings.lastSeed = result.seed;
-      await persistSchedule(event.currentTarget);
+      const saved = await persistSchedule(event.currentTarget);
       const total = Object.values(result.schedules).reduce((sum, blocks) => sum + blocks.length, 0);
-      render();
-      const status = document.querySelector('#scheduler-status');
-      if (status) status.textContent = `Scheduled ${total} blocks. Open Calendar to review or override them.`;
+      if (!saved) {
+        render();
+        const status = document.querySelector('#scheduler-status');
+        if (status) status.textContent = 'Your schedule was created on this page but could not be saved. Please try again.';
+        return;
+      }
+      scheduleGenerationMessage = `Your schedule is ready: ${total} blocks created for ${formatDateLabel(weekStart, { month: 'long', day: 'numeric' })} through ${formatDateLabel(weekEnd, { month: 'long', day: 'numeric', year: 'numeric' })}.`;
+      calendarDate = weekStart;
+      calendarView = 'week';
+      window.location.hash = 'calendar';
     });
     return;
   }
