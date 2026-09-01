@@ -34,3 +34,17 @@ test('a custom daily break prevents blocks from overlapping the user-selected in
   const result = generateSchedule({ weekStart: '2026-08-24', dayRules: mondayOnly, projects: [{ name: 'Work', priority: 1, duration: 60 }], seed: 'custom-break' });
   assert.deepEqual(result.schedules['2026-08-24'].map((block) => block.time), ['09:00', '13:15']);
 });
+
+
+test('a custom end date controls the exact generated date range', () => {
+  const everyDay = structuredClone(days);
+  Object.values(everyDay).forEach((rule) => { rule.enabled = true; rule.blocks = 1; });
+  const result = generateSchedule({
+    weekStart: '2026-08-31',
+    rangeEnd: '2026-09-02',
+    dayRules: everyDay,
+    projects: [{ name: 'Work', priority: 1, duration: 60 }],
+    seed: 'custom-range',
+  });
+  assert.deepEqual(Object.keys(result.schedules), ['2026-08-31', '2026-09-01', '2026-09-02']);
+});
