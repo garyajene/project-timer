@@ -757,6 +757,9 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .blackout-row { display: grid; grid-template-columns: repeat(4, minmax(8rem, 1fr)) minmax(12rem, 2fr) auto; gap: .75rem; align-items: end; }
 .generate-controls { display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; }
 .generate-controls label { min-width:12rem; }
+.scheduler-date-control { display:grid; gap:.5rem; min-width:13rem; }
+.date-picker-button { width:100%; justify-content:center; border:1px solid var(--line); background:#15151a; color:#fff; font-weight:850; }
+.date-picker-button:hover, .date-picker-button:focus-visible { border-color:var(--red); }
 
 @media (max-width: 1050px) {
   .scheduler-days { grid-template-columns: repeat(3, minmax(0, 1fr)); }
