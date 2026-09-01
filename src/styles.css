@@ -113,6 +113,8 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .day-view, .week-view, .month-view { background: #08080a; border: 1px solid var(--line); border-radius: 18px; padding: 1rem; }
 .week-view { overflow-x: auto; }
 .month-view { display: grid; grid-template-columns: repeat(7, 1fr); gap: .45rem; }
+.month-weekday { padding:.45rem .25rem; color:#fff; font-size:.78rem; font-weight:900; letter-spacing:.06em; text-align:center; text-transform:uppercase; border-bottom:1px solid var(--line); }
+.schedule-generation-notice { margin:0 0 1rem; padding:1rem 1.1rem; border:1px solid rgba(60,210,120,.55); border-radius:14px; background:rgba(60,210,120,.12); color:#d8ffe5; font-weight:900; line-height:1.45; }
 .month-view span { aspect-ratio: 1; display: grid; place-items: center; border: 1px solid var(--line); border-radius: 12px; color: var(--muted); }
 .today-dot { color: #fff !important; background: var(--red); border-color: var(--red) !important; }
 .notes-grid { grid-template-columns: 1fr 1fr 1fr; }
@@ -754,6 +756,8 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .scheduler-break-times { display: grid; grid-template-columns: minmax(0, 1fr); gap: .75rem; }
 .blackout-row { display: grid; grid-template-columns: repeat(4, minmax(8rem, 1fr)) minmax(12rem, 2fr) auto; gap: .75rem; align-items: end; }
 .generate-controls { display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; }
+.generate-controls label { min-width:12rem; }
+#scheduler-week-end[readonly] { color:#fff; opacity:.8; cursor:not-allowed; }
 
 @media (max-width: 1050px) {
   .scheduler-days { grid-template-columns: repeat(3, minmax(0, 1fr)); }
