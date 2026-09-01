@@ -4,7 +4,7 @@ import test from 'node:test';
 
 const mainSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
 
-test('Projects expose a required one-to-five priority and optional default block length', () => {
+test('Projects expose a required one-to-five priority and an always-available default block length', () => {
   const projectList = mainSource.slice(mainSource.indexOf('function masterProjectList()'), mainSource.indexOf('function calendarTaskSummary'));
   assert.match(projectList, /class="project-priority"/);
   assert.match(projectList, /type="radio"/);
