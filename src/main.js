@@ -652,9 +652,8 @@ function todayPlanner() {
 function masterProjectList() {
   return section({ id: 'projects', title: 'Master Project List', eyebrow: 'Backlog', content: `<div class="project-list">${state.projects.map((project, index) => {
     const settings = projectSettings(project);
-    const durationEnabled = settings.defaultDuration !== null;
     const priorities = [1, 2, 3, 4, 5].map((priority) => `<label class="priority-option"><input class="project-priority" data-index="${index}" type="radio" name="project-priority-${index}" value="${priority}" ${settings.priority === priority ? 'checked' : ''} required /><span>${priority}</span></label>`).join('');
-    return `<div class="project-row"><div class="project-main"><input class="text-input project-name" data-index="${index}" value="${escapeHtml(project)}" aria-label="Project name" /><fieldset class="priority-control"><legend>Priority <small>1 highest · 5 lowest</small></legend><div>${priorities}</div></fieldset><label class="project-duration-toggle"><input class="project-duration-enabled" data-index="${index}" type="checkbox" role="switch" ${durationEnabled ? 'checked' : ''} /> Set default block length</label><label class="project-duration-field ${durationEnabled ? '' : 'disabled-field'}">Default block length <span class="optional-label">(optional)</span><select class="text-input project-duration" data-index="${index}" ${durationEnabled ? '' : 'disabled'}>${CALENDAR_DURATION_OPTIONS.map((minutes) => `<option value="${minutes}" ${settings.defaultDuration === minutes || (!durationEnabled && minutes === DEFAULT_BLOCK_MINUTES) ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label></div><div class="row-actions"><button class="delete-project" data-index="${index}" aria-label="Delete ${escapeHtml(project)}">${icon.trash} Delete</button></div></div>`;
+    return `<div class="project-row"><div class="project-main"><input class="text-input project-name" data-index="${index}" value="${escapeHtml(project)}" aria-label="Project name" /><fieldset class="priority-control"><legend>Priority <small>1 highest · 5 lowest</small></legend><div>${priorities}</div></fieldset><label class="project-duration-field">Default block length<select class="text-input project-duration" data-index="${index}">${CALENDAR_DURATION_OPTIONS.map((minutes) => `<option value="${minutes}" ${settings.defaultDuration === minutes || (settings.defaultDuration === null && minutes === DEFAULT_BLOCK_MINUTES) ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label></div><div class="row-actions"><button class="delete-project" data-index="${index}" aria-label="Delete ${escapeHtml(project)}">${icon.trash} Delete</button></div></div>`;
   }).join('') || '<p class="empty-state">No projects yet.</p>'}</div><button id="add-project" class="add-button"><span>${icon.plus}</span> Add Project</button>` });
 }
 
@@ -1510,12 +1509,6 @@ function bindEvents() {
     const project = state.projects[Number(event.target.dataset.index)];
     state.projectSettings[project] = { ...projectSettings(project), priority: Number(event.target.value) };
     saveState();
-  }));
-  document.querySelectorAll('.project-duration-enabled').forEach((input) => input.addEventListener('change', (event) => {
-    const project = state.projects[Number(event.target.dataset.index)];
-    state.projectSettings[project] = { ...projectSettings(project), defaultDuration: event.target.checked ? DEFAULT_BLOCK_MINUTES : null };
-    saveState();
-    render();
   }));
   document.querySelectorAll('.project-duration').forEach((input) => input.addEventListener('change', (event) => {
     const project = state.projects[Number(event.target.dataset.index)];
