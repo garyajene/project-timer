@@ -1293,7 +1293,9 @@ function syncTimerToClock() {
 
 function handleRouteChange() {
   viewedIndex = null;
-  if (getRoute() === 'timer') syncTimerToClock();
+  const route = getRoute();
+  if (route === 'scheduler') schedulerRangeStart = getWeekStart(toDateKey(new Date()));
+  if (route === 'timer') syncTimerToClock();
   render();
 }
 
@@ -1544,13 +1546,27 @@ function bindEvents() {
       const weekEnd = addDays(weekStart, 6);
       schedulerRangeStart = weekStart;
       if (!state.projects.length) { document.querySelector('#scheduler-status').textContent = 'Add at least one project first.'; return; }
+      const rangeDates = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+      const existingDates = rangeDates.map((date) => ({ date, blocks: getScheduleForDate(date) })).filter((item) => item.blocks.length);
+      if (existingDates.length) {
+        const existingTotal = existingDates.reduce((sum, item) => sum + item.blocks.length, 0);
+        const confirmed = window.confirm(`You are overriding an existing schedule. ${existingTotal} scheduled block${existingTotal === 1 ? '' : 's'} already exist${existingTotal === 1 ? 's' : ''} between ${formatDateLabel(weekStart, { month: 'long', day: 'numeric' })} and ${formatDateLabel(weekEnd, { month: 'long', day: 'numeric', year: 'numeric' })}. Replace them with a newly generated schedule?`);
+        if (!confirmed) {
+          const status = document.querySelector('#scheduler-status');
+          if (status) status.textContent = 'Your existing schedule was kept. Nothing was changed.';
+          return;
+        }
+      }
+      const previousSchedules = Object.fromEntries(rangeDates.map((date) => [date, cloneSchedule(getScheduleForDate(date))]));
       const seed = `${Date.now()}-${Math.random()}`;
       const result = generateSchedule({ weekStart, dayRules: state.schedulerSettings.days, blackouts: state.schedulerSettings.blackouts, projects: state.projects.map((name) => ({ name, priority: projectSettings(name).priority, duration: projectSettings(name).defaultDuration || DEFAULT_BLOCK_MINUTES })), seed });
+      rangeDates.forEach((date) => setScheduleForDate(date, []));
       Object.entries(result.schedules).forEach(([date, blocks]) => setScheduleForDate(date, blocks));
       state.schedulerSettings.lastSeed = result.seed;
       const saved = await persistSchedule(event.currentTarget);
       const total = Object.values(result.schedules).reduce((sum, blocks) => sum + blocks.length, 0);
       if (!saved) {
+        rangeDates.forEach((date) => setScheduleForDate(date, previousSchedules[date]));
         render();
         const status = document.querySelector('#scheduler-status');
         if (status) status.textContent = 'Your schedule was created on this page but could not be saved. Please try again.';
