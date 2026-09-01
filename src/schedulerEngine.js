@@ -1,4 +1,6 @@
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+const MINIMUM_BLOCK_GAP_MINUTES = 60;
+const PREFERRED_BLOCK_GAP_MINUTES = 120;
 
 function hashSeed(value) {
   let hash = 2166136261;
@@ -20,6 +22,32 @@ function seededRandom(seed) {
 const minutes = (time) => { const [hour, minute] = time.split(':').map(Number); return hour * 60 + minute; };
 const time = (value) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
 const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+
+function availableMinutes(start, end, unavailable) {
+  if (start >= end) return 0;
+  let available = end - start;
+  unavailable.forEach((item) => {
+    const overlapStart = Math.max(start, minutes(item.start));
+    const overlapEnd = Math.min(end, minutes(item.end));
+    if (overlapEnd > overlapStart) available -= overlapEnd - overlapStart;
+  });
+  return Math.max(0, available);
+}
+
+function assertMinimumSpacing(schedules) {
+  Object.entries(schedules).forEach(([date, blocks]) => {
+    const ordered = [...blocks].sort((a, b) => a.time.localeCompare(b.time));
+    for (let index = 1; index < ordered.length; index += 1) {
+      const previous = ordered[index - 1];
+      const current = ordered[index];
+      const previousEnd = minutes(previous.time) + Number(previous.duration);
+      const gap = minutes(current.time) - previousEnd;
+      if (gap < MINIMUM_BLOCK_GAP_MINUTES) {
+        throw new Error(`Generated schedule failed spacing validation on ${date}. Every work block requires at least one hour between blocks.`);
+      }
+    }
+  });
+}
 
 export function generateSchedule({ weekStart, rangeEnd = null, dayRules, blackouts = [], projects, seed = Date.now() }) {
   const random = seededRandom(seed);
@@ -60,10 +88,17 @@ export function generateSchedule({ weekStart, rangeEnd = null, dayRules, blackou
       const chosen = ranked[0].project;
       counts[chosen.name] += 1;
       (schedules[dateValue] ||= []).push({ time: time(cursor), project: chosen.name, title: '', duration: chosen.duration, done: false });
-      cursor += Number(chosen.duration) + 60;
+      const chosenEnd = cursor + Number(chosen.duration);
+      const remainingBlocks = Math.max(0, Number(rule.blocks) - (index + 1));
+      const minimumProjectDuration = eligible.length ? Math.min(...eligible.map((project) => Number(project.duration))) : 0;
+      const minimumFutureWork = (remainingBlocks * minimumProjectDuration) + (Math.max(0, remainingBlocks - 1) * MINIMUM_BLOCK_GAP_MINUTES);
+      const preferredNextStart = chosenEnd + PREFERRED_BLOCK_GAP_MINUTES;
+      const canUsePreferredGap = remainingBlocks > 0 && availableMinutes(preferredNextStart, dayEnd, dayBlackouts) >= minimumFutureWork;
+      cursor = chosenEnd + (canUsePreferredGap ? PREFERRED_BLOCK_GAP_MINUTES : MINIMUM_BLOCK_GAP_MINUTES);
       index += 1;
     }
   }
   Object.values(schedules).forEach((blocks) => blocks.sort((a, b) => a.time.localeCompare(b.time)));
+  assertMinimumSpacing(schedules);
   return { schedules, counts, unfilled, seed: String(seed) };
 }
