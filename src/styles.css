@@ -757,7 +757,6 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .blackout-row { display: grid; grid-template-columns: repeat(4, minmax(8rem, 1fr)) minmax(12rem, 2fr) auto; gap: .75rem; align-items: end; }
 .generate-controls { display: flex; gap: 1rem; align-items: end; flex-wrap: wrap; }
 .generate-controls label { min-width:12rem; }
-#scheduler-week-end[readonly] { color:#fff; opacity:.8; cursor:not-allowed; }
 
 @media (max-width: 1050px) {
   .scheduler-days { grid-template-columns: repeat(3, minmax(0, 1fr)); }
