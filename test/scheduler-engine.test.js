@@ -48,3 +48,21 @@ test('a custom end date controls the exact generated date range', () => {
   });
   assert.deepEqual(Object.keys(result.schedules), ['2026-08-31', '2026-09-01', '2026-09-02']);
 });
+
+
+test('generated work blocks prefer two-hour gaps when the day has room', () => {
+  const mondayOnly = structuredClone(days);
+  Object.entries(mondayOnly).forEach(([day, rule]) => { rule.enabled = day === 'Monday'; });
+  mondayOnly.Monday = { ...mondayOnly.Monday, start: '09:00', end: '23:00', blocks: 3 };
+  const result = generateSchedule({ weekStart: '2026-08-24', dayRules: mondayOnly, projects: [{ name: 'Work', priority: 1, duration: 60 }], seed: 'preferred-spacing' });
+  assert.deepEqual(result.schedules['2026-08-24'].map((block) => block.time), ['09:00', '12:00', '15:00']);
+});
+
+test('generated work blocks never violate the one-hour minimum gap', () => {
+  const mondayOnly = structuredClone(days);
+  Object.entries(mondayOnly).forEach(([day, rule]) => { rule.enabled = day === 'Monday'; });
+  mondayOnly.Monday = { ...mondayOnly.Monday, start: '09:00', end: '13:00', blocks: 3 };
+  const result = generateSchedule({ weekStart: '2026-08-24', dayRules: mondayOnly, projects: [{ name: 'Long work', priority: 1, duration: 120 }], seed: 'minimum-spacing' });
+  assert.equal(result.schedules['2026-08-24'].length, 1);
+  assert.equal(result.unfilled.length, 1);
+});
