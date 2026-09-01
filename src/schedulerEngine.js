@@ -21,15 +21,16 @@ const minutes = (time) => { const [hour, minute] = time.split(':').map(Number); 
 const time = (value) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
 const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
-export function generateSchedule({ weekStart, dayRules, blackouts = [], projects, seed = Date.now() }) {
+export function generateSchedule({ weekStart, rangeEnd = null, dayRules, blackouts = [], projects, seed = Date.now() }) {
   const random = seededRandom(seed);
   const schedules = {};
   const eligible = projects.filter((project) => project.name && project.duration > 0);
   const counts = Object.fromEntries(eligible.map((project) => [project.name, 0]));
   const unfilled = [];
   const startDate = new Date(`${weekStart}T12:00:00`);
-  for (let offset = 0; offset < 7; offset += 1) {
-    const date = new Date(startDate); date.setDate(date.getDate() + offset);
+  const endDate = rangeEnd ? new Date(`${rangeEnd}T12:00:00`) : new Date(startDate);
+  if (!rangeEnd) endDate.setDate(endDate.getDate() + 6);
+  for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
     const dateValue = dateKey(date);
     const rule = dayRules[DAY_NAMES[date.getDay()]];
     if (!rule?.enabled || rule.type === 'off') continue;
