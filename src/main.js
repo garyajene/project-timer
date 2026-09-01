@@ -33,6 +33,7 @@ let todayDraft = [];
 let calendarView = 'day';
 let calendarDate = toDateKey(new Date());
 let schedulerRangeStart = getWeekStart(toDateKey(new Date()));
+let schedulerRangeEnd = addDays(schedulerRangeStart, 6);
 let scheduleGenerationMessage = '';
 let calendarDraft = [];
 let isRunning = false;
@@ -736,13 +737,13 @@ function calendarSection() {
 function schedulerPage() {
   const settings = state.schedulerSettings;
   const weekStart = schedulerRangeStart || getWeekStart(toDateKey(new Date()));
-  const weekEnd = addDays(weekStart, 6);
+  const weekEnd = schedulerRangeEnd || addDays(weekStart, 6);
   const dayRows = weekDays.map((day) => {
     const rule = settings.days[day];
     return `<article class="scheduler-day" data-day="${day}"><header><strong>${day}</strong></header><label>Day type<select class="text-input scheduler-type"><option value="normal" ${rule.type === 'normal' ? 'selected' : ''}>Normal</option><option value="light" ${rule.type === 'light' ? 'selected' : ''}>Light</option><option value="off" ${rule.type === 'off' ? 'selected' : ''}>Off</option></select></label><label>Start<input class="text-input scheduler-start" type="time" value="${rule.start}"></label><label>End<input class="text-input scheduler-end" type="time" value="${rule.end}"></label><label>Blocks<input class="text-input scheduler-blocks" type="number" min="0" max="12" value="${rule.blocks}"></label><label class="scheduler-break-toggle"><input class="scheduler-break-enabled" type="checkbox" role="switch" ${rule.breakEnabled ? 'checked' : ''}> Add a break</label><div class="scheduler-break-times ${rule.breakEnabled ? '' : 'disabled-field'}"><label>Break starts<input class="text-input scheduler-break-start" type="time" value="${rule.breakStart}" ${rule.breakEnabled ? '' : 'disabled'}></label><label>Break ends<input class="text-input scheduler-break-end" type="time" value="${rule.breakEnd}" ${rule.breakEnabled ? '' : 'disabled'}></label></div></article>`;
   }).join('');
   const blackoutRows = settings.blackouts.map((item, index) => `<article class="blackout-row"><label>When<select class="text-input blackout-recurring" data-index="${index}"><option value="date" ${item.recurring ? '' : 'selected'}>This date</option><option value="daily" ${item.recurring ? 'selected' : ''}>Every day</option></select></label><label>Date<input class="text-input blackout-date" data-index="${index}" type="date" value="${escapeHtml(item.date || '')}" ${item.recurring ? 'disabled' : ''}></label><label>Starts<input class="text-input blackout-start" data-index="${index}" type="time" value="${escapeHtml(item.start || '16:00')}"></label><label>Ends<input class="text-input blackout-end" data-index="${index}" type="time" value="${escapeHtml(item.end || '19:00')}"></label><label>Name<input class="text-input blackout-name" data-index="${index}" value="${escapeHtml(item.name || '')}" placeholder="Food, trip, meeting…"></label><button class="delete-blackout" data-index="${index}">${icon.trash} Delete</button></article>`).join('') || '<p class="empty-state">No blackout dates yet.</p>';
-  return `${section({ id: 'scheduler', title: 'Build My Week', eyebrow: 'You shape the time. The scheduler chooses the work.', content: `<p class="helper-text">Set each day before generating. Block lengths come from Projects, and the scheduler leaves at least one hour between blocks. Priority automatically means more often.</p><div class="scheduler-days">${dayRows}</div>` })}${section({ id: 'blackouts', title: 'Blackout Dates', eyebrow: 'Protected time', content: `<div class="blackout-list">${blackoutRows}</div><button id="add-blackout" class="add-button">${icon.plus} Add Blackout</button>` })}${section({ id: 'generate-week', title: 'Generate Schedule', eyebrow: 'Priority-weighted random picker', content: `<div class="generate-controls"><label>Start date<input id="scheduler-week" class="text-input" type="date" value="${weekStart}"></label><label>End date<input id="scheduler-week-end" class="text-input" type="date" value="${weekEnd}" readonly aria-readonly="true"></label><button id="generate-schedule" class="primary">Make My Schedule</button></div><p class="helper-text">This schedule covers ${escapeHtml(formatDateLabel(weekStart, { month: 'long', day: 'numeric', year: 'numeric' }))} through ${escapeHtml(formatDateLabel(weekEnd, { month: 'long', day: 'numeric', year: 'numeric' }))}.</p><p id="scheduler-status" class="helper-text" role="status"></p>` })}`;
+  return `${section({ id: 'scheduler', title: 'Build My Week', eyebrow: 'You shape the time. The scheduler chooses the work.', content: `<p class="helper-text">Set each day before generating. Block lengths come from Projects, and the scheduler leaves at least one hour between blocks. Priority automatically means more often.</p><div class="scheduler-days">${dayRows}</div>` })}${section({ id: 'blackouts', title: 'Blackout Dates', eyebrow: 'Protected time', content: `<div class="blackout-list">${blackoutRows}</div><button id="add-blackout" class="add-button">${icon.plus} Add Blackout</button>` })}${section({ id: 'generate-week', title: 'Generate Schedule', eyebrow: 'Priority-weighted random picker', content: `<div class="generate-controls"><label>Start date<input id="scheduler-week" class="text-input" type="date" value="${weekStart}"></label><label>End date<input id="scheduler-week-end" class="text-input" type="date" value="${weekEnd}"></label><button id="generate-schedule" class="primary">Make My Schedule</button></div><p class="helper-text">This schedule covers ${escapeHtml(formatDateLabel(weekStart, { month: 'long', day: 'numeric', year: 'numeric' }))} through ${escapeHtml(formatDateLabel(weekEnd, { month: 'long', day: 'numeric', year: 'numeric' }))}.</p><p id="scheduler-status" class="helper-text" role="status"></p>` })}`;
 }
 
 function notesAndReview() {
@@ -1294,7 +1295,10 @@ function syncTimerToClock() {
 function handleRouteChange() {
   viewedIndex = null;
   const route = getRoute();
-  if (route === 'scheduler') schedulerRangeStart = getWeekStart(toDateKey(new Date()));
+  if (route === 'scheduler') {
+    schedulerRangeStart = getWeekStart(toDateKey(new Date()));
+    schedulerRangeEnd = addDays(schedulerRangeStart, 6);
+  }
   if (route === 'timer') syncTimerToClock();
   render();
 }
@@ -1538,15 +1542,29 @@ function bindEvents() {
     document.querySelectorAll('.delete-blackout').forEach((button) => button.addEventListener('click', (event) => { state.schedulerSettings.blackouts.splice(Number(event.currentTarget.dataset.index), 1); saveState(); render(); }));
     document.querySelector('#scheduler-week')?.addEventListener('change', (event) => {
       schedulerRangeStart = event.target.value || getWeekStart(toDateKey(new Date()));
+      schedulerRangeEnd = addDays(schedulerRangeStart, 6);
       const endInput = document.querySelector('#scheduler-week-end');
-      if (endInput) endInput.value = addDays(schedulerRangeStart, 6);
+      if (endInput) endInput.value = schedulerRangeEnd;
+    });
+    document.querySelector('#scheduler-week-end')?.addEventListener('change', (event) => {
+      schedulerRangeEnd = event.target.value || addDays(schedulerRangeStart, 6);
     });
     document.querySelector('#generate-schedule')?.addEventListener('click', async (event) => {
       const weekStart = document.querySelector('#scheduler-week').value;
-      const weekEnd = addDays(weekStart, 6);
+      const weekEnd = document.querySelector('#scheduler-week-end').value;
+      if (!weekStart || !weekEnd) {
+        document.querySelector('#scheduler-status').textContent = 'Choose both a start date and an end date.';
+        return;
+      }
+      if (weekEnd < weekStart) {
+        document.querySelector('#scheduler-status').textContent = 'The end date must be the same as or later than the start date.';
+        return;
+      }
       schedulerRangeStart = weekStart;
+      schedulerRangeEnd = weekEnd;
       if (!state.projects.length) { document.querySelector('#scheduler-status').textContent = 'Add at least one project first.'; return; }
-      const rangeDates = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
+      const rangeDates = [];
+      for (let date = weekStart; date <= weekEnd; date = addDays(date, 1)) rangeDates.push(date);
       const existingDates = rangeDates.map((date) => ({ date, blocks: getScheduleForDate(date) })).filter((item) => item.blocks.length);
       if (existingDates.length) {
         const existingTotal = existingDates.reduce((sum, item) => sum + item.blocks.length, 0);
@@ -1559,7 +1577,7 @@ function bindEvents() {
       }
       const previousSchedules = Object.fromEntries(rangeDates.map((date) => [date, cloneSchedule(getScheduleForDate(date))]));
       const seed = `${Date.now()}-${Math.random()}`;
-      const result = generateSchedule({ weekStart, dayRules: state.schedulerSettings.days, blackouts: state.schedulerSettings.blackouts, projects: state.projects.map((name) => ({ name, priority: projectSettings(name).priority, duration: projectSettings(name).defaultDuration || DEFAULT_BLOCK_MINUTES })), seed });
+      const result = generateSchedule({ weekStart, rangeEnd: weekEnd, dayRules: state.schedulerSettings.days, blackouts: state.schedulerSettings.blackouts, projects: state.projects.map((name) => ({ name, priority: projectSettings(name).priority, duration: projectSettings(name).defaultDuration || DEFAULT_BLOCK_MINUTES })), seed });
       rangeDates.forEach((date) => setScheduleForDate(date, []));
       Object.entries(result.schedules).forEach(([date, blocks]) => setScheduleForDate(date, blocks));
       state.schedulerSettings.lastSeed = result.seed;
