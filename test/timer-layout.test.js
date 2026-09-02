@@ -229,8 +229,11 @@ test('creating a Quick Task pauses the timer and loads its configured duration',
   assert.match(activateQuickTask, /hasTimerStarted = false/);
 });
 
-test('Next Block and saved schedule blocks use the same selection behavior', () => {
-  assert.match(mainSource, /data-select-block="\$\{selectIndex\}"/);
+test('active red card, Next Block, and saved schedule blocks use the same selection behavior', () => {
+  const activeBlockCard = mainSource.slice(mainSource.indexOf('function activeBlockCard('), mainSource.indexOf('function viewedBlockCard('));
+  assert.match(activeBlockCard, /data-select-block="\$\{selectIndex\}"/);
+  assert.match(mainSource, /activeBlockCard\(current, activeCardIndex\)/);
+  assert.match(mainSource, /position\.currentIndex \?\? position\.nextIndex/);
   assert.match(mainSource, /projectCard\('Next Block'.*next \? nextIndex : null\)/);
   assert.match(mainSource, /document\.querySelectorAll\('\[data-select-block\]'\)/);
   assert.match(mainSource, /document\.querySelectorAll\('\.time-block'\)/);
