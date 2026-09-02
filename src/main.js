@@ -747,7 +747,21 @@ function calendarPlanner() {
 function calendarSection() {
   const selectedView = calendarView === 'week' ? weekView(calendarDate) : calendarView === 'month' ? monthView(calendarDate) : dayView(calendarDate);
   const generationNotice = scheduleGenerationMessage ? `<p class="schedule-generation-notice" role="status">${escapeHtml(scheduleGenerationMessage)}</p>` : '';
-  return section({ id: 'calendar', title: 'Calendar', eyebrow: 'Planning', content: `${generationNotice}<div class="calendar-controls"><label>Planning Date <input id="calendar-date" class="text-input" type="date" value="${calendarDate}" /></label><button id="clear-schedule" class="danger-button" type="button">Clear Schedule</button></div><div class="calendar-tabs"><button class="${calendarView === 'day' ? 'active-tab' : ''}" data-calendar-view="day">Day</button><button class="${calendarView === 'week' ? 'active-tab' : ''}" data-calendar-view="week">Week</button><button class="${calendarView === 'month' ? 'active-tab' : ''}" data-calendar-view="month">Month</button></div><div class="calendar-layout single-calendar-view">${selectedView}</div>` });
+  return section({ id: 'calendar', title: 'Calendar', eyebrow: 'Planning', content: `${generationNotice}<div class="calendar-controls"><label>Planning Date <input id="calendar-date" class="text-input" type="date" value="${calendarDate}" /></label><div class="actions"><button class="danger-button clear-schedule" data-clear-schedule="day" type="button">Clear Day</button><button class="danger-button clear-schedule" data-clear-schedule="week" type="button">Clear Week</button><button class="danger-button clear-schedule" data-clear-schedule="month" type="button">Clear Month</button></div></div><div class="calendar-tabs"><button class="${calendarView === 'day' ? 'active-tab' : ''}" data-calendar-view="day">Day</button><button class="${calendarView === 'week' ? 'active-tab' : ''}" data-calendar-view="week">Week</button><button class="${calendarView === 'month' ? 'active-tab' : ''}" data-calendar-view="month">Month</button></div><div class="calendar-layout single-calendar-view">${selectedView}</div>` });
+}
+
+function calendarClearDates(scope, dateKey) {
+  if (scope === 'day') return [dateKey];
+  if (scope === 'week') {
+    const start = getWeekStart(dateKey);
+    return weekDays.map((_, index) => addDays(start, index));
+  }
+  const selected = parseDateKey(dateKey);
+  const first = new Date(selected.getFullYear(), selected.getMonth(), 1);
+  const last = new Date(selected.getFullYear(), selected.getMonth() + 1, 0);
+  const dates = [];
+  for (let date = new Date(first); date <= last; date.setDate(date.getDate() + 1)) dates.push(toDateKey(date));
+  return dates;
 }
 
 function schedulerPage() {
@@ -1659,20 +1673,23 @@ function bindEvents() {
     return;
   }
   if (document.querySelector('#calendar')) {
-    document.querySelector('#clear-schedule')?.addEventListener('click', async (event) => {
-      const total = Object.values(state.schedules || {}).reduce((sum, blocks) => sum + blocks.length, 0);
+    document.querySelectorAll('[data-clear-schedule]').forEach((button) => button.addEventListener('click', async (event) => {
+      const scope = event.currentTarget.dataset.clearSchedule;
+      const dates = calendarClearDates(scope, calendarDate);
+      const total = dates.reduce((sum, date) => sum + getScheduleForDate(date).length, 0);
       if (!total) {
-        window.alert('Your schedule is already empty.');
+        window.alert(`This ${scope} is already empty.`);
         return;
       }
-      const confirmed = window.confirm(`Clear all ${total} scheduled blocks from every date? This cannot be undone.`);
+      const confirmed = window.confirm(`Clear ${total} scheduled block${total === 1 ? '' : 's'} from this ${scope}? This cannot be undone.`);
       if (!confirmed) return;
       const previousSchedules = structuredClone(state.schedules || {});
       const previousTodaySchedule = cloneSchedule(state.schedule);
-      state.schedules = {};
-      state.schedule = [];
-      state.activeIndex = 0;
-      resetCurrentDuration();
+      dates.forEach((date) => setScheduleForDate(date, []));
+      if (dates.includes(toDateKey(new Date()))) {
+        state.activeIndex = 0;
+        resetCurrentDuration();
+      }
       const saved = await persistSchedule(event.currentTarget);
       if (!saved) {
         state.schedules = previousSchedules;
@@ -1681,9 +1698,9 @@ function bindEvents() {
         window.alert('The schedule could not be cleared. Nothing was deleted. Please try again.');
         return;
       }
-      scheduleGenerationMessage = 'Your entire schedule is clear. You can now generate a fresh schedule.';
+      scheduleGenerationMessage = `The selected ${scope} is clear.`;
       render();
-    });
+    }));
     document.querySelectorAll('[data-calendar-view]').forEach((button) => button.addEventListener('click', (event) => { calendarView = event.currentTarget.dataset.calendarView; render(); }));
     document.querySelector('#calendar-date')?.addEventListener('change', (event) => { calendarDate = event.target.value || toDateKey(new Date()); loadCalendarDraft(); render(); });
     document.querySelector('#calendar-prev')?.addEventListener('click', () => shiftCalendarDate(-1));
