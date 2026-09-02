@@ -32,13 +32,15 @@ test('Week view lays Monday through Sunday across a vertical time axis', () => {
 });
 
 
-test('Calendar can clear every scheduled date after confirmation', () => {
+test('Calendar can clear the selected day, week, or month after confirmation', () => {
   const calendar = mainSource.slice(mainSource.indexOf('function calendarSection()'), mainSource.indexOf('function schedulerPage()'));
   const handlers = mainSource.slice(mainSource.indexOf("if (document.querySelector('#calendar'))"), mainSource.indexOf("if (document.querySelector('#save-today'))"));
 
-  assert.match(calendar, /id="clear-schedule"/);
-  assert.match(handlers, /clear-schedule[\s\S]*window\.confirm/);
-  assert.match(handlers, /state\.schedules = \{\}/);
-  assert.match(handlers, /state\.schedule = \[\]/);
+  assert.match(calendar, /data-clear-schedule="day"/);
+  assert.match(calendar, /data-clear-schedule="week"/);
+  assert.match(calendar, /data-clear-schedule="month"/);
+  assert.match(handlers, /data-clear-schedule[\s\S]*window\.confirm/);
+  assert.match(handlers, /calendarClearDates\(scope, calendarDate\)/);
+  assert.match(handlers, /dates\.forEach\(\(date\) => setScheduleForDate\(date, \[\]\)\)/);
   assert.match(handlers, /previousSchedules[\s\S]*if \(!saved\)/);
 });
