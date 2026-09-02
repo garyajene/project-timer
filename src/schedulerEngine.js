@@ -22,8 +22,8 @@ function seededRandom(seed) {
 }
 
 const minutes = (time) => { const [hour, minute] = time.split(':').map(Number); return hour * 60 + minute; };
-const time = (value) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-const isOffDay = (rule) => !rule?.enabled || String(rule.type).toLowerCase() === 'off';
+const time = (value) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
+const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 const isOffDay = (rule) => !rule?.enabled || String(rule.type).toLowerCase() === 'off';
 
 function findAvailableStart(target, duration, minimumStart, latestStart, unavailable) {
