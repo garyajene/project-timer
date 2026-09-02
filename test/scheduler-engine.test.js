@@ -30,6 +30,20 @@ test('blackouts are applied before project placement', () => {
   assert.equal(result.schedules['2026-08-24'][0].time, '12:00');
 });
 
+test('an off day never receives generated work even when it is otherwise enabled', () => {
+  const rules = structuredClone(days);
+  rules.Wednesday = { ...rules.Wednesday, enabled: true, type: 'off', blocks: 12 };
+  const result = generateSchedule({ weekStart: '2026-08-24', dayRules: rules, projects: [{ name: 'Work', priority: 1, duration: 60 }], seed: 'off-day' });
+  assert.equal(result.schedules['2026-08-26'], undefined);
+});
+
+test('off day matching is tolerant of legacy capitalization', () => {
+  const rules = structuredClone(days);
+  rules.Wednesday = { ...rules.Wednesday, enabled: true, type: 'Off', blocks: 12 };
+  const result = generateSchedule({ weekStart: '2026-08-24', dayRules: rules, projects: [{ name: 'Work', priority: 1, duration: 60 }], seed: 'legacy-off-day' });
+  assert.equal(result.schedules['2026-08-26'], undefined);
+});
+
 test('project durations determine block lengths and blocks spread across the available day', () => {
   const mondayOnly = structuredClone(days);
   Object.entries(mondayOnly).forEach(([day, rule]) => { rule.enabled = day === 'Monday'; });
