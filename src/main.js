@@ -747,7 +747,7 @@ function calendarPlanner() {
 function calendarSection() {
   const selectedView = calendarView === 'week' ? weekView(calendarDate) : calendarView === 'month' ? monthView(calendarDate) : dayView(calendarDate);
   const generationNotice = scheduleGenerationMessage ? `<p class="schedule-generation-notice" role="status">${escapeHtml(scheduleGenerationMessage)}</p>` : '';
-  return section({ id: 'calendar', title: 'Calendar', eyebrow: 'Planning', content: `${generationNotice}<div class="calendar-controls"><label>Planning Date <input id="calendar-date" class="text-input" type="date" value="${calendarDate}" /></label></div><div class="calendar-tabs"><button class="${calendarView === 'day' ? 'active-tab' : ''}" data-calendar-view="day">Day</button><button class="${calendarView === 'week' ? 'active-tab' : ''}" data-calendar-view="week">Week</button><button class="${calendarView === 'month' ? 'active-tab' : ''}" data-calendar-view="month">Month</button></div><div class="calendar-layout single-calendar-view">${selectedView}</div>` });
+  return section({ id: 'calendar', title: 'Calendar', eyebrow: 'Planning', content: `${generationNotice}<div class="calendar-controls"><label>Planning Date <input id="calendar-date" class="text-input" type="date" value="${calendarDate}" /></label><button id="clear-schedule" class="danger-button" type="button">Clear Schedule</button></div><div class="calendar-tabs"><button class="${calendarView === 'day' ? 'active-tab' : ''}" data-calendar-view="day">Day</button><button class="${calendarView === 'week' ? 'active-tab' : ''}" data-calendar-view="week">Week</button><button class="${calendarView === 'month' ? 'active-tab' : ''}" data-calendar-view="month">Month</button></div><div class="calendar-layout single-calendar-view">${selectedView}</div>` });
 }
 
 function schedulerPage() {
@@ -1659,6 +1659,31 @@ function bindEvents() {
     return;
   }
   if (document.querySelector('#calendar')) {
+    document.querySelector('#clear-schedule')?.addEventListener('click', async (event) => {
+      const total = Object.values(state.schedules || {}).reduce((sum, blocks) => sum + blocks.length, 0);
+      if (!total) {
+        window.alert('Your schedule is already empty.');
+        return;
+      }
+      const confirmed = window.confirm(`Clear all ${total} scheduled blocks from every date? This cannot be undone.`);
+      if (!confirmed) return;
+      const previousSchedules = structuredClone(state.schedules || {});
+      const previousTodaySchedule = cloneSchedule(state.schedule);
+      state.schedules = {};
+      state.schedule = [];
+      state.activeIndex = 0;
+      resetCurrentDuration();
+      const saved = await persistSchedule(event.currentTarget);
+      if (!saved) {
+        state.schedules = previousSchedules;
+        state.schedule = previousTodaySchedule;
+        render();
+        window.alert('The schedule could not be cleared. Nothing was deleted. Please try again.');
+        return;
+      }
+      scheduleGenerationMessage = 'Your entire schedule is clear. You can now generate a fresh schedule.';
+      render();
+    });
     document.querySelectorAll('[data-calendar-view]').forEach((button) => button.addEventListener('click', (event) => { calendarView = event.currentTarget.dataset.calendarView; render(); }));
     document.querySelector('#calendar-date')?.addEventListener('change', (event) => { calendarDate = event.target.value || toDateKey(new Date()); loadCalendarDraft(); render(); });
     document.querySelector('#calendar-prev')?.addEventListener('click', () => shiftCalendarDate(-1));
