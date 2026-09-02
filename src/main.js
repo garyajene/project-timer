@@ -603,7 +603,7 @@ function timerSchedule() {
     const displayBlock = index === viewedIndex && viewedBlockDraft ? viewedBlockDraft : block;
     return `<div class="time-block timer-block ${displayBlock.isBreak ? 'break-block' : ''} ${!quickTask?.active && index === selectedIndex ? 'active-task' : ''} ${displayBlock.done ? 'completed-task' : ''}" data-index="${index}" role="button" tabindex="0" aria-label="Edit ${escapeHtml(displayBlock.title || displayBlock.project)}"><input class="schedule-done" data-index="${index}" type="checkbox" ${displayBlock.done ? 'checked' : ''} aria-label="Mark ${escapeHtml(displayBlock.title || displayBlock.project)} complete" /><span class="time">${escapeHtml(formatTime(displayBlock.time))}</span><span class="task-copy"><strong>${escapeHtml(displayBlock.project || 'Task')}</strong><small>${escapeHtml([displayBlock.title || 'Task', formatMinutes(displayBlock.duration), displayBlock.zenBreakMinutes ? `Zen Break: ${formatMinutes(displayBlock.zenBreakMinutes)}` : ''].filter(Boolean).join(' · '))}</small></span></div>`;
   }).join('') || '<p class="empty-state">No saved schedule yet. Plan today on the Today page.</p>';
-  return section({ id: 'timer-schedule', title: 'Today’s Saved Schedule', eyebrow: 'Click any project to edit it', content: `<div class="schedule-list">${blocks}</div>` });
+  return section({ id: 'timer-schedule', title: 'Today’s Saved Schedule', content: `<div class="schedule-list">${blocks}</div>` });
 }
 
 function timerBlockConflictDialog() {
