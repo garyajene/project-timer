@@ -1319,6 +1319,26 @@ function viewedBlockHasUnsavedChanges() {
   return JSON.stringify(normalizeBlock(viewedBlockDraft)) !== JSON.stringify(normalizeBlock(state.schedule[viewedIndex]));
 }
 
+function readSchedulerDayRule(row) {
+  const type = row.querySelector('.scheduler-type').value;
+  return {
+    enabled: type !== 'off',
+    type,
+    start: row.querySelector('.scheduler-start').value,
+    end: row.querySelector('.scheduler-end').value,
+    blocks: Number(row.querySelector('.scheduler-blocks').value),
+    breakEnabled: row.querySelector('.scheduler-break-enabled').checked,
+    breakStart: row.querySelector('.scheduler-break-start').value,
+    breakEnd: row.querySelector('.scheduler-break-end').value,
+  };
+}
+
+function synchronizeSchedulerDayRules() {
+  document.querySelectorAll('.scheduler-day').forEach((row) => {
+    state.schedulerSettings.days[row.dataset.day] = readSchedulerDayRule(row);
+  });
+}
+
 async function saveSelectedBlock() {
   if (viewedIndex === null || !viewedBlockDraft || !state.schedule[viewedIndex]) return;
   const savedBlock = normalizeBlock(viewedBlockDraft);
@@ -1551,8 +1571,7 @@ function bindEvents() {
   if (document.querySelector('#scheduler')) {
     const saveDay = (row) => {
       const day = row.dataset.day;
-      const type = row.querySelector('.scheduler-type').value;
-      state.schedulerSettings.days[day] = { enabled: type !== 'off', type, start: row.querySelector('.scheduler-start').value, end: row.querySelector('.scheduler-end').value, blocks: Number(row.querySelector('.scheduler-blocks').value), breakEnabled: row.querySelector('.scheduler-break-enabled').checked, breakStart: row.querySelector('.scheduler-break-start').value, breakEnd: row.querySelector('.scheduler-break-end').value };
+      state.schedulerSettings.days[day] = readSchedulerDayRule(row);
       saveState();
     };
     document.querySelectorAll('.scheduler-day').forEach((row) => row.querySelectorAll('input, select').forEach((input) => input.addEventListener('change', (event) => { saveDay(row); if (event.target.classList.contains('scheduler-break-enabled')) render(); })));
@@ -1583,6 +1602,8 @@ function bindEvents() {
       updateSchedulerRangeSummary();
     });
     document.querySelector('#generate-schedule')?.addEventListener('click', async (event) => {
+      // Read the visible controls at action time so Off is always authoritative.
+      synchronizeSchedulerDayRules();
       const weekStart = document.querySelector('#scheduler-week').value;
       const weekEnd = document.querySelector('#scheduler-week-end').value;
       if (!weekStart || !weekEnd) {

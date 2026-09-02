@@ -18,3 +18,10 @@ test('Scheduler shows Monday through Friday across while each day stacks its con
   assert.match(styles, /\.scheduler-day \{ display: grid; grid-template-columns: minmax\(0, 1fr\)/);
   assert.match(styles, /\.scheduler-break-times \{ display: grid; grid-template-columns: minmax\(0, 1fr\)/);
 });
+
+
+test('Scheduler rereads visible day types immediately before generation', () => {
+  const bindEvents = mainSource.slice(mainSource.indexOf('function bindEvents()'), mainSource.indexOf('async function initializeApp'));
+  assert.match(mainSource, /function synchronizeSchedulerDayRules\(\)/);
+  assert.match(bindEvents, /generate-schedule[\s\S]*synchronizeSchedulerDayRules\(\)/);
+});

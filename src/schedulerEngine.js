@@ -24,6 +24,7 @@ function seededRandom(seed) {
 const minutes = (time) => { const [hour, minute] = time.split(':').map(Number); return hour * 60 + minute; };
 const time = (value) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
 const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+const isOffDay = (rule) => !rule?.enabled || String(rule.type).toLowerCase() === 'off';
 
 function findAvailableStart(target, duration, minimumStart, latestStart, unavailable) {
   let candidate = Math.max(Math.round(target), minimumStart);
@@ -53,6 +54,16 @@ function assertMinimumSpacing(schedules) {
   });
 }
 
+function assertNoOffDayBlocks(schedules, dayRules) {
+  Object.keys(schedules).forEach((dateValue) => {
+    const date = new Date(`${dateValue}T12:00:00`);
+    const dayName = DAY_NAMES[date.getDay()];
+    if (isOffDay(dayRules[dayName])) {
+      throw new Error(`Generated schedule failed day-type validation on ${dateValue}. Off days cannot contain work blocks.`);
+    }
+  });
+}
+
 export function generateSchedule({ weekStart, rangeEnd = null, dayRules, blackouts = [], projects, seed = Date.now() }) {
   const random = seededRandom(seed);
   const schedules = {};
@@ -66,7 +77,7 @@ export function generateSchedule({ weekStart, rangeEnd = null, dayRules, blackou
   for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
     const dateValue = dateKey(date);
     const rule = dayRules[DAY_NAMES[date.getDay()]];
-    if (!rule?.enabled || rule.type === 'off') continue;
+    if (isOffDay(rule)) continue;
 
     const requestedBlocks = Math.max(0, Number(rule.blocks) || 0);
     const earliestStart = minutes(rule.start);
@@ -139,5 +150,6 @@ export function generateSchedule({ weekStart, rangeEnd = null, dayRules, blackou
 
   Object.values(schedules).forEach((blocks) => blocks.sort((a, b) => a.time.localeCompare(b.time)));
   assertMinimumSpacing(schedules);
+  assertNoOffDayBlocks(schedules, dayRules);
   return { schedules, counts, unfilled, seed: String(seed) };
 }
