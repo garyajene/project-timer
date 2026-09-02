@@ -509,15 +509,16 @@ function getNextScheduledBlock(date = new Date()) {
   };
 }
 
-function activeBlockCard(current, date = new Date()) {
+function activeBlockCard(current, selectIndex = null, date = new Date()) {
+  const selectionAttributes = selectIndex === null ? '' : ` data-select-block="${selectIndex}" role="button" tabindex="0" aria-label="Edit selected project"`;
   if (!current) {
     const upcoming = getNextScheduledBlock(date);
     if (!upcoming) return projectCard('Current Scheduled Block', 'Nothing scheduled right now', 'No future saved blocks', true);
-    return `<article class="project-card active-card" data-upcoming-card><p class="eyebrow" data-upcoming-label>${escapeHtml(upcoming.label)}</p><h3 data-card-title>${escapeHtml(upcoming.title)}</h3><p data-card-meta>${escapeHtml(upcoming.meta)}</p></article>`;
+    return `<article class="project-card active-card"${selectionAttributes} data-upcoming-card><p class="eyebrow" data-upcoming-label>${escapeHtml(upcoming.label)}</p><h3 data-card-title>${escapeHtml(upcoming.title)}</h3><p data-card-meta>${escapeHtml(upcoming.meta)}</p></article>`;
   }
   const scheduledTimes = current.time ? `<div><dt>Start Time</dt><dd>${escapeHtml(formatTime(current.time))}</dd></div><div><dt>End Time</dt><dd>${escapeHtml(formatTime(getNextStartTime(current)))}</dd></div>` : '';
   const label = isRunning ? 'Running Timer' : (viewedIndex !== null ? 'Selected Project Block' : 'Current Scheduled Block');
-  return `<article class="project-card active-card active-block-card"><p class="eyebrow">${label}</p><h3 data-card-title>${escapeHtml(current.project || QUICK_START_PROJECT)}</h3><p data-card-meta>${escapeHtml(current.title || 'Untitled task')}</p><dl class="active-block-details"><div><dt>Duration</dt><dd>${escapeHtml(formatMinutes(current.duration || DEFAULT_BLOCK_MINUTES))}</dd></div>${scheduledTimes}</dl></article>`;
+  return `<article class="project-card active-card active-block-card"${selectionAttributes}><p class="eyebrow">${label}</p><h3 data-card-title>${escapeHtml(current.project || QUICK_START_PROJECT)}</h3><p data-card-meta>${escapeHtml(current.title || 'Untitled task')}</p><dl class="active-block-details"><div><dt>Duration</dt><dd>${escapeHtml(formatMinutes(current.duration || DEFAULT_BLOCK_MINUTES))}</dd></div>${scheduledTimes}</dl></article>`;
 }
 
 function viewedBlockCard(block) {
@@ -579,6 +580,9 @@ function timerPage() {
   const navigationIndex = quickTask?.active
     ? null
     : (viewedIndex ?? runningIndex ?? position.currentIndex);
+  const activeCardIndex = quickTask?.active
+    ? null
+    : (viewedIndex ?? runningIndex ?? position.currentIndex ?? position.nextIndex);
   const previousIndex = navigationIndex === null
     ? position.previousIndex
     : (navigationIndex > 0 ? navigationIndex - 1 : null);
@@ -593,7 +597,7 @@ function timerPage() {
   const autoStartControl = `<label class="auto-start-control"><span>Auto-Start</span><input id="auto-start-next-task" type="checkbox" role="switch" aria-label="Auto-Start Next Task" ${state.autoStartNextTask ? 'checked' : ''} /></label>`;
   const timerActions = `<div class="actions timer-actions"><button id="start-button" class="primary" ${canStart ? '' : 'disabled'}>Start</button><button id="stop-button">Pause</button><button id="reset-button" ${canStart ? '' : 'disabled'} aria-label="Clear timer to zero">Reset</button><button id="skip-button">Skip</button>${autoStartControl}${zenBreakControl(inspected || current)}</div>`;
   const quickTaskButton = quickTask?.active ? '' : `<button id="quick-task-button" class="quick-task-button" ${hasTimerStarted ? 'disabled' : ''}>${icon.plus} Quick Task</button>`;
-  return `${section({ id: 'timer', title: 'Timer', eyebrow: 'Execution only', className: 'hero-panel', content: `<div class="timer-control-area"><div class="timer-shell" data-inactive="${current ? 'false' : 'true'}" aria-label="Countdown timer"><input id="timer-display" value="${formatSeconds(remainingSeconds)}" aria-label="Timer duration in hours, minutes, and seconds" inputmode="numeric" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" ${hasTimerStarted ? 'disabled' : ''} /><p id="timer-status">${escapeHtml(getTimerStatus(current))}</p></div>${quickTaskControls}${timerActions}${quickTaskButton}</div>${primaryNavigation('timer-nav')}<div class="block-navigation"><div class="dashboard-grid">${projectCard('Previous Block', previous ? `← ${previous.project}` : 'Start of schedule', previous?.title || 'No previous block', false, previous ? previousIndex : null)}${activeBlockCard(current)}${projectCard('Next Block', next ? `${next.project} →` : 'End of schedule', next?.title || 'No next block', false, next ? nextIndex : null)}</div>${viewedBlockCard(inspected)}</div>` })}${timerSchedule()}${timerBlockConflictDialog()}${conflictModal()}${zenBreakOverlay()}`;
+  return `${section({ id: 'timer', title: 'Timer', eyebrow: 'Execution only', className: 'hero-panel', content: `<div class="timer-control-area"><div class="timer-shell" data-inactive="${current ? 'false' : 'true'}" aria-label="Countdown timer"><input id="timer-display" value="${formatSeconds(remainingSeconds)}" aria-label="Timer duration in hours, minutes, and seconds" inputmode="numeric" pattern="[0-9]+:[0-5][0-9]:[0-5][0-9]" ${hasTimerStarted ? 'disabled' : ''} /><p id="timer-status">${escapeHtml(getTimerStatus(current))}</p></div>${quickTaskControls}${timerActions}${quickTaskButton}</div>${primaryNavigation('timer-nav')}<div class="block-navigation"><div class="dashboard-grid">${projectCard('Previous Block', previous ? `← ${previous.project}` : 'Start of schedule', previous?.title || 'No previous block', false, previous ? previousIndex : null)}${activeBlockCard(current, activeCardIndex)}${projectCard('Next Block', next ? `${next.project} →` : 'End of schedule', next?.title || 'No next block', false, next ? nextIndex : null)}</div>${viewedBlockCard(inspected)}</div>` })}${timerSchedule()}${timerBlockConflictDialog()}${conflictModal()}${zenBreakOverlay()}`;
 }
 
 function timerSchedule() {
