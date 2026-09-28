@@ -1,7 +1,7 @@
 import { sounds } from './audio.js';
 import { remainingFromTimerState } from './timerPersistence.js';
 import { generateSchedule } from './schedulerEngine.js';
-import { doablLogoBlack } from './assets/images/doablLogos.js';
+const doablLogoBlack = new URL('./assets/images/doAbl_logo_black.webp', import.meta.url).href;
 const STORAGE_KEY = 'project-timer-state-v1';
 const DEFAULT_BLOCK_MINUTES = 30;
 const DURATION_PRESETS = [5, 10, 15, 30, 45, 60, 120, 180, 240];
@@ -545,10 +545,9 @@ function primaryNavigation(className = '') {
 }
 
 function header() {
-  if (getRoute() === 'today') {
-    return `<header class="app-header today-app-header"><a class="today-brand" href="#today" aria-label="DoAbl Today"><img src="${doablLogoBlack}" alt="DoAbl" /></a><div class="header-meta" aria-label="Current date and time"><span>${icon.clock}</span><span>${formatDate()}</span>${authEnabled && currentUser ? `<span>${escapeHtml(currentUser.email)}</span><button id="logout-button">Log out</button>` : ''}</div>${primaryNavigation('today-navigation')}</header>`;
-  }
-  return `<header class="app-header ${getRoute() === 'timer' ? 'timer-header' : ''}"><div><p class="eyebrow">Personal workspace</p><h1>Project Timer</h1></div><div class="header-meta" aria-label="Current date and time"><span>${icon.clock}</span><span>${formatDate()}</span>${authEnabled && currentUser ? `<span>${escapeHtml(currentUser.email)}</span><button id="logout-button">Log out</button>` : ''}</div>${getRoute() === 'timer' ? '' : primaryNavigation()}</header>`;
+  const isToday = getRoute() === 'today';
+  const brand = `<a class="app-brand" href="#today" aria-label="DoAbl home"><img src="${doablLogoBlack}" alt="DoAbl" /></a>`;
+  return `<header class="app-header ${isToday ? 'today-app-header' : ''} ${getRoute() === 'timer' ? 'timer-header' : ''}">${brand}<div class="header-meta" aria-label="Current date and time"><span>${icon.clock}</span><span>${formatDate()}</span>${authEnabled && currentUser ? `<span>${escapeHtml(currentUser.email)}</span><button id="logout-button">Log out</button>` : ''}</div>${getRoute() === 'timer' ? '' : primaryNavigation(isToday ? 'today-navigation' : '')}</header>`;
 }
 
 function getActiveBlock() {
@@ -809,7 +808,7 @@ function errorPanel(error) {
   const message = error instanceof Error ? error.message : 'Unknown startup error';
   return section({
     id: 'startup-error',
-    title: 'Project Timer is available',
+    title: 'DoAbl is available',
     eyebrow: 'Startup warning',
     className: 'startup-error-panel',
     content: `<p class="helper-text">One part of the application could not initialize, but the app shell is still available. Check the browser console for details.</p><pre>${escapeHtml(message)}</pre>`,
@@ -819,7 +818,7 @@ function errorPanel(error) {
 function renderShell(content = '') {
   const app = getAppElement();
   if (!app) {
-    console.error('Project Timer startup failed: #app container is missing.');
+    console.error('DoAbl startup failed: #app container is missing.');
     return false;
   }
   app.classList.toggle('today-app', getRoute() === 'today');
@@ -834,19 +833,19 @@ function render() {
       const registrationMessage = registrationEnabled
         ? 'Registration is currently open.'
         : 'Registration is closed; existing users can still log in.';
-      app.innerHTML = `<main class="auth-page"><section class="panel auth-panel"><p class="eyebrow">Private workspace</p><h1>Project Timer</h1><p class="helper-text">Log in to open your workspace.</p><form id="auth-form"><label>Email<input class="text-input" name="email" type="email" autocomplete="email" required /></label><label>Password<input class="text-input" name="password" type="password" autocomplete="current-password" minlength="12" required /></label><p class="auth-status">${registrationMessage}</p><p id="auth-error" class="auth-error" role="alert" aria-live="polite"></p><div class="actions"><button class="primary" name="action" value="login">Log in</button><button name="action" value="register"${registrationEnabled ? '' : ' disabled aria-disabled="true"'}>Register</button></div></form></section></main>`;
+      app.innerHTML = `<main class="auth-page"><section class="panel auth-panel"><p class="eyebrow">Private workspace</p><div class="auth-brand"><img src="${doablLogoBlack}" alt="DoAbl" /></div><p class="helper-text">Log in to open your workspace.</p><form id="auth-form"><label>Email<input class="text-input" name="email" type="email" autocomplete="email" required /></label><label>Password<input class="text-input" name="password" type="password" autocomplete="current-password" minlength="12" required /></label><p class="auth-status">${registrationMessage}</p><p id="auth-error" class="auth-error" role="alert" aria-live="polite"></p><div class="actions"><button class="primary" name="action" value="login">Log in</button><button name="action" value="register"${registrationEnabled ? '' : ' disabled aria-disabled="true"'}>Register</button></div></form></section></main>`;
       bindAuthEvents();
       return;
     }
     if (!renderShell(mainContent())) return;
     bindEvents();
   } catch (error) {
-    console.error('Project Timer render failed.', error);
+    console.error('DoAbl render failed.', error);
     try {
       renderShell(errorPanel(error));
       bindGlobalEvents();
     } catch (shellError) {
-      console.error('Project Timer shell render failed.', shellError);
+      console.error('DoAbl shell render failed.', shellError);
     }
   }
 }
@@ -1849,7 +1848,7 @@ async function initializeApp() {
       else updateTimerDisplay();
     }, 1000);
   } catch (error) {
-    console.error('Project Timer startup failed while loading saved state.', error);
+    console.error('DoAbl startup failed while loading saved state.', error);
     if (authEnabled) currentUser = null;
     state = structuredClone(defaultState);
     todayDraft = [];

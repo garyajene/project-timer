@@ -16,6 +16,8 @@ html { scroll-behavior: smooth; }
 body { margin: 0; min-width: 320px; background: radial-gradient(circle at top right, rgba(255,41,61,.18), transparent 32rem), #000; }
 .auth-page { min-height: 100vh; place-content: center; }
 .auth-panel { width: min(100%, 30rem); margin: auto; }
+.auth-brand { width: clamp(8rem, 32vw, 11rem); margin-bottom: 1rem; padding: .65rem .8rem; border-radius: 12px; background: #fff; }
+.auth-brand img { display: block; width: 100%; height: auto; object-fit: contain; }
 .auth-panel form, .auth-panel label { display: grid; gap: .65rem; }
 .auth-panel form { gap: 1rem; margin-top: 1.5rem; }
 .auth-status { margin: 0; color: var(--muted); }
@@ -28,6 +30,8 @@ textarea { width: 100%; min-height: 11rem; resize: vertical; border: 1px solid v
 textarea:focus { border-color: var(--red); }
 
 .app-header { position: sticky; top: 0; z-index: 10; display: grid; grid-template-columns: 1fr auto auto; gap: 1.25rem; align-items: center; padding: 1rem clamp(1rem, 4vw, 3rem); backdrop-filter: blur(18px); background: rgba(0,0,0,.76); border-bottom: 1px solid var(--line); }
+.app-brand { display: inline-flex; width: clamp(7rem, 13vw, 10rem); padding: .55rem .7rem; border-radius: 12px; background: #fff; }
+.app-brand img { display: block; width: 100%; height: auto; object-fit: contain; }
 h1, h2, h3, p { margin-top: 0; }
 h1 { margin-bottom: 0; font-size: clamp(1.8rem, 5vw, 3.4rem); letter-spacing: -.06em; }
 h2 { margin-bottom: 0; font-size: clamp(1.35rem, 3vw, 2rem); letter-spacing: -.03em; }
@@ -174,8 +178,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   color: #101a38;
   box-shadow: none;
 }
-.today-brand { display: inline-flex; width: clamp(7rem, 13vw, 10rem); }
-.today-brand img { display: block; width: 100%; height: auto; object-fit: contain; }
+.today-app-header .app-brand { padding: 0; background: transparent; }
 .today-app-header .header-meta { justify-self: end; color: #65708d; }
 .today-navigation { grid-column: 1 / -1; justify-content: flex-start; margin-top: .75rem; }
 .today-navigation a { border-color: transparent; color: #65708d; font-weight: 700; }
