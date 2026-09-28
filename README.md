@@ -1,4 +1,4 @@
-# Project Timer
+# DoAbl
 
 A dark, minimal personal productivity web app with private accounts, timer logic, sounds, and SQLite persistence.
 

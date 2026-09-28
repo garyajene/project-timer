@@ -167,5 +167,5 @@ export function createAppServer(stateStore = store, options = {}) {
 
 if (process.env.NODE_ENV !== 'test' && resolve(process.argv[1] ?? '') === resolve(new URL(import.meta.url).pathname)) {
   await store.initialize();
-  createAppServer().listen(port, '0.0.0.0', () => console.log(`Project Timer is running on port ${port}`));
+  createAppServer().listen(port, '0.0.0.0', () => console.log(`DoAbl is running on port ${port}`));
 }
