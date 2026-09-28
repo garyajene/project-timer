@@ -1,6 +1,7 @@
 import { sounds } from './audio.js';
 import { remainingFromTimerState } from './timerPersistence.js';
 import { generateSchedule } from './schedulerEngine.js';
+import { doablLogoBlack } from './assets/images/doablLogos.js';
 const STORAGE_KEY = 'project-timer-state-v1';
 const DEFAULT_BLOCK_MINUTES = 30;
 const DURATION_PRESETS = [5, 10, 15, 30, 45, 60, 120, 180, 240];
@@ -544,6 +545,9 @@ function primaryNavigation(className = '') {
 }
 
 function header() {
+  if (getRoute() === 'today') {
+    return `<header class="app-header today-app-header"><a class="today-brand" href="#today" aria-label="DoAbl Today"><img src="${doablLogoBlack}" alt="DoAbl" /></a><div class="header-meta" aria-label="Current date and time"><span>${icon.clock}</span><span>${formatDate()}</span>${authEnabled && currentUser ? `<span>${escapeHtml(currentUser.email)}</span><button id="logout-button">Log out</button>` : ''}</div>${primaryNavigation('today-navigation')}</header>`;
+  }
   return `<header class="app-header ${getRoute() === 'timer' ? 'timer-header' : ''}"><div><p class="eyebrow">Personal workspace</p><h1>Project Timer</h1></div><div class="header-meta" aria-label="Current date and time"><span>${icon.clock}</span><span>${formatDate()}</span>${authEnabled && currentUser ? `<span>${escapeHtml(currentUser.email)}</span><button id="logout-button">Log out</button>` : ''}</div>${getRoute() === 'timer' ? '' : primaryNavigation()}</header>`;
 }
 
@@ -657,12 +661,14 @@ function saveStatus() {
 
 function todayPlanner() {
   const now = new Date();
-  const rows = getScheduleForDate(toDateKey(now)).map((block) => {
+  const rows = getScheduleForDate(toDateKey(now)).map((block, index) => {
     const duration = Number(block.duration) || DEFAULT_BLOCK_MINUTES;
     const endTime = getNextStartTime(block);
-    return `<article class="today-schedule-row"><h4>${escapeHtml(block.project || 'Task')}</h4><dl class="today-block-details"><div><dt>Start:</dt><dd><time datetime="${escapeHtml(block.time)}">${escapeHtml(formatTime(block.time))}</time></dd></div><div><dt>End:</dt><dd><time datetime="${escapeHtml(endTime)}">${escapeHtml(formatTime(endTime))}</time></dd></div><div><dt>Duration:</dt><dd>${escapeHtml(formatMinutes(duration))}</dd></div></dl></article>`;
+    const palette = ['coral', 'blue', 'lavender', 'mint', 'peach'];
+    const taskName = block.title || block.project || 'Task';
+    return `<article class="today-schedule-row today-card-${palette[index % palette.length]}"><div class="today-card-time"><time datetime="${escapeHtml(block.time)}">${escapeHtml(formatTime(block.time))}</time><span aria-hidden="true">–</span><time datetime="${escapeHtml(endTime)}">${escapeHtml(formatTime(endTime))}</time></div><h4>${escapeHtml(taskName)}</h4>${block.title && block.project ? `<p class="today-card-project"><span aria-hidden="true"></span>${escapeHtml(block.project)}</p>` : ''}<dl class="today-block-details"><div><dt>Start:</dt><dd><time datetime="${escapeHtml(block.time)}">${escapeHtml(formatTime(block.time))}</time></dd></div><div><dt>End:</dt><dd><time datetime="${escapeHtml(endTime)}">${escapeHtml(formatTime(endTime))}</time></dd></div><div><dt>Duration:</dt><dd>${escapeHtml(formatMinutes(duration))}</dd></div></dl></article>`;
   }).join('') || '<p class="empty-state today-empty-state">Nothing scheduled for today.</p>';
-  return `<section id="today" class="panel today-overview"><header class="today-page-heading"><h2>TODAY</h2><p>What am I doing today?</p></header><div class="today-agenda"><h3>TODAY’S SCHEDULE</h3><div class="today-schedule-list">${rows}</div></div></section>`;
+  return `<section id="today" class="today-overview"><header class="today-page-heading"><p class="today-kicker">Make today count</p><h2>TODAY</h2><p>What am I doing today?</p></header><div class="today-agenda"><div class="today-agenda-heading"><h3>TODAY’S SCHEDULE</h3><span>${getScheduleForDate(toDateKey(now)).length} ${getScheduleForDate(toDateKey(now)).length === 1 ? 'task' : 'tasks'}</span></div><div class="today-schedule-list">${rows}</div></div></section>`;
 }
 
 
@@ -816,7 +822,8 @@ function renderShell(content = '') {
     console.error('Project Timer startup failed: #app container is missing.');
     return false;
   }
-  app.innerHTML = `${header()}<main>${content}</main>`;
+  app.classList.toggle('today-app', getRoute() === 'today');
+  app.innerHTML = `${header()}<main class="${getRoute() === 'today' ? 'today-main' : ''}">${content}</main>`;
   return true;
 }
 

@@ -1,0 +1,4 @@
+// The review system cannot transport binary diffs. Keep the original lossless
+// WebP bytes as local data URLs so the logos remain self-contained and fast.
+export const doablLogoBlack = 'data:image/webp;base64,UklGRiAAAABXRUJQVlA4TBQAAAAvpUAKAAcQEf0PAAnh/30lov8pHA==';
+export const doablLogoWhite = 'data:image/webp;base64,UklGRlQBAABXRUJQVlA4TEcBAAAvpUAKAA8w//M///MfeJBbW1scSR+nF7z5MxApjLmpIaUxa6+a3awQJhUmE0KgraE2PoMfuiaDiP5PAMYLDSoNSIoSSTsUlPQW3sl0ZJEMfDIQoD4o5jCWrYaxKHc5KPktcArg/t97j2KbaejLDIbOzXaum0iilDAtEqVTN5l86LjOflFIW0rwi8SgHcKiPGRZKLLToiyuiM28SA9XLdniAbcBmqLlhyGTtaspEzBtgE0zK0RxgJ87L8ngyD2KALMCJC1g0fhoFyMOC2G4x1ErPcE7bWpS6OBem04emwWYnZZ7vrdUXkVxgJcGyD6dXOOGik+nIMDBecBJtGkJXH26NVE88Kez8enlgwDJbnA4dnyn2KtJR6scQkOSD4X8/Y/khXSVmsnkd2pSufUk90jk385D5S2QDDhwHzum8uRIWqC6TkDlqwAA';

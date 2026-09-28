@@ -1,9 +1,20 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
+import { doablLogoBlack, doablLogoWhite } from '../src/assets/images/doablLogos.js';
 
 const mainSource = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
 const todayPage = mainSource.slice(mainSource.indexOf('function todayPlanner()'), mainSource.indexOf('function masterProjectList()'));
+
+test('Today uses the supplied WebP logo assets', async () => {
+  assert.match(mainSource, /src="\$\{doablLogoBlack\}"/);
+  for (const [logoName, dataUrl] of [['black logo', doablLogoBlack], ['white logo', doablLogoWhite]]) {
+    assert.match(dataUrl, /^data:image\/webp;base64,/);
+    const logo = Buffer.from(dataUrl.split(',')[1], 'base64');
+    assert.equal(logo.subarray(0, 4).toString('ascii'), 'RIFF');
+    assert.equal(logo.subarray(8, 12).toString('ascii'), 'WEBP', `${logoName} must contain WebP data`);
+  }
+});
 
 test('Today is a read-only overview backed by today’s saved schedule', () => {
   assert.match(todayPage, /getScheduleForDate\(toDateKey\(now\)\)/);

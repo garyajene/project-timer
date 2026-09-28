@@ -163,84 +163,84 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .time-block input, .time-block button { cursor: auto; }
 
 .helper-text, .empty-state { color: var(--muted); }
-.today-overview {
-  display: grid;
-  gap: clamp(2rem, 5vw, 3.5rem);
-  padding: clamp(1.5rem, 4vw, 2.75rem);
+/* The DoAbl visual language is deliberately isolated to Today for review. */
+.today-app { min-height: 100vh; color: #101a38; background: #f7f7f4; }
+.today-app-header {
+  position: relative;
+  grid-template-columns: auto 1fr;
+  padding: 1.4rem clamp(1.25rem, 5vw, 4.5rem) 1rem;
+  border: 0;
+  background: rgba(247,247,244,.9);
+  color: #101a38;
+  box-shadow: none;
 }
-
-.today-page-heading h2 {
-  font-size: clamp(2.2rem, 6vw, 4.25rem);
-  letter-spacing: -.055em;
-}
-
-.today-page-heading p {
-  margin: .35rem 0 0;
-  color: #d7a4aa;
-  font-size: clamp(1rem, 2vw, 1.2rem);
-  font-weight: 650;
-}
-
-.today-agenda {
-  display: grid;
-  gap: 1rem;
-}
-
-.today-agenda > h3 {
-  margin: 0;
-  color: var(--red);
-  font-size: .78rem;
-  font-weight: 900;
-  letter-spacing: .16em;
-}
-
-.today-schedule-list {
-  display: grid;
-  gap: .8rem;
-}
-
+.today-brand { display: inline-flex; width: clamp(7rem, 13vw, 10rem); }
+.today-brand img { display: block; width: 100%; height: auto; object-fit: contain; }
+.today-app-header .header-meta { justify-self: end; color: #65708d; }
+.today-navigation { grid-column: 1 / -1; justify-content: flex-start; margin-top: .75rem; }
+.today-navigation a { border-color: transparent; color: #65708d; font-weight: 700; }
+.today-navigation a:hover { border-color: #c9cde0; color: #101a38; }
+.today-navigation a[aria-current="page"] { border-color: #d9dceb; background: #fff; color: #101a38; box-shadow: 0 5px 14px rgba(46,54,85,.08); }
+.today-main { width: min(1080px, calc(100% - 2rem)); margin-top: 0; }
+.today-overview { display: grid; gap: clamp(2.5rem, 6vw, 5rem); padding: clamp(2rem, 6vw, 5rem) 0 5rem; }
+.today-page-heading { max-width: 40rem; }
+.today-page-heading .today-kicker { margin: 0 0 .65rem; color: #f36f58; font-size: .76rem; font-weight: 850; letter-spacing: .18em; text-transform: uppercase; }
+.today-page-heading h2 { font-size: clamp(3.5rem, 11vw, 7.5rem); line-height: .82; letter-spacing: -.075em; }
+.today-page-heading > p:last-child { margin: 1.25rem 0 0; color: #69728e; font-size: clamp(1.1rem, 2.5vw, 1.45rem); font-weight: 600; }
+.today-agenda { display: grid; gap: 1.4rem; }
+.today-agenda-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
+.today-agenda-heading h3 { margin: 0; font-size: .78rem; font-weight: 900; letter-spacing: .17em; }
+.today-agenda-heading span { color: #8a91a7; font-size: .82rem; font-weight: 750; }
+.today-schedule-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(1rem, 2.5vw, 1.6rem); }
 .today-schedule-row {
+  --card-bg: #ffd2c9;
+  --card-border: #ffac9e;
+  --card-accent: #f2654c;
+  position: relative;
   display: grid;
+  align-content: start;
   gap: .75rem;
-  min-height: 5.75rem;
-  padding: 1.15rem 1.3rem;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  background: #0a0a0d;
+  min-height: 13.5rem;
+  padding: clamp(1.25rem, 3vw, 1.75rem);
+  overflow: hidden;
+  border: 1px solid var(--card-border);
+  border-radius: 27px;
+  background: linear-gradient(145deg, rgba(255,255,255,.54), transparent 38%), var(--card-bg);
+  color: #111b3a;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.9), inset 0 -3px 5px rgba(70,75,115,.08), 0 15px 25px rgba(42,49,78,.14), 0 3px 5px rgba(42,49,78,.08);
+  touch-action: manipulation;
+  user-select: none;
+  transition: transform .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s ease;
 }
-
-.today-schedule-row h4 {
-  margin: 0;
-  overflow-wrap: anywhere;
-  font-size: clamp(1.05rem, 2vw, 1.3rem);
-  letter-spacing: -.015em;
+.today-schedule-row::after { content: ''; position: absolute; inset: 1px 10% auto; height: 1px; background: rgba(255,255,255,.7); }
+@media (hover: hover) { .today-schedule-row:hover { transform: translateY(-5px) rotate(-.2deg); box-shadow: inset 0 1px 0 rgba(255,255,255,.9), inset 0 -3px 5px rgba(70,75,115,.08), 0 22px 32px rgba(42,49,78,.18), 0 5px 8px rgba(42,49,78,.08); } }
+.today-schedule-row:active { transform: translateY(2px) scale(.992); box-shadow: inset 0 2px 5px rgba(42,49,78,.09), 0 7px 12px rgba(42,49,78,.12); transition-duration: .08s; }
+.today-card-blue { --card-bg: #bfddff; --card-border: #91c2f8; --card-accent: #2786df; }
+.today-card-lavender { --card-bg: #dcd4ff; --card-border: #bdb0f6; --card-accent: #7969cf; }
+.today-card-mint { --card-bg: #ccebdc; --card-border: #9fd6bc; --card-accent: #3a9c74; }
+.today-card-peach { --card-bg: #ffe1bd; --card-border: #f6c58d; --card-accent: #d88440; }
+.today-card-time { display: flex; gap: .35rem; color: color-mix(in srgb, var(--card-accent) 78%, #101a38); font-size: .83rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+.today-schedule-row h4 { margin: 0; overflow-wrap: anywhere; font-size: clamp(1.5rem, 3.5vw, 2.15rem); line-height: 1.05; letter-spacing: -.045em; }
+.today-card-project { display: flex; align-items: center; gap: .5rem; margin: 0; color: #4d5672; font-weight: 650; }
+.today-card-project span { width: .7rem; height: .7rem; border-radius: 50%; background: var(--card-accent); box-shadow: inset 0 1px 1px rgba(255,255,255,.65); }
+.today-block-details { display: grid; grid-template-columns: repeat(3, auto); gap: .75rem; margin: auto 0 0; padding-top: 1rem; border-top: 1px solid rgba(16,26,56,.12); }
+.today-block-details div { display: grid; gap: .15rem; }
+.today-block-details dt { color: #67708a; font-size: .65rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.today-block-details dd { margin: 0; color: #101a38; font-size: .85rem; font-weight: 750; font-variant-numeric: tabular-nums; }
+.today-empty-state { grid-column: 1 / -1; margin: 0; padding: 3rem; border: 1px dashed #cdd1dd; border-radius: 27px; background: rgba(255,255,255,.55); color: #69728e; text-align: center; }
+@media (prefers-reduced-motion: reduce) { .today-schedule-row { transition: none; } }
+@media (max-width: 700px) {
+  .today-app-header { grid-template-columns: 1fr auto; padding: 1rem; }
+  .today-app-header .header-meta svg { display: none; }
+  .today-navigation { flex-wrap: nowrap; overflow-x: auto; margin-inline: -1rem; padding: .35rem 1rem .6rem; scrollbar-width: none; }
+  .today-navigation a { flex: 0 0 auto; min-height: 44px; display: grid; place-items: center; }
+  .today-main { width: min(100% - 2rem, 1080px); }
+  .today-overview { padding-top: 2.75rem; }
+  .today-schedule-list { grid-template-columns: 1fr; }
 }
-
-.today-block-details {
-  display: grid;
-  gap: .35rem;
-  margin: 0;
-}
-
-.today-block-details div {
-  display: flex;
-  gap: .4rem;
-}
-
-.today-block-details dt {
-  color: #d7a4aa;
-  font-weight: 750;
-}
-
-.today-block-details dd {
-  margin: 0;
-  color: #fff;
-  font-variant-numeric: tabular-nums;
-}
-
-.today-empty-state {
-  margin: 0;
-  padding: 1.25rem 0;
+@media (max-width: 420px) {
+  .today-app-header .header-meta span:first-of-type { display: none; }
+  .today-block-details { gap: .4rem; }
 }
 
 .save-button { margin-top: 1rem; margin-left: .75rem; }
