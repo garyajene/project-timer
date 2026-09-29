@@ -845,7 +845,8 @@ function renderShell(content = '') {
   app.classList.toggle('timer-app', getRoute() === 'timer');
   app.classList.toggle('projects-app', getRoute() === 'projects');
   app.classList.toggle('scheduler-app', getRoute() === 'scheduler');
-  app.innerHTML = `${header()}<main class="${getRoute() === 'today' ? 'today-main' : (getRoute() === 'timer' ? 'timer-main' : (getRoute() === 'projects' ? 'projects-main' : (getRoute() === 'scheduler' ? 'scheduler-main' : '')))}">${content}</main>`;
+  app.classList.toggle('calendar-app', getRoute() === 'calendar');
+  app.innerHTML = `${header()}<main class="${getRoute() === 'today' ? 'today-main' : (getRoute() === 'timer' ? 'timer-main' : (getRoute() === 'projects' ? 'projects-main' : (getRoute() === 'scheduler' ? 'scheduler-main' : (getRoute() === 'calendar' ? 'calendar-main' : ''))))}">${content}</main>`;
   return true;
 }
 
