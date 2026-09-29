@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 const mainSource = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
+const stylesSource = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
 
 test('Calendar shows the calculated end time underneath Block Length', () => {
   const planner = mainSource.slice(mainSource.indexOf('function calendarPlanner()'), mainSource.indexOf('function calendarSection()'));
@@ -61,4 +62,19 @@ test('3D month and week views retain semantic date buttons and details', () => {
   assert.match(perspective, /data-calendar-date/);
   assert.match(perspective, /calendarDetailsPanel/);
   assert.match(perspective, /perspective-viewport/);
+});
+
+test('3D calendar uses a foreshortened three-quarter scene with an anchored detail callout', () => {
+  const perspective = mainSource.slice(mainSource.indexOf('function calendarDetailsPanel('), mainSource.indexOf('function calendarTimeSelector('));
+
+  assert.match(perspective, /calendar-callout-pin/);
+  assert.match(perspective, /--scene-row:/);
+  assert.match(stylesSource, /\.calendar-cube-row[\s\S]*rotateX\(15deg\)[\s\S]*rotateY\(-11deg\)/);
+  assert.match(stylesSource, /\.calendar-callout-pin::after/);
+  assert.match(stylesSource, /\.calendar-cube\.is-selected[\s\S]*translate3d\(0,-10px,38px\)/);
+});
+
+test('foreshortened calendar has mobile and reduced-motion treatments', () => {
+  assert.match(stylesSource, /@media \(max-width: 560px\)[\s\S]*\.calendar-cube-row/);
+  assert.match(stylesSource, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.calendar-cube-row/);
 });
