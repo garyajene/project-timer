@@ -141,6 +141,87 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   .row-actions button { flex: 1; justify-content: center; }
 }
 
+/* Calendar — a dimensional planning desk built from the DoAbl palette. */
+.calendar-app {
+  min-height: 100vh;
+  color: #111b3a;
+  background:
+    radial-gradient(circle at 12% 8%, rgba(255, 202, 188, .48), transparent 25rem),
+    radial-gradient(circle at 88% 14%, rgba(184, 218, 255, .55), transparent 29rem),
+    linear-gradient(165deg, #fbfaf6 0%, #f0f2f6 100%);
+}
+.calendar-main { width: min(1440px, calc(100% - 2rem)); margin-top: 2rem; perspective: 1400px; }
+.calendar-app .panel {
+  border: 1px solid rgba(201, 205, 219, .9);
+  background: rgba(255, 255, 255, .78);
+  box-shadow: 0 35px 80px rgba(48, 57, 89, .15), inset 0 1px 0 #fff;
+  backdrop-filter: blur(18px);
+}
+.calendar-app #calendar { position: relative; overflow: hidden; transform-style: preserve-3d; }
+.calendar-app #calendar::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  width: 22rem;
+  height: 22rem;
+  top: -11rem;
+  right: -7rem;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #d8eaff, #a9cef8);
+  box-shadow: 0 24px 45px rgba(66, 100, 150, .18);
+}
+.calendar-app #calendar > .section-heading h2 { color: #111b3a; font-size: clamp(2rem, 4vw, 3.7rem); }
+.calendar-app .eyebrow { color: #f2654c; }
+.calendar-app button { border-color: #d7dbe7; background: #fff; color: #202b4c; box-shadow: 0 7px 15px rgba(48, 57, 89, .09); font-weight: 750; }
+.calendar-app button:hover { border-color: #a8b1ca; box-shadow: 0 11px 22px rgba(48, 57, 89, .14); }
+.calendar-app .calendar-controls { justify-content: space-between; gap: 1rem; align-items: end; }
+.calendar-app .calendar-controls label { color: #69728d; }
+.calendar-app .text-input { border-color: #d5d9e5; background: rgba(255,255,255,.9); color: #111b3a; color-scheme: light; box-shadow: inset 0 2px 5px rgba(55, 65, 98, .05); }
+.calendar-app .text-input:focus { border-color: #72a9e4; box-shadow: 0 0 0 3px rgba(114,169,228,.18); }
+.calendar-app .calendar-tabs { width: fit-content; padding: .35rem; border: 1px solid #dfe2eb; border-radius: 999px; background: #eef0f5; box-shadow: inset 0 2px 5px rgba(55,65,98,.07); }
+.calendar-app .calendar-tabs button { min-width: 6rem; border: 0; box-shadow: none; background: transparent; }
+.calendar-app .calendar-tabs .active-tab { background: #111b3a; color: #fff; box-shadow: 0 7px 14px rgba(17,27,58,.22); }
+.calendar-app .day-view, .calendar-app .week-view, .calendar-app .month-view { border-color: #dfe2eb; background: rgba(247,248,251,.86); box-shadow: inset 0 1px 0 #fff; }
+.calendar-app .calendar-view-heading h3 { color: #111b3a; font-size: clamp(1.25rem, 3vw, 2rem); }
+.calendar-app .calendar-block-card {
+  position: relative;
+  border: 1px solid #d4d8e4;
+  background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(239,242,248,.96));
+  box-shadow: 0 15px 0 -8px #d9ddea, 0 24px 35px -20px rgba(45,55,90,.42), inset 0 1px 0 #fff;
+  transform: translateZ(0);
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.calendar-app .calendar-block-card:nth-child(3n+1) { border-left: .4rem solid #f58b77; }
+.calendar-app .calendar-block-card:nth-child(3n+2) { border-left: .4rem solid #72a9e4; }
+.calendar-app .calendar-block-card:nth-child(3n) { border-left: .4rem solid #8dc9aa; }
+.calendar-app .calendar-block-card:hover { transform: translateY(-3px) rotateX(1deg); box-shadow: 0 18px 0 -9px #d9ddea, 0 30px 42px -19px rgba(45,55,90,.44), inset 0 1px 0 #fff; }
+.calendar-app .calendar-card-fields > label, .calendar-app .calendar-timing-summary > label, .calendar-app .calendar-card-fields legend, .calendar-app .calendar-time-selector label, .calendar-app .optional-label { color: #69728d; }
+.calendar-app .calendar-ends-at { border-color: #dfe2eb; }
+.calendar-app .calendar-ends-at span { color: #7a829a; }
+.calendar-app .calendar-ends-at strong { color: #111b3a; }
+.calendar-app .calendar-period { border-color: #b7cef0; background: #dcecff; color: #245d9c; }
+.calendar-app .add-button, .calendar-app .save-button { border-color: #111b3a; background: #111b3a; color: #fff; }
+.calendar-app .save-button { background: #f2654c; border-color: #f2654c; }
+.calendar-app .danger-button { color: #b84336; }
+.calendar-app .week-header { background: #f7f8fb; }
+.calendar-app .week-day-heading, .calendar-app .week-day-column { border-color: #dfe2eb; }
+.calendar-app .week-day-heading small, .calendar-app .week-time-axis time { color: #747d97; }
+.calendar-app .week-day-column { background-image: repeating-linear-gradient(to bottom, transparent 0, transparent calc(100% / var(--week-hours) - 1px), #dfe2eb calc(100% / var(--week-hours))); }
+.calendar-app .calendar-task { border-color: #9fc6f0; background: linear-gradient(145deg, #ddebff, #bddafa); color: #111b3a; box-shadow: 0 8px 16px rgba(45,73,112,.16); }
+.calendar-app .calendar-task small, .calendar-app .month-task small { color: #56617e; }
+.calendar-app .month-day { border-color: #dfe2eb; background: linear-gradient(145deg, #fff, #f0f2f7); color: #111b3a; box-shadow: 0 7px 14px rgba(48,57,89,.08); }
+.calendar-app .month-day:hover { transform: translateY(-2px); }
+.calendar-app .month-day.today-dot { border-color: #f58b77 !important; background: linear-gradient(145deg, #ffdcd4, #ffc4b7); color: #111b3a !important; }
+.calendar-app .empty-state, .calendar-app .empty-month-day { color: #778099; }
+
+@media (max-width: 700px) {
+  .calendar-main { width: min(100% - 1rem, 1440px); margin-top: .5rem; }
+  .calendar-app .calendar-controls { align-items: stretch; flex-direction: column; }
+  .calendar-app .calendar-controls .actions { justify-content: flex-start; overflow-x: auto; flex-wrap: nowrap; padding-bottom: .35rem; }
+  .calendar-app .calendar-tabs { width: 100%; }
+  .calendar-app .calendar-tabs button { min-width: 0; flex: 1; justify-content: center; }
+}
+
 /* Timer — DoAbl's light, dimensional focus workspace. Kept route-scoped so the
    established screens retain their existing visual language. */
 .timer-app { min-height: 100vh; color: #111b3a; background: #f7f7f4; }
