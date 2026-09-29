@@ -140,6 +140,87 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   .row-actions { grid-column: 1 / -1; }
   .row-actions button { flex: 1; justify-content: center; }
 }
+
+/* Timer — DoAbl's light, dimensional focus workspace. Kept route-scoped so the
+   established screens retain their existing visual language. */
+.timer-app { min-height: 100vh; color: #111b3a; background: #f7f7f4; }
+.timer-app .timer-header { grid-template-columns: auto 1fr; }
+.timer-app .timer-navigation { grid-column: 1 / -1; justify-content: flex-start; margin-top: .75rem; }
+.timer-app .timer-navigation a { border-color: transparent; color: #65708d; font-weight: 700; }
+.timer-app .timer-navigation a:hover { border-color: #c9cde0; color: #111b3a; }
+.timer-app .timer-navigation a[aria-current="page"] { border-color: #d9dceb; background: #fff; color: #111b3a; box-shadow: 0 5px 14px rgba(46,54,85,.08); }
+.timer-main { width: min(1120px, calc(100% - 2rem)); margin-top: 2rem; gap: 2rem; }
+.timer-app .panel { border: 1px solid #e2e3e9; background: rgba(255,255,255,.72); box-shadow: 0 24px 70px rgba(45,52,82,.09); }
+.timer-app .hero-panel { min-height: 0; padding: clamp(1.25rem, 4vw, 3rem); gap: clamp(2.5rem, 6vw, 5rem); overflow: hidden; }
+.timer-app .hero-panel > .section-heading { margin: 0; }
+.timer-app .hero-panel > .section-heading h2 { font-size: 1rem; }
+.timer-app .eyebrow { color: #f2654c; }
+.timer-focus-heading { display: grid; justify-items: center; gap: .35rem; text-align: center; }
+.timer-focus-heading p { margin: 0; color: #f2654c; font-size: .78rem; font-weight: 900; letter-spacing: .16em; text-transform: uppercase; }
+.timer-focus-heading h1 { max-width: 42rem; color: #111b3a; font-size: clamp(1.7rem, 4vw, 3.2rem); line-height: 1; }
+.timer-focus-heading time { color: #69728e; font-weight: 750; }
+.timer-app .timer-control-area { gap: 1.25rem; }
+.timer-app .timer-shell { width: min(100%, 54rem); padding: clamp(1rem, 3vw, 2rem); border: 0; background: transparent; }
+.timer-app .timer-shell[data-inactive="true"] { background: transparent; }
+.timer-progress-ring { width: min(100%, 42rem); aspect-ratio: 1.75; display: grid; place-items: center; margin: auto; padding: clamp(1.2rem, 5vw, 3rem); border-radius: 50%; background: radial-gradient(ellipse at center, #fff 0 54%, transparent 55%), conic-gradient(from -.25turn, #9fcdfb var(--timer-progress), #e8e9f1 0); box-shadow: inset 0 2px 3px rgba(255,255,255,.95), inset 0 -10px 22px rgba(66,83,125,.08), 0 28px 55px rgba(69,79,112,.16); }
+.timer-app .timer-shell input { color: #111b3a; font-size: clamp(3.8rem, 11vw, 8.5rem); letter-spacing: -.07em; filter: drop-shadow(0 4px 1px rgba(54,64,99,.08)); }
+.timer-app .timer-shell[data-inactive="true"] input { color: #6d7590; }
+.timer-app .timer-shell input:not(:disabled):focus { box-shadow: 0 0 0 3px #91c2f8; }
+.timer-app .timer-shell p { color: #68718c; font-size: .78rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+.timer-app button { min-height: 44px; border-color: #d9dbe6; background: #fff; color: #25304f; box-shadow: 0 7px 14px rgba(45,52,82,.08); font-weight: 750; }
+.timer-app button:hover { border-color: #aeb5cd; box-shadow: 0 10px 18px rgba(45,52,82,.12); }
+.timer-app .timer-actions .primary { min-width: 8rem; border-color: #111b3a; background: #111b3a; color: #fff; box-shadow: 0 10px 20px rgba(17,27,58,.22); }
+.timer-app .quick-task-button { background: transparent; box-shadow: none; }
+.timer-app .auto-start-control, .timer-app .zen-break-control { color: #5f6985; }
+.timer-app .auto-start-control input { border-color: #c8ccda; background: #dfe2ea; }
+.timer-app .auto-start-control input:checked { border-color: #72ac91; background: #9fd6bc; }
+.timer-app .auto-start-control input:checked::before { background: #fff; }
+.timer-app input[type="checkbox"] { accent-color: #527ac1; }
+.timer-section-label { margin: 0 0 1rem; color: #81889f; font-size: .72rem; font-weight: 900; letter-spacing: .16em; text-align: center; text-transform: uppercase; }
+.timer-app .block-navigation .dashboard-grid { align-items: center; gap: 1rem; perspective: 1000px; }
+.timer-app .project-card { border-color: #dfe1e9; background: linear-gradient(145deg, rgba(255,255,255,.9), rgba(239,241,247,.9)); color: #111b3a; box-shadow: inset 0 1px 0 #fff, 0 12px 24px rgba(45,52,82,.1); }
+.timer-app .block-navigation .dashboard-grid > .project-card:not(.active-card) { transform: scale(.92); opacity: .72; }
+.timer-app .block-navigation .dashboard-grid > .project-card:first-child { transform: perspective(700px) rotateY(4deg) scale(.92); }
+.timer-app .block-navigation .dashboard-grid > .project-card:last-child { transform: perspective(700px) rotateY(-4deg) scale(.92); }
+.timer-app .active-card, .timer-app .active-task { border-color: #9bb9e8 !important; background: linear-gradient(145deg, #d8e9ff, #c4dcfa) !important; box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 20px 34px rgba(54,82,127,.18); }
+.timer-app .active-block-details { display: flex; gap: 1.25rem; flex-wrap: wrap; margin: 1rem 0 0; }
+.timer-app .active-block-details div { display: grid; gap: .15rem; }
+.timer-app .active-block-details dt { color: #64708d; font-size: .65rem; font-weight: 850; text-transform: uppercase; }
+.timer-app .active-block-details dd { margin: 0; font-weight: 800; }
+.timer-app .viewed-block-card { background: #fff; }
+.timer-app .text-input { border-color: #d5d8e3; background: #f9fafc; color: #111b3a; }
+.timer-app .zen-break-options { border-color: #d9dbe6; background: #fff; box-shadow: 0 18px 35px rgba(45,52,82,.16); }
+.timer-app #timer-schedule { padding: clamp(1.25rem, 4vw, 2.5rem); }
+.timer-app #timer-schedule .section-heading { margin-bottom: 1.5rem; }
+.timer-app .schedule-list { position: relative; gap: 1rem; padding-left: 1.25rem; }
+.timer-app .schedule-list::before { content: ''; position: absolute; top: 1rem; bottom: 1rem; left: .32rem; width: 2px; border-radius: 2px; background: #d9dce7; }
+.timer-app .timer-block { --project-bg: #ffd2c9; --project-border: #ffac9e; --project-accent: #f2654c; position: relative; min-height: 5.8rem; grid-template-columns: auto minmax(8.5rem, auto) minmax(0,1fr); gap: 1rem; border-color: var(--project-border); background: linear-gradient(145deg, rgba(255,255,255,.6), transparent 45%), var(--project-bg); color: #111b3a; box-shadow: inset 0 1px 0 rgba(255,255,255,.9), 0 11px 20px rgba(45,52,82,.12); }
+.timer-app .timer-block::before { content: ''; position: absolute; left: -1.55rem; width: .78rem; height: .78rem; border: 3px solid #f7f7f4; border-radius: 50%; background: var(--project-accent); box-shadow: 0 0 0 1px var(--project-border); }
+.timer-app .timer-palette-1 { --project-bg: #bfddff; --project-border: #91c2f8; --project-accent: #2786df; }
+.timer-app .timer-palette-2 { --project-bg: #dcd4ff; --project-border: #bdb0f6; --project-accent: #7969cf; }
+.timer-app .timer-palette-3 { --project-bg: #ccebdc; --project-border: #9fd6bc; --project-accent: #3a9c74; }
+.timer-app .timer-block .time { display: flex; gap: .35rem; color: color-mix(in srgb, var(--project-accent) 78%, #111b3a); font-weight: 850; }
+.timer-app .timer-block small { color: #56617e; }
+.timer-app .completed-task { filter: saturate(.35); opacity: .68; }
+.timer-app .completed-task .task-copy { opacity: 1; }
+.timer-app .quick-task-setup { border-color: #d9dbe6; background: #f7f8fb; }
+
+@media (max-width: 700px) {
+  .timer-app .timer-header { grid-template-columns: 1fr auto; padding: 1rem; }
+  .timer-app .timer-header .header-meta svg { display: none; }
+  .timer-app .timer-navigation { flex-wrap: nowrap; overflow-x: auto; margin-inline: -1rem; padding: .35rem 1rem .6rem; scrollbar-width: none; }
+  .timer-app .timer-navigation a { flex: 0 0 auto; min-height: 44px; display: grid; place-items: center; }
+  .timer-main { width: min(100% - 1rem, 1120px); }
+  .timer-app .hero-panel { padding-inline: .75rem; }
+  .timer-progress-ring { aspect-ratio: 1.45; }
+  .timer-app .timer-shell input { font-size: clamp(3rem, 16vw, 5rem); }
+  .timer-app .timer-actions { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); width: 100%; }
+  .timer-app .timer-actions > * { justify-content: center; }
+  .timer-app .block-navigation .dashboard-grid { display: flex; overflow-x: auto; padding: 1rem .25rem 1.5rem; scroll-snap-type: x mandatory; }
+  .timer-app .block-navigation .dashboard-grid > .project-card { flex: 0 0 82%; transform: none !important; scroll-snap-align: center; }
+  .timer-app .timer-block { grid-template-columns: auto 1fr; }
+  .timer-app .timer-block .time, .timer-app .timer-block .task-copy { grid-column: 2; }
+}
 @media (max-width: 1000px) { .project-main { grid-template-columns: 1fr 1fr; } }
 @media (max-width: 620px) { .project-main, .project-row { grid-template-columns: 1fr; } .project-row .row-actions { grid-column: 1; } }
 .text-input, .time-input {

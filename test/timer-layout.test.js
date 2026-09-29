@@ -6,7 +6,7 @@ const mainSource = await readFile(new URL('../src/main.js', import.meta.url), 'u
 
 test('Timer page keeps all duration and task controls connected to the main timer', () => {
   const timerPage = mainSource.slice(mainSource.indexOf('function timerPage()'), mainSource.indexOf('function timerSchedule()'));
-  const orderedMarkers = ['class="timer-shell"', '${quickTaskControls}', '${timerActions}', '${quickTaskButton}', "primaryNavigation('timer-nav')", 'class="dashboard-grid"'];
+  const orderedMarkers = ['class="timer-focus-heading"', 'class="timer-shell"', '${quickTaskControls}', '${timerActions}', '${quickTaskButton}', 'class="dashboard-grid"'];
   const positions = orderedMarkers.map((marker) => timerPage.indexOf(marker));
 
   assert.ok(positions.every((position) => position >= 0), 'all Timer page layout regions are present');
@@ -122,11 +122,12 @@ test('Quick Task uses only a name and the shared timer duration controls', () =>
   assert.match(mainSource, /if \(quickTask\?\.active\) quickTask\.duration = configuredDurationSeconds \/ 60/);
 });
 
-test('Timer navigation keeps all existing destinations and is moved rather than duplicated', () => {
+test('Timer navigation keeps all existing destinations in the shared DoAbl header', () => {
+  const timerPage = mainSource.slice(mainSource.indexOf('function timerPage()'), mainSource.indexOf('function timerSchedule()'));
   assert.match(mainSource, /\['Today', 'Timer', 'Projects', 'Scheduler', 'Calendar', 'Notes'\]/);
   assert.match(mainSource, /href="#\$\{route\}"/);
-  assert.match(mainSource, /getRoute\(\) === 'timer' \? '' : primaryNavigation\(isToday \? 'today-navigation' : ''\)/);
-  assert.match(mainSource, /primaryNavigation\('timer-nav'\)/);
+  assert.match(mainSource, /isTimer \? 'timer-navigation' : ''/);
+  assert.doesNotMatch(timerPage, /primaryNavigation\(/);
 });
 
 test('all four Timer controls retain their existing event handlers', () => {
