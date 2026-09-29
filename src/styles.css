@@ -327,6 +327,58 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   .today-block-details { gap: .4rem; }
 }
 
+/* Projects — compact, tactile controls in the shared light DoAbl workspace. */
+.projects-app { min-height: 100vh; color: #111b3a; background: #f7f7f4; }
+.projects-main { width: min(1180px, calc(100% - 2rem)); margin-top: 2rem; }
+.projects-app .projects-panel { padding: clamp(1.2rem, 3vw, 2rem); border: 1px solid #e1e3ea; background: rgba(255,255,255,.72); box-shadow: 0 24px 70px rgba(45,52,82,.09); }
+.projects-app .section-heading { margin-bottom: 1.5rem; }
+.projects-app .section-heading h2 { color: #111b3a; font-size: clamp(2rem, 5vw, 3.4rem); }
+.projects-app .eyebrow { color: #f2654c; }
+.projects-app .project-list { gap: 1rem; }
+.projects-app .project-row { grid-template-columns: minmax(0, 1fr) auto; gap: 1rem; padding: 1.15rem; border: 1px solid #e0e2e9; border-radius: 22px; background: linear-gradient(145deg, #fff, #f7f8fb); color: #111b3a; box-shadow: inset 0 1px 0 #fff, 0 10px 22px rgba(45,52,82,.08), 0 2px 4px rgba(45,52,82,.05); }
+.projects-app .project-main { grid-template-columns: minmax(13rem, 1.35fr) auto minmax(11rem, .8fr) minmax(14rem, 1fr); gap: 1rem; align-items: end; }
+.projects-app .project-name-field, .projects-app .project-duration-field { display: grid; gap: .4rem; color: #59637e; font-size: .74rem; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
+.projects-app .text-input { min-height: 46px; border: 1px solid #d8dbe5; border-radius: 12px; background: #fff; color: #111b3a; box-shadow: inset 0 1px 2px rgba(47,57,88,.05), 0 4px 9px rgba(47,57,88,.05); color-scheme: light; }
+.projects-app .project-name { font-size: 1rem; font-weight: 800; text-transform: none; }
+.projects-app .text-input:focus { border-color: #6fa9eb; outline: 0; box-shadow: 0 0 0 3px rgba(71,143,224,.18), 0 5px 12px rgba(47,57,88,.07); }
+.projects-app .priority-control, .projects-app .project-color-control { min-width: 0; margin: 0; padding: 0; border: 0; }
+.projects-app .priority-control legend, .projects-app .project-color-control legend { margin-bottom: .45rem; color: #59637e; font-size: .74rem; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
+.projects-app .priority-control legend small { display: block; margin-top: .12rem; color: #8a91a6; font-size: .62rem; font-weight: 650; letter-spacing: 0; text-transform: none; }
+.projects-app .priority-control > div, .projects-app .project-color-control > div { display: flex; gap: .42rem; }
+.projects-app .priority-option input, .projects-app .project-color-option input { position: absolute; opacity: 0; pointer-events: none; }
+.projects-app .priority-option span { width: 2.55rem; height: 2.55rem; border: 1px solid #d7dae4; border-radius: 10px; background: linear-gradient(145deg, #fff, #e9ebf1); color: #33405e; box-shadow: inset 0 1px 0 #fff, 0 5px 0 #cdd1dc, 0 8px 12px rgba(46,55,85,.12); transition: transform .14s ease, box-shadow .14s ease, background .18s ease; }
+@media (hover: hover) { .projects-app .priority-option span:hover { transform: translateY(-2px); box-shadow: inset 0 1px 0 #fff, 0 7px 0 #cdd1dc, 0 11px 15px rgba(46,55,85,.14); } }
+.projects-app .priority-option input:checked + span { transform: translateY(4px); border-color: #367fcf; background: linear-gradient(145deg, #75b5fa, #438bdc); color: #fff; box-shadow: inset 0 2px 4px rgba(24,73,131,.25), inset 0 1px 0 rgba(255,255,255,.5), 0 2px 0 #276bae, 0 4px 8px rgba(39,107,174,.2); }
+.projects-app .priority-option input:focus-visible + span, .projects-app .project-color-option input:focus-visible + span { outline: 3px solid rgba(54,127,207,.4); outline-offset: 3px; }
+.projects-app .project-color-option { --swatch: #bfddff; --edge: #91c2f8; display: block; }
+.projects-app .project-color-option > span { display: grid; place-items: center; width: 2.35rem; height: 2.35rem; border: 2px solid var(--edge); border-radius: 10px; background: linear-gradient(145deg, rgba(255,255,255,.58), transparent 45%), var(--swatch); color: #17213d; cursor: pointer; box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 4px 0 var(--edge), 0 7px 10px rgba(45,52,82,.12); transition: transform .14s ease, box-shadow .14s ease; }
+.projects-app .project-color-option b { font-size: 1rem; line-height: 1; filter: drop-shadow(0 1px 0 rgba(255,255,255,.75)); }
+.projects-app .project-color-option.color-coral { --swatch: #ffd2c9; --edge: #ffac9e; }
+.projects-app .project-color-option.color-lavender { --swatch: #dcd4ff; --edge: #bdb0f6; }
+.projects-app .project-color-option.color-mint { --swatch: #ccebdc; --edge: #9fd6bc; }
+.projects-app .project-color-option.color-sky { --swatch: #d7edff; --edge: #add7f8; }
+.projects-app .project-color-option.color-gray { --swatch: #e7e9ef; --edge: #c9cdd8; }
+@media (hover: hover) { .projects-app .project-color-option > span:hover { transform: translateY(-2px); box-shadow: inset 0 1px 0 rgba(255,255,255,.8), 0 6px 0 var(--edge), 0 10px 13px rgba(45,52,82,.14); } }
+.projects-app .project-color-option input:checked + span { transform: translateY(2px); outline: 2px solid #263657; outline-offset: 2px; box-shadow: inset 0 2px 3px rgba(45,52,82,.14), 0 2px 0 var(--edge), 0 4px 7px rgba(45,52,82,.12); }
+.projects-app .row-actions { align-self: end; }
+.projects-app button { min-height: 44px; border-color: #d8dbe5; background: #fff; color: #59637e; box-shadow: 0 5px 10px rgba(45,52,82,.07); font-weight: 750; }
+.projects-app .delete-project:hover, .projects-app .delete-project:focus-visible { border-color: #eea89e; background: #fff5f3; color: #b84635; }
+.projects-app .add-button { margin-top: 1.25rem; border-color: #367fcf; background: linear-gradient(145deg, #68adf6, #3f86d5); color: #fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 5px 0 #286bad, 0 10px 17px rgba(39,107,174,.2); }
+.projects-app .add-button:hover { transform: translateY(-2px); box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 7px 0 #286bad, 0 13px 20px rgba(39,107,174,.23); }
+.projects-app .add-button:active { transform: translateY(4px); box-shadow: inset 0 2px 4px rgba(24,73,131,.25), 0 1px 0 #286bad; }
+.projects-app button:focus-visible { outline: 3px solid rgba(54,127,207,.4); outline-offset: 3px; }
+.projects-app .empty-state { margin: 0; padding: 2.5rem; border: 1px dashed #cdd1dd; border-radius: 20px; background: rgba(255,255,255,.55); color: #69728e; text-align: center; }
+.sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; overflow: hidden !important; clip: rect(0,0,0,0) !important; white-space: nowrap !important; border: 0 !important; }
+@media (prefers-reduced-motion: reduce) { .projects-app .priority-option span, .projects-app .project-color-option > span, .projects-app button { transition: none; } }
+@media (max-width: 1050px) { .projects-app .project-main { grid-template-columns: minmax(13rem, 1fr) auto; } }
+@media (max-width: 700px) {
+  .projects-main { width: min(100% - 1rem, 1180px); margin-top: .5rem; }
+  .projects-app .project-row, .projects-app .project-main { grid-template-columns: 1fr; }
+  .projects-app .project-row .row-actions { grid-column: 1; }
+  .projects-app .delete-project { width: 100%; justify-content: center; }
+  .projects-app .priority-option span, .projects-app .project-color-option > span { width: 2.75rem; height: 2.75rem; }
+}
+
 .save-button { margin-top: 1rem; margin-left: .75rem; }
 .timer-block { grid-template-columns: auto auto minmax(0, 1fr); }
 .timer-block .task-copy { gap: .2rem; }

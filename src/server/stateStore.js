@@ -6,6 +6,8 @@ import { createHash, randomBytes, randomUUID, scrypt as scryptCallback, timingSa
 
 const execFileAsync = promisify(execFile);
 const scrypt = promisify(scryptCallback);
+const PROJECT_COLORS = new Set(['coral', 'blue', 'lavender', 'mint', 'sky', 'gray']);
+const DEFAULT_PROJECT_COLOR = 'blue';
 export const EMPTY_TIMER_STATE = {
   status: 'idle', mode: 'scheduled', configuredDurationSeconds: 1800, remainingSecondsWhenPaused: 1800,
   startedAt: null, endsAt: null, activeIndex: null, quickTask: null, zenBreak: null,
@@ -39,7 +41,8 @@ export function normalizeState(value) {
     const candidate = settings[project] || {};
     const priority = Math.min(5, Math.max(1, Number(candidate.priority) || 3));
     const defaultDuration = candidate.defaultDuration == null ? null : Math.max(1, Number(candidate.defaultDuration) || 30);
-    return [project, { priority, defaultDuration }];
+    const color = PROJECT_COLORS.has(candidate.color) ? candidate.color : DEFAULT_PROJECT_COLOR;
+    return [project, { priority, defaultDuration, color }];
   }));
   return {
     projects, projectSettings, schedule: value.schedule,

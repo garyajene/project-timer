@@ -8,6 +8,15 @@ const DURATION_PRESETS = [5, 10, 15, 30, 45, 60, 120, 180, 240];
 const CALENDAR_DURATION_OPTIONS = [15, 30, 45, 60, 90, 120, 150, 180, 240];
 const QUICK_START_PROJECT = 'Quick Start';
 const ZEN_BREAK_PRESETS = [0, 2, 5, 10, 15];
+const DEFAULT_PROJECT_COLOR = 'blue';
+const PROJECT_COLORS = [
+  { id: 'coral', label: 'Coral' },
+  { id: 'blue', label: 'Blue' },
+  { id: 'lavender', label: 'Lavender' },
+  { id: 'mint', label: 'Mint' },
+  { id: 'sky', label: 'Light blue' },
+  { id: 'gray', label: 'Soft gray' },
+];
 
 const DEMO_PROJECTS = new Set(['Project Timer', 'Writing system', 'Portfolio refresh', 'Health tracker', 'Home admin', 'Morning setup', 'Daily review']);
 const DEMO_TITLES = new Set(['Plan daily priorities', 'Use Project Timer', 'Review content backlog', 'Focused project block', 'Wrap-up and tomorrow setup']);
@@ -217,7 +226,8 @@ function normalizeProjectSettings(settings, projects) {
     const value = source[name] || {};
     const priority = Math.min(5, Math.max(1, Number(value.priority) || 3));
     const defaultDuration = value.defaultDuration == null ? null : Math.max(1, Number(value.defaultDuration) || DEFAULT_BLOCK_MINUTES);
-    return [name, { priority, defaultDuration }];
+    const color = PROJECT_COLORS.some((option) => option.id === value.color) ? value.color : DEFAULT_PROJECT_COLOR;
+    return [name, { priority, defaultDuration, color }];
   }));
 }
 
@@ -547,8 +557,9 @@ function primaryNavigation(className = '') {
 function header() {
   const isToday = getRoute() === 'today';
   const isTimer = getRoute() === 'timer';
+  const isProjects = getRoute() === 'projects';
   const brand = `<a class="app-brand" href="#today" aria-label="DoAbl home"><img src="${doablLogoBlack}" alt="DoAbl" /></a>`;
-  return `<header class="app-header ${isToday || isTimer ? 'today-app-header' : ''} ${isTimer ? 'timer-header' : ''}">${brand}<div class="header-meta" aria-label="Current date and time"><span>${icon.clock}</span><span>${formatDate()}</span>${authEnabled && currentUser ? `<span>${escapeHtml(currentUser.email)}</span><button id="logout-button">Log out</button>` : ''}</div>${primaryNavigation(isToday ? 'today-navigation' : (isTimer ? 'timer-navigation' : ''))}</header>`;
+  return `<header class="app-header ${isToday || isTimer || isProjects ? 'today-app-header' : ''} ${isTimer ? 'timer-header' : ''}">${brand}<div class="header-meta" aria-label="Current date and time"><span>${icon.clock}</span><span>${formatDate()}</span>${authEnabled && currentUser ? `<span>${escapeHtml(currentUser.email)}</span><button id="logout-button">Log out</button>` : ''}</div>${primaryNavigation(isToday || isProjects ? 'today-navigation' : (isTimer ? 'timer-navigation' : ''))}</header>`;
 }
 
 function getActiveBlock() {
@@ -651,13 +662,13 @@ function addProjectToMasterList(name) {
   if (!project) return '';
   if (!state.projects.includes(project)) {
     state.projects.push(project);
-    state.projectSettings[project] = { priority: 3, defaultDuration: null };
+    state.projectSettings[project] = { priority: 3, defaultDuration: null, color: DEFAULT_PROJECT_COLOR };
   }
   return project;
 }
 
 function projectSettings(project) {
-  return state.projectSettings[project] || { priority: 3, defaultDuration: null };
+  return state.projectSettings[project] || { priority: 3, defaultDuration: null, color: DEFAULT_PROJECT_COLOR };
 }
 
 function saveStatus() {
@@ -678,10 +689,11 @@ function todayPlanner() {
 
 
 function masterProjectList() {
-  return section({ id: 'projects', title: 'Master Project List', eyebrow: 'Backlog', content: `<div class="project-list">${state.projects.map((project, index) => {
+  return section({ id: 'projects', title: 'Master Project List', eyebrow: 'Projects', className: 'projects-panel', content: `<div class="project-list">${state.projects.map((project, index) => {
     const settings = projectSettings(project);
     const priorities = [1, 2, 3, 4, 5].map((priority) => `<label class="priority-option"><input class="project-priority" data-index="${index}" type="radio" name="project-priority-${index}" value="${priority}" ${settings.priority === priority ? 'checked' : ''} required /><span>${priority}</span></label>`).join('');
-    return `<div class="project-row"><div class="project-main"><input class="text-input project-name" data-index="${index}" value="${escapeHtml(project)}" aria-label="Project name" /><fieldset class="priority-control"><legend>Priority <small>1 highest · 5 lowest</small></legend><div>${priorities}</div></fieldset><label class="project-duration-field">Default block length<select class="text-input project-duration" data-index="${index}">${CALENDAR_DURATION_OPTIONS.map((minutes) => `<option value="${minutes}" ${settings.defaultDuration === minutes || (settings.defaultDuration === null && minutes === DEFAULT_BLOCK_MINUTES) ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label></div><div class="row-actions"><button class="delete-project" data-index="${index}" aria-label="Delete ${escapeHtml(project)}">${icon.trash} Delete</button></div></div>`;
+    const colors = PROJECT_COLORS.map(({ id, label }) => `<label class="project-color-option color-${id}" title="${label}"><input class="project-color" data-index="${index}" type="radio" name="project-color-${index}" value="${id}" ${settings.color === id ? 'checked' : ''} /><span><b aria-hidden="true">${settings.color === id ? icon.check : ''}</b><span class="sr-only">${label}</span></span></label>`).join('');
+    return `<article class="project-row"><div class="project-main"><label class="project-name-field"><span>Project name</span><input class="text-input project-name" data-index="${index}" value="${escapeHtml(project)}" aria-label="Project name" /></label><fieldset class="priority-control"><legend>Priority <small>1 highest · 5 lowest</small></legend><div>${priorities}</div></fieldset><label class="project-duration-field">Default block length<select class="text-input project-duration" data-index="${index}">${CALENDAR_DURATION_OPTIONS.map((minutes) => `<option value="${minutes}" ${settings.defaultDuration === minutes || (settings.defaultDuration === null && minutes === DEFAULT_BLOCK_MINUTES) ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label><fieldset class="project-color-control"><legend>Project color</legend><div>${colors}</div></fieldset></div><div class="row-actions"><button class="delete-project" data-index="${index}" aria-label="Delete ${escapeHtml(project)}">${icon.trash} Delete</button></div></article>`;
   }).join('') || '<p class="empty-state">No projects yet.</p>'}</div><button id="add-project" class="add-button"><span>${icon.plus}</span> Add Project</button>` });
 }
 
@@ -829,7 +841,8 @@ function renderShell(content = '') {
   }
   app.classList.toggle('today-app', getRoute() === 'today');
   app.classList.toggle('timer-app', getRoute() === 'timer');
-  app.innerHTML = `${header()}<main class="${getRoute() === 'today' ? 'today-main' : (getRoute() === 'timer' ? 'timer-main' : '')}">${content}</main>`;
+  app.classList.toggle('projects-app', getRoute() === 'projects');
+  app.innerHTML = `${header()}<main class="${getRoute() === 'today' ? 'today-main' : (getRoute() === 'timer' ? 'timer-main' : (getRoute() === 'projects' ? 'projects-main' : ''))}">${content}</main>`;
   return true;
 }
 
@@ -1551,7 +1564,7 @@ function bindEvents() {
     let suffix = 2;
     while (state.projects.includes(name)) name = `New Project ${suffix++}`;
     state.projects.push(name);
-    state.projectSettings[name] = { priority: 3, defaultDuration: null };
+    state.projectSettings[name] = { priority: 3, defaultDuration: null, color: DEFAULT_PROJECT_COLOR };
     saveState();
     render();
     const input = document.querySelector(`.project-name[data-index="${state.projects.length - 1}"]`);
@@ -1564,7 +1577,7 @@ function bindEvents() {
       const previousName = state.projects[index];
       const nextName = event.target.value;
       state.projects[index] = nextName;
-      state.projectSettings[nextName] = state.projectSettings[previousName] || { priority: 3, defaultDuration: null };
+      state.projectSettings[nextName] = state.projectSettings[previousName] || { priority: 3, defaultDuration: null, color: DEFAULT_PROJECT_COLOR };
       if (previousName !== nextName) delete state.projectSettings[previousName];
       state.schedule.forEach((block) => { if (block.project === previousName) block.project = nextName; });
       Object.values(state.schedules || {}).forEach((schedule) => schedule.forEach((block) => { if (block.project === previousName) block.project = nextName; }));
@@ -1592,6 +1605,12 @@ function bindEvents() {
     const project = state.projects[Number(event.target.dataset.index)];
     state.projectSettings[project] = { ...projectSettings(project), defaultDuration: Number(event.target.value) };
     saveState();
+  }));
+  document.querySelectorAll('.project-color').forEach((input) => input.addEventListener('change', (event) => {
+    const project = state.projects[Number(event.target.dataset.index)];
+    state.projectSettings[project] = { ...projectSettings(project), color: event.target.value };
+    saveState();
+    render();
   }));
   document.querySelectorAll('.delete-project').forEach((button) => button.addEventListener('click', (event) => {
     const index = Number(event.currentTarget.dataset.index);
