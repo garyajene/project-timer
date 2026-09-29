@@ -42,6 +42,10 @@ let state = structuredClone(defaultState);
 let todayDraft = [];
 let calendarView = 'day';
 let calendarDate = toDateKey(new Date());
+let calendarPresentation = 'standard';
+let todayPresentation = 'standard';
+let selectedCalendarDate = calendarDate;
+let selectedTodayIndex = null;
 let schedulerRangeStart = getWeekStart(toDateKey(new Date()));
 let schedulerRangeEnd = addDays(schedulerRangeStart, 6);
 let scheduleGenerationMessage = '';
@@ -679,14 +683,15 @@ function saveStatus() {
 
 function todayPlanner() {
   const now = new Date();
-  const rows = getScheduleForDate(toDateKey(now)).map((block, index) => {
+  const schedule = getScheduleForDate(toDateKey(now));
+  const rows = schedule.map((block, index) => {
     const duration = Number(block.duration) || DEFAULT_BLOCK_MINUTES;
     const endTime = getNextStartTime(block);
     const palette = ['coral', 'blue', 'lavender', 'mint', 'peach'];
     const taskName = block.title || block.project || 'Task';
-    return `<article class="today-schedule-row today-card-${palette[index % palette.length]}"><div class="today-card-time"><time datetime="${escapeHtml(block.time)}">${escapeHtml(formatTime(block.time))}</time><span aria-hidden="true">–</span><time datetime="${escapeHtml(endTime)}">${escapeHtml(formatTime(endTime))}</time></div><h4>${escapeHtml(taskName)}</h4>${block.title && block.project ? `<p class="today-card-project"><span aria-hidden="true"></span>${escapeHtml(block.project)}</p>` : ''}<dl class="today-block-details"><div><dt>Start:</dt><dd><time datetime="${escapeHtml(block.time)}">${escapeHtml(formatTime(block.time))}</time></dd></div><div><dt>End:</dt><dd><time datetime="${escapeHtml(endTime)}">${escapeHtml(formatTime(endTime))}</time></dd></div><div><dt>Duration:</dt><dd>${escapeHtml(formatMinutes(duration))}</dd></div></dl></article>`;
+    return `<article class="today-schedule-row perspective-item today-card-${palette[index % palette.length]} ${selectedTodayIndex === index ? 'is-selected' : ''}" data-today-index="${index}" role="button" tabindex="0" aria-expanded="${selectedTodayIndex === index}" aria-label="${escapeHtml(`${taskName}, ${formatTime(block.time)} to ${formatTime(endTime)}`)}"><div class="today-card-time"><time datetime="${escapeHtml(block.time)}">${escapeHtml(formatTime(block.time))}</time><span aria-hidden="true">–</span><time datetime="${escapeHtml(endTime)}">${escapeHtml(formatTime(endTime))}</time></div><h4>${escapeHtml(taskName)}</h4>${block.title && block.project ? `<p class="today-card-project"><span aria-hidden="true"></span>${escapeHtml(block.project)}</p>` : ''}<dl class="today-block-details"><div><dt>Start:</dt><dd><time datetime="${escapeHtml(block.time)}">${escapeHtml(formatTime(block.time))}</time></dd></div><div><dt>End:</dt><dd><time datetime="${escapeHtml(endTime)}">${escapeHtml(formatTime(endTime))}</time></dd></div><div><dt>Duration:</dt><dd>${escapeHtml(formatMinutes(duration))}</dd></div></dl>${selectedTodayIndex === index ? `<div class="today-expanded-detail"><strong>${block.done ? 'Completed' : 'Scheduled'}</strong><span>${escapeHtml(block.project || 'No project')}</span><a href="#calendar" data-open-calendar-date="${toDateKey(now)}">Open in Calendar</a></div>` : ''}</article>`;
   }).join('') || '<p class="empty-state today-empty-state">Nothing scheduled for today.</p>';
-  return `<section id="today" class="today-overview"><header class="today-page-heading"><p class="today-kicker">Make today count</p><h2>TODAY</h2><p>What am I doing today?</p></header><div class="today-agenda"><div class="today-agenda-heading"><h3>TODAY’S SCHEDULE</h3><span>${getScheduleForDate(toDateKey(now)).length} ${getScheduleForDate(toDateKey(now)).length === 1 ? 'task' : 'tasks'}</span></div><div class="today-schedule-list">${rows}</div></div></section>`;
+  return `<section id="today" class="today-overview"><header class="today-page-heading"><p class="today-kicker">Make today count</p><h2>TODAY</h2><p>What am I doing today?</p></header><div class="presentation-toggle" role="group" aria-label="Today presentation"><button type="button" data-today-presentation="standard" aria-pressed="${todayPresentation === 'standard'}">Standard</button><button type="button" data-today-presentation="three-d" aria-pressed="${todayPresentation === 'three-d'}">3D</button></div><div class="today-agenda"><div class="today-agenda-heading"><h3>TODAY’S SCHEDULE</h3><span>${schedule.length} ${schedule.length === 1 ? 'task' : 'tasks'}</span></div><div class="today-schedule-list ${todayPresentation === 'three-d' ? 'perspective-viewport today-3d-track' : ''}" data-perspective-viewport>${rows}</div></div></section>`;
 }
 
 
@@ -752,6 +757,52 @@ function monthView(dateKey) {
   return `<div class="calendar-full-view"><div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(dateKey, { month: 'long', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Month</button><button id="calendar-next">Next Month</button></div></div><div class="month-view">${weekdayHeaders}${cells}</div></div>`;
 }
 
+function calendarDetailsPanel(dateKey = selectedCalendarDate) {
+  const blocks = getScheduleForDate(dateKey);
+  const items = blocks.map((block) => `<li><div><strong>${escapeHtml(block.title || block.project || 'Task')}</strong><span>${escapeHtml(block.project || 'No project')}</span></div><time>${escapeHtml(formatTime(block.time))}–${escapeHtml(formatTime(getNextStartTime(block)))}</time></li>`).join('');
+  return `<aside class="calendar-details-panel" aria-live="polite" aria-labelledby="calendar-detail-title"><p class="eyebrow">Selected date</p><h3 id="calendar-detail-title">${escapeHtml(formatDateLabel(dateKey))}</h3><ul>${items || '<li class="empty-detail">Nothing scheduled.</li>'}</ul><button type="button" data-plan-selected-date>Plan this day</button></aside>`;
+}
+
+function calendarDateBlock(dateKey, label, { outside = false, workload = 0 } = {}) {
+  const parsed = parseDateKey(dateKey);
+  const count = getScheduleForDate(dateKey).length;
+  const classes = [dateKey === toDateKey(new Date()) ? 'is-today' : '', dateKey === selectedCalendarDate ? 'is-selected' : '', outside ? 'outside-month' : ''].filter(Boolean).join(' ');
+  return `<button type="button" class="calendar-cube ${classes}" data-calendar-date="${dateKey}" aria-pressed="${dateKey === selectedCalendarDate}" aria-label="${escapeHtml(`${formatDateLabel(dateKey)}, ${count} scheduled ${count === 1 ? 'item' : 'items'}`)}" style="--workload:${workload}"><span class="cube-day">${escapeHtml(label)}</span><strong>${parsed.getDate()}</strong><span class="cube-count">${count ? `${count} ${count === 1 ? 'item' : 'items'}` : 'Free'}</span></button>`;
+}
+
+function perspectiveMonthView(dateKey) {
+  const date = parseDateKey(dateKey);
+  const gridStart = getWeekStart(toDateKey(new Date(date.getFullYear(), date.getMonth(), 1)));
+  const rows = Array.from({ length: 6 }, (_, row) => {
+    const cells = weekDays.map((day, column) => {
+      const cellDate = addDays(gridStart, row * 7 + column);
+      return calendarDateBlock(cellDate, day.slice(0, 3), { outside: parseDateKey(cellDate).getMonth() !== date.getMonth() });
+    }).join('');
+    return `<div class="perspective-item calendar-cube-row" role="row">${cells}</div>`;
+  }).join('');
+  return `<div class="calendar-full-view perspective-calendar"><div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(dateKey, { month: 'long', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Month</button><button id="calendar-next">Next Month</button></div></div><div class="perspective-stage"><div class="perspective-viewport month-3d-track" data-perspective-viewport role="grid" aria-label="3D month calendar">${rows}</div>${calendarDetailsPanel()}</div></div>`;
+}
+
+function perspectiveWeekView(dateKey) {
+  const center = getWeekStart(dateKey);
+  const rows = Array.from({ length: 5 }, (_, rowIndex) => {
+    const start = addDays(center, (rowIndex - 2) * 7);
+    const days = weekDays.map((day, column) => {
+      const dayKey = addDays(start, column);
+      const minutes = getScheduleForDate(dayKey).reduce((total, block) => total + Number(block.duration || DEFAULT_BLOCK_MINUTES), 0);
+      return calendarDateBlock(dayKey, day.slice(0, 3), { workload: Math.min(1, minutes / 360) });
+    }).join('');
+    return `<div class="perspective-item calendar-cube-row week-cube-row" role="row" data-week-start="${start}">${days}</div>`;
+  }).join('');
+  return `<div class="calendar-full-view perspective-calendar"><div class="calendar-view-heading"><h3>Week of ${escapeHtml(formatDateLabel(center, { month: 'long', day: 'numeric', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Week</button><button id="calendar-next">Next Week</button></div></div><div class="perspective-stage"><div class="perspective-viewport week-3d-track" data-perspective-viewport role="grid" aria-label="Scrollable weeks">${rows}</div>${calendarDetailsPanel()}</div></div>`;
+}
+
+function perspectiveDayView(dateKey) {
+  const blocks = getScheduleForDate(dateKey);
+  const cards = blocks.map((block, index) => `<button type="button" class="perspective-item day-3d-card" data-calendar-task-time="${escapeHtml(block.time)}"><span>${escapeHtml(formatTime(block.time))}–${escapeHtml(formatTime(getNextStartTime(block)))}</span><strong>${escapeHtml(block.title || block.project || 'Task')}</strong><small>${escapeHtml(block.project || formatMinutes(block.duration))}</small><b>${index + 1}</b></button>`).join('') || '<p class="empty-state">Nothing scheduled. Use “Plan this day” to add a block.</p>';
+  return `<div class="calendar-full-view perspective-calendar"><div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(dateKey))}</h3><div class="actions"><button id="calendar-prev">Previous Day</button><button id="calendar-next">Next Day</button></div></div><div class="perspective-stage"><div class="perspective-viewport day-3d-track" data-perspective-viewport>${cards}</div>${calendarDetailsPanel(dateKey)}</div></div>`;
+}
+
 function calendarTimeSelector(block, index) {
   const [hours24 = 9, minutes = 0] = String(block.time).split(':').map(Number);
   const period = hours24 >= 12 ? 'PM' : 'AM';
@@ -770,9 +821,11 @@ function calendarPlanner() {
 }
 
 function calendarSection() {
-  const selectedView = calendarView === 'week' ? weekView(calendarDate) : calendarView === 'month' ? monthView(calendarDate) : dayView(calendarDate);
+  const standardView = calendarView === 'week' ? weekView(calendarDate) : calendarView === 'month' ? monthView(calendarDate) : dayView(calendarDate);
+  const perspectiveView = calendarView === 'week' ? perspectiveWeekView(calendarDate) : calendarView === 'month' ? perspectiveMonthView(calendarDate) : perspectiveDayView(calendarDate);
+  const selectedView = calendarPresentation === 'three-d' ? perspectiveView : standardView;
   const generationNotice = scheduleGenerationMessage ? `<p class="schedule-generation-notice" role="status">${escapeHtml(scheduleGenerationMessage)}</p>` : '';
-  return section({ id: 'calendar', title: 'Calendar', eyebrow: 'Planning', content: `${generationNotice}<div class="calendar-controls"><label>Planning Date <input id="calendar-date" class="text-input" type="date" value="${calendarDate}" /></label><div class="actions"><button class="danger-button clear-schedule" data-clear-schedule="day" type="button">Clear Day</button><button class="danger-button clear-schedule" data-clear-schedule="week" type="button">Clear Week</button><button class="danger-button clear-schedule" data-clear-schedule="month" type="button">Clear Month</button></div></div><div class="calendar-tabs"><button class="${calendarView === 'day' ? 'active-tab' : ''}" data-calendar-view="day">Day</button><button class="${calendarView === 'week' ? 'active-tab' : ''}" data-calendar-view="week">Week</button><button class="${calendarView === 'month' ? 'active-tab' : ''}" data-calendar-view="month">Month</button></div><div class="calendar-layout single-calendar-view">${selectedView}</div>` });
+  return section({ id: 'calendar', title: 'Calendar', eyebrow: 'Planning', content: `${generationNotice}<div class="calendar-controls"><label>Planning Date <input id="calendar-date" class="text-input" type="date" value="${calendarDate}" /></label><div class="actions"><button class="danger-button clear-schedule" data-clear-schedule="day" type="button">Clear Day</button><button class="danger-button clear-schedule" data-clear-schedule="week" type="button">Clear Week</button><button class="danger-button clear-schedule" data-clear-schedule="month" type="button">Clear Month</button></div></div><div class="calendar-mode-bar"><div class="calendar-tabs" role="group" aria-label="Calendar range"><button class="${calendarView === 'day' ? 'active-tab' : ''}" data-calendar-view="day">Today</button><button class="${calendarView === 'week' ? 'active-tab' : ''}" data-calendar-view="week">Week</button><button class="${calendarView === 'month' ? 'active-tab' : ''}" data-calendar-view="month">Month</button></div><div class="presentation-toggle" role="group" aria-label="Calendar presentation"><button type="button" data-calendar-presentation="standard" aria-pressed="${calendarPresentation === 'standard'}">Standard</button><button type="button" data-calendar-presentation="three-d" aria-pressed="${calendarPresentation === 'three-d'}">3D</button></div></div><div class="calendar-layout single-calendar-view">${selectedView}</div>` });
 }
 
 function calendarClearDates(scope, dateKey) {
@@ -863,6 +916,7 @@ function render() {
     }
     if (!renderShell(mainContent())) return;
     bindEvents();
+    setupPerspectiveController();
   } catch (error) {
     console.error('DoAbl render failed.', error);
     try {
@@ -872,6 +926,32 @@ function render() {
       console.error('DoAbl shell render failed.', shellError);
     }
   }
+}
+
+function setupPerspectiveController() {
+  const viewport = document.querySelector('[data-perspective-viewport]');
+  if (!viewport?.classList.contains('perspective-viewport')) return;
+  const items = [...viewport.querySelectorAll('.perspective-item')];
+  let frame = 0;
+  const update = () => {
+    frame = 0;
+    const bounds = viewport.getBoundingClientRect();
+    const focus = bounds.top + bounds.height * .58;
+    items.forEach((item) => {
+      const rect = item.getBoundingClientRect();
+      const signedDistance = (rect.top + rect.height / 2 - focus) / Math.max(bounds.height * .55, 1);
+      const distance = Math.min(1.35, Math.abs(signedDistance));
+      item.style.setProperty('--perspective-distance', distance.toFixed(3));
+      item.style.setProperty('--perspective-direction', Math.max(-1, Math.min(1, signedDistance)).toFixed(3));
+      item.classList.toggle('is-visual-focus', distance < .22);
+    });
+  };
+  const requestUpdate = () => { if (!frame) frame = requestAnimationFrame(update); };
+  viewport.addEventListener('scroll', requestUpdate, { passive: true });
+  window.addEventListener('resize', requestUpdate, { passive: true, once: true });
+  requestUpdate();
+  const selected = viewport.querySelector('.is-selected')?.closest('.perspective-item');
+  selected?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
 }
 
 function bindAuthEvents() {
@@ -885,6 +965,8 @@ function bindAuthEvents() {
     accountGeneration += 1;
     currentUser = payload.user;
     state = await loadState();
+    calendarPresentation = localStorage.getItem('doabl-calendar-presentation') === 'three-d' ? 'three-d' : 'standard';
+    todayPresentation = localStorage.getItem('doabl-today-presentation') === 'three-d' ? 'three-d' : 'standard';
     todayDraft = cloneSchedule(state.schedule.filter((block) => !block.isBreak));
     calendarDraft = cloneSchedule(getScheduleForDate(calendarDate).filter((block) => !block.isBreak));
     restoreTimerState();
@@ -1416,6 +1498,21 @@ async function saveSelectedBlock() {
 
 function bindEvents() {
   bindGlobalEvents();
+  document.querySelectorAll('[data-today-presentation]').forEach((button) => button.addEventListener('click', (event) => {
+    todayPresentation = event.currentTarget.dataset.todayPresentation;
+    localStorage.setItem('doabl-today-presentation', todayPresentation);
+    render();
+  }));
+  document.querySelectorAll('[data-today-index]').forEach((card) => {
+    const select = () => { selectedTodayIndex = selectedTodayIndex === Number(card.dataset.todayIndex) ? null : Number(card.dataset.todayIndex); render(); };
+    card.addEventListener('click', (event) => { if (!event.target.closest('a')) select(); });
+    card.addEventListener('keydown', (event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); select(); } });
+  });
+  document.querySelectorAll('[data-open-calendar-date]').forEach((link) => link.addEventListener('click', () => {
+    calendarDate = link.dataset.openCalendarDate;
+    selectedCalendarDate = calendarDate;
+    loadCalendarDraft();
+  }));
   const saveNote = (key, value) => {
     state.notes[key] = value;
     clearTimeout(noteSaveTimer);
@@ -1714,6 +1811,32 @@ function bindEvents() {
     return;
   }
   if (document.querySelector('#calendar')) {
+    document.querySelectorAll('[data-calendar-presentation]').forEach((button) => button.addEventListener('click', (event) => {
+      calendarPresentation = event.currentTarget.dataset.calendarPresentation;
+      localStorage.setItem('doabl-calendar-presentation', calendarPresentation);
+      render();
+    }));
+    document.querySelectorAll('.calendar-cube').forEach((button) => {
+      button.addEventListener('click', (event) => {
+        selectedCalendarDate = event.currentTarget.dataset.calendarDate;
+        render();
+      });
+      button.addEventListener('keydown', (event) => {
+        const offsets = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 };
+        if (!(event.key in offsets)) return;
+        event.preventDefault();
+        selectedCalendarDate = addDays(event.currentTarget.dataset.calendarDate, offsets[event.key]);
+        render();
+        document.querySelector(`[data-calendar-date="${selectedCalendarDate}"]`)?.focus();
+      });
+    });
+    document.querySelector('[data-plan-selected-date]')?.addEventListener('click', () => {
+      calendarDate = selectedCalendarDate;
+      calendarView = 'day';
+      calendarPresentation = 'standard';
+      loadCalendarDraft();
+      render();
+    });
     document.querySelectorAll('[data-clear-schedule]').forEach((button) => button.addEventListener('click', async (event) => {
       const scope = event.currentTarget.dataset.clearSchedule;
       const dates = calendarClearDates(scope, calendarDate);
@@ -1742,8 +1865,8 @@ function bindEvents() {
       scheduleGenerationMessage = `The selected ${scope} is clear.`;
       render();
     }));
-    document.querySelectorAll('[data-calendar-view]').forEach((button) => button.addEventListener('click', (event) => { calendarView = event.currentTarget.dataset.calendarView; render(); }));
-    document.querySelector('#calendar-date')?.addEventListener('change', (event) => { calendarDate = event.target.value || toDateKey(new Date()); loadCalendarDraft(); render(); });
+    document.querySelectorAll('[data-calendar-view]').forEach((button) => button.addEventListener('click', (event) => { calendarView = event.currentTarget.dataset.calendarView; selectedCalendarDate = calendarDate; render(); }));
+    document.querySelector('#calendar-date')?.addEventListener('change', (event) => { calendarDate = event.target.value || toDateKey(new Date()); selectedCalendarDate = calendarDate; loadCalendarDraft(); render(); });
     document.querySelector('#calendar-prev')?.addEventListener('click', () => shiftCalendarDate(-1));
     document.querySelector('#calendar-next')?.addEventListener('click', () => shiftCalendarDate(1));
     document.querySelectorAll('.month-day').forEach((button) => button.addEventListener('click', (event) => { calendarDate = event.currentTarget.dataset.calendarDate; calendarView = 'day'; loadCalendarDraft(); render(); }));
@@ -1868,6 +1991,8 @@ async function initializeApp() {
       if (!currentUser) return;
     }
     state = await loadState();
+    calendarPresentation = localStorage.getItem('doabl-calendar-presentation') === 'three-d' ? 'three-d' : 'standard';
+    todayPresentation = localStorage.getItem('doabl-today-presentation') === 'three-d' ? 'three-d' : 'standard';
     todayDraft = cloneSchedule(state.schedule.filter((block) => !block.isBreak));
     calendarDraft = cloneSchedule(getScheduleForDate(calendarDate).filter((block) => !block.isBreak));
     restoreTimerState();
