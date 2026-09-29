@@ -44,3 +44,21 @@ test('Calendar can clear the selected day, week, or month after confirmation', (
   assert.match(handlers, /dates\.forEach\(\(date\) => setScheduleForDate\(date, \[\]\)\)/);
   assert.match(handlers, /previousSchedules[\s\S]*if \(!saved\)/);
 });
+
+test('Calendar offers independent Standard and 3D presentation modes', () => {
+  const calendar = mainSource.slice(mainSource.indexOf('function calendarSection()'), mainSource.indexOf('function calendarClearDates('));
+  assert.match(calendar, /calendarPresentation === 'three-d'/);
+  assert.match(calendar, /data-calendar-presentation="standard"/);
+  assert.match(calendar, /data-calendar-presentation="three-d"/);
+  assert.match(calendar, /aria-pressed/);
+});
+
+test('3D month and week views retain semantic date buttons and details', () => {
+  const perspective = mainSource.slice(mainSource.indexOf('function calendarDetailsPanel('), mainSource.indexOf('function calendarTimeSelector('));
+  assert.match(perspective, /function perspectiveMonthView/);
+  assert.match(perspective, /function perspectiveWeekView/);
+  assert.match(perspective, /class="calendar-cube/);
+  assert.match(perspective, /data-calendar-date/);
+  assert.match(perspective, /calendarDetailsPanel/);
+  assert.match(perspective, /perspective-viewport/);
+});

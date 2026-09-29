@@ -15,12 +15,22 @@ test('every application shell uses the supplied black WebP logo asset', async ()
   assert.equal(logo.subarray(8, 12).toString('ascii'), 'WEBP');
 });
 
-test('Today is a read-only overview backed by today’s saved schedule', () => {
+test('Today remains a read-only schedule while offering presentation controls', () => {
   assert.match(todayPage, /getScheduleForDate\(toDateKey\(now\)\)/);
   assert.match(todayPage, /<h2>TODAY<\/h2>/);
   assert.match(todayPage, /What am I doing today\?/);
   assert.match(todayPage, /TODAY’S SCHEDULE/);
-  assert.doesNotMatch(todayPage, /button|input|select|textarea/);
+  assert.doesNotMatch(todayPage, /<(?:input|select|textarea)\b/);
+  assert.match(todayPage, /data-today-presentation="standard"/);
+  assert.match(todayPage, /data-today-presentation="three-d"/);
+  assert.match(todayPage, /aria-pressed/);
+});
+
+test('Today 3D mode uses a native-scroll perspective track and selectable cards', () => {
+  assert.match(todayPage, /perspective-viewport today-3d-track/);
+  assert.match(todayPage, /perspective-item/);
+  assert.match(todayPage, /data-today-index/);
+  assert.match(todayPage, /aria-expanded/);
 });
 
 test('Today shows project, calculated start and end times, and duration', () => {

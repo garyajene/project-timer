@@ -356,7 +356,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .today-agenda-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; }
 .today-agenda-heading h3 { margin: 0; font-size: .78rem; font-weight: 900; letter-spacing: .17em; }
 .today-agenda-heading span { color: #8a91a7; font-size: .82rem; font-weight: 750; }
-.today-schedule-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(1rem, 2.5vw, 1.6rem); }
+.today-schedule-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: clamp(1rem, 2.5vw, 1.6rem); }
 .today-schedule-row {
   --card-bg: #ffd2c9;
   --card-border: #ffac9e;
@@ -393,6 +393,8 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .today-block-details dt { color: #67708a; font-size: .65rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .today-block-details dd { margin: 0; color: #101a38; font-size: .85rem; font-weight: 750; font-variant-numeric: tabular-nums; }
 .today-empty-state { grid-column: 1 / -1; margin: 0; padding: 3rem; border: 1px dashed #cdd1dd; border-radius: 27px; background: rgba(255,255,255,.55); color: #69728e; text-align: center; }
+.today-expanded-detail { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; padding: .85rem 1rem; border-radius: 14px; background: rgba(255,255,255,.55); }
+.today-expanded-detail a { margin-left: auto; color: #111b3a; font-weight: 850; }
 @media (prefers-reduced-motion: reduce) { .today-schedule-row { transition: none; } }
 @media (max-width: 700px) {
   .today-app-header { grid-template-columns: 1fr auto; padding: 1rem; }
@@ -402,6 +404,96 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   .today-main { width: min(100% - 2rem, 1080px); }
   .today-overview { padding-top: 2.75rem; }
   .today-schedule-list { grid-template-columns: 1fr; }
+}
+
+/* Shared, native-scrolling perspective presentation. JavaScript supplies only
+   distance variables; document order and all controls remain normal DOM. */
+.presentation-toggle { display: inline-flex; width: fit-content; gap: .25rem; padding: .3rem; border: 1px solid #dfe2eb; border-radius: 999px; background: #eef0f5; }
+.presentation-toggle button { min-height: 44px; border: 0; background: transparent; color: #59637e; box-shadow: none; }
+.presentation-toggle button[aria-pressed="true"] { background: #111b3a; color: #fff; box-shadow: 0 7px 16px rgba(17,27,58,.22); }
+.today-overview > .presentation-toggle { justify-self: end; margin-top: -8rem; }
+.perspective-viewport {
+  position: relative;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-snap-type: y proximity;
+  -webkit-overflow-scrolling: touch;
+  perspective: 1050px;
+  perspective-origin: 50% 58%;
+  transform-style: preserve-3d;
+  scrollbar-color: #aeb8cc transparent;
+}
+.perspective-item {
+  --perspective-distance: .7;
+  --perspective-direction: -1;
+  scroll-snap-align: center;
+  transform-origin: 50% 50%;
+  transform: translate3d(0, calc(var(--perspective-direction) * 15px), calc(var(--perspective-distance) * -120px)) rotateX(calc(var(--perspective-direction) * -8deg)) scale(calc(1 - var(--perspective-distance) * .18));
+  opacity: calc(1 - var(--perspective-distance) * .3);
+  transition: transform .12s linear, opacity .12s linear, box-shadow .2s ease;
+}
+.perspective-item.is-visual-focus { will-change: transform; opacity: 1; }
+.today-3d-track { height: min(68vh, 46rem); gap: 2.2rem; padding: 24vh clamp(.25rem, 4vw, 3rem); background: radial-gradient(ellipse at 50% 58%, rgba(163,200,244,.2), transparent 55%); }
+.today-3d-track .today-schedule-row { min-height: 14rem; transform: translate3d(calc(var(--perspective-direction) * -10px), calc(var(--perspective-direction) * 15px), calc(var(--perspective-distance) * -120px)) rotateX(calc(var(--perspective-direction) * -8deg)) rotateY(-4deg) scale(calc(1 - var(--perspective-distance) * .18)); }
+.today-3d-track .today-schedule-row.is-visual-focus { box-shadow: inset 0 1px 0 #fff, 18px 22px 0 -10px color-mix(in srgb, var(--card-border) 75%, #71809f), 0 30px 40px rgba(42,49,78,.2); }
+.today-schedule-row:focus-visible, .calendar-cube:focus-visible, .day-3d-card:focus-visible { outline: 4px solid #367fd0; outline-offset: 5px; }
+
+.calendar-mode-bar { display: flex; justify-content: space-between; align-items: center; gap: 1rem; flex-wrap: wrap; }
+.calendar-mode-bar .calendar-tabs { margin-bottom: 0; }
+.perspective-calendar { padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
+.perspective-stage { display: grid; grid-template-columns: minmax(0, 1fr) minmax(17rem, .32fr); gap: clamp(1rem, 3vw, 2.5rem); align-items: center; }
+.month-3d-track, .week-3d-track, .day-3d-track { height: min(68vh, 44rem); min-height: 30rem; padding: 22vh clamp(1rem, 4vw, 4rem); }
+.calendar-cube-row { display: grid; grid-template-columns: repeat(7, minmax(4.5rem, 1fr)); gap: clamp(.55rem, 1.3vw, 1.25rem); min-width: 43rem; margin: 1.2rem 0; transform-style: preserve-3d; }
+.calendar-cube {
+  --cube-color: #dcecff;
+  position: relative;
+  isolation: isolate;
+  min-height: clamp(6rem, 10vw, 9rem);
+  display: grid !important;
+  align-content: center;
+  justify-items: start;
+  gap: .2rem !important;
+  padding: 1rem !important;
+  overflow: visible;
+  border: 1px solid #98b9e0 !important;
+  border-radius: 9px !important;
+  background: linear-gradient(145deg, rgba(255,255,255,.85), transparent 42%), var(--cube-color) !important;
+  box-shadow: 10px 12px 0 #8faed3, 0 22px 30px rgba(45,66,98,.2) !important;
+  transform: translateZ(calc(var(--workload, 0) * 20px));
+  transition: transform .18s ease, filter .18s ease, box-shadow .18s ease;
+}
+.calendar-cube::before { content: ''; position: absolute; z-index: -1; left: 4px; right: -1px; top: -10px; height: 10px; border-radius: 8px 8px 2px 2px; background: linear-gradient(90deg, #f8fbff, #b9d5f2); transform: skewX(-38deg); transform-origin: bottom; }
+.calendar-cube::after { content: ''; position: absolute; z-index: -1; top: -4px; right: -11px; bottom: -8px; width: 11px; border-radius: 2px 7px 7px 2px; background: linear-gradient(#91b4dc, #688bb8); transform: skewY(-42deg); transform-origin: left; }
+.calendar-cube:hover { transform: translate3d(0,-5px,24px) !important; filter: saturate(1.12); }
+.calendar-cube.is-selected { --cube-color: #ffd2c9; border-color: #ef765e !important; box-shadow: 10px 12px 0 #d97867, 0 0 0 4px rgba(242,101,76,.2), 0 25px 35px rgba(45,66,98,.25) !important; }
+.calendar-cube.is-today:not(.is-selected) { --cube-color: #ccebdc; }
+.calendar-cube.outside-month { filter: grayscale(.35); opacity: .58; }
+.cube-day { color: #546581; font-size: .66rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
+.calendar-cube > strong { color: #111b3a; font-size: clamp(1.65rem, 3vw, 2.6rem); line-height: 1; }
+.cube-count { color: #52617d; font-size: .7rem; font-weight: 750; }
+.calendar-details-panel { position: sticky; top: 2rem; padding: clamp(1.2rem, 3vw, 2rem); border: 1px solid #d7dce8; border-radius: 24px; background: rgba(255,255,255,.94); color: #111b3a; box-shadow: 0 25px 50px rgba(45,57,90,.16); }
+.calendar-details-panel h3 { font-size: clamp(1.3rem, 2.4vw, 2rem); }
+.calendar-details-panel ul { display: grid; gap: .65rem; margin: 1.2rem 0; padding: 0; list-style: none; }
+.calendar-details-panel li { display: flex; justify-content: space-between; gap: .7rem; padding: .75rem; border-radius: 13px; background: #f0f3f8; }
+.calendar-details-panel li div { display: grid; }
+.calendar-details-panel li span, .calendar-details-panel time { color: #66718c; font-size: .75rem; }
+.day-3d-track { display: grid; gap: 2rem; }
+.day-3d-card { position: relative; width: min(100%, 48rem); min-height: 9rem; display: grid !important; justify-items: start; align-content: center; gap: .4rem !important; margin-inline: auto; border-radius: 22px !important; background: linear-gradient(145deg,#dcecff,#b9d7fa) !important; box-shadow: 15px 17px 0 -7px #89add7, 0 25px 35px rgba(45,66,98,.2) !important; }
+.day-3d-card > b { position: absolute; right: 1.2rem; color: rgba(17,27,58,.12); font-size: 4rem; }
+
+@media (max-width: 820px) {
+  .today-overview > .presentation-toggle { justify-self: start; margin-top: -1.5rem; }
+  .perspective-stage { grid-template-columns: 1fr; }
+  .calendar-details-panel { position: static; }
+  .month-3d-track, .week-3d-track { margin-inline: -.75rem; padding-inline: 1rem; }
+  .calendar-cube-row { min-width: 37rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .perspective-viewport { scroll-snap-type: none; }
+  .perspective-item, .today-3d-track .today-schedule-row { transform: scale(calc(1 - var(--perspective-distance) * .06)); transition: none; opacity: calc(1 - var(--perspective-distance) * .12); }
 }
 @media (max-width: 420px) {
   .today-app-header .header-meta span:first-of-type { display: none; }
