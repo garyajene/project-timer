@@ -924,3 +924,111 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   .scheduler-days { grid-template-columns: 1fr; }
   .calendar-block-card > button { justify-content: center; }
 }
+
+/* Scheduler — the existing planning workflow in DoAbl's light, tactile system. */
+.scheduler-app {
+  min-height: 100vh;
+  color: #111b3a;
+  background:
+    radial-gradient(circle at 90% 4%, rgba(188, 221, 255, .38), transparent 27rem),
+    linear-gradient(180deg, #fafaf7 0%, #f5f6f4 100%);
+}
+.scheduler-main { width: min(1440px, calc(100% - 2rem)); margin-top: 2rem; gap: 1.5rem; }
+.scheduler-app .panel {
+  border: 1px solid #e1e3ea;
+  background: rgba(255, 255, 255, .76);
+  box-shadow: 0 24px 70px rgba(45, 52, 82, .08);
+}
+.scheduler-app #scheduler { padding: clamp(1.25rem, 3vw, 2.25rem); }
+.scheduler-app .section-heading { margin-bottom: 1.25rem; }
+.scheduler-app .section-heading h2 { color: #111b3a; }
+.scheduler-app #scheduler .section-heading h2 {
+  font-size: clamp(2.2rem, 5vw, 4rem);
+  line-height: .95;
+  letter-spacing: -.055em;
+  text-transform: uppercase;
+}
+.scheduler-app .eyebrow { color: #5b78ad; font-weight: 850; text-transform: none; letter-spacing: .035em; }
+.scheduler-app #scheduler .eyebrow { color: #f06b55; font-size: .85rem; }
+.scheduler-app .helper-text { color: #707990; line-height: 1.6; }
+.scheduler-app #scheduler > .helper-text { max-width: 58rem; margin-bottom: 1.5rem; }
+.scheduler-app .scheduler-days { gap: 1rem; }
+.scheduler-app .scheduler-day {
+  min-width: 0;
+  padding: 1.05rem;
+  border: 1px solid #dde0e8;
+  border-radius: 20px;
+  background: linear-gradient(145deg, #fff 0%, #f8f9fb 100%);
+  color: #17213d;
+  box-shadow: inset 0 1px 0 #fff, 0 9px 0 #e3e5eb, 0 16px 25px rgba(49, 58, 88, .10);
+  transition: transform .18s ease, box-shadow .18s ease, opacity .18s ease;
+}
+@media (hover: hover) {
+  .scheduler-app .scheduler-day:not(.scheduler-day-off):hover {
+    transform: translateY(-3px);
+    box-shadow: inset 0 1px 0 #fff, 0 12px 0 #e3e5eb, 0 21px 30px rgba(49, 58, 88, .12);
+  }
+}
+.scheduler-app .scheduler-day header { display: flex; align-items: center; justify-content: space-between; gap: .75rem; border-color: #e6e8ee; }
+.scheduler-app .scheduler-day header strong { color: #111b3a; font-size: 1.05rem; letter-spacing: .075em; text-transform: uppercase; }
+.scheduler-app .scheduler-day header span { color: #9097aa; font-size: .65rem; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+.scheduler-app .scheduler-day label,
+.scheduler-app .blackout-row label,
+.scheduler-app .generate-controls label { color: #5c6680; font-size: .73rem; font-weight: 850; letter-spacing: .035em; }
+.scheduler-app .text-input {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #d6d9e3;
+  border-radius: 11px;
+  background: linear-gradient(180deg, #fff, #fafbfc);
+  color: #17213d;
+  box-shadow: inset 0 1px 1px rgba(255, 255, 255, .9), 0 4px 8px rgba(43, 53, 83, .07);
+  color-scheme: light;
+  transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease;
+}
+.scheduler-app .text-input:hover:not(:disabled) { border-color: #aeb8cc; }
+.scheduler-app .text-input:focus { border-color: #639de0; outline: 0; box-shadow: 0 0 0 3px rgba(74, 145, 224, .18), 0 6px 11px rgba(43, 53, 83, .08); }
+.scheduler-app .scheduler-blocks { font-size: 1.05rem; font-weight: 900; font-variant-numeric: tabular-nums; }
+.scheduler-app .scheduler-break-toggle { position: relative; min-height: 42px; display: flex; gap: .65rem; padding: .5rem .65rem; border: 1px solid #dadee7; border-radius: 12px; background: #fff; box-shadow: 0 4px 8px rgba(43, 53, 83, .07); cursor: pointer; }
+.scheduler-app .scheduler-break-toggle input { appearance: none; width: 2.35rem; height: 1.35rem; margin: 0; padding: .16rem; border: 1px solid #c7ccd8; border-radius: 999px; background: #e3e5eb; cursor: pointer; transition: background .18s ease, border-color .18s ease; }
+.scheduler-app .scheduler-break-toggle input::before { content: ''; display: block; width: .92rem; height: .92rem; border-radius: 50%; background: #fff; box-shadow: 0 2px 4px rgba(44, 52, 80, .22); transition: transform .18s ease; }
+.scheduler-app .scheduler-break-toggle input:checked { border-color: #6796d0; background: #8fbff2; }
+.scheduler-app .scheduler-break-toggle input:checked::before { transform: translateX(.98rem); }
+.scheduler-app .scheduler-break-toggle input:focus-visible { outline: 3px solid rgba(54, 127, 207, .35); outline-offset: 3px; }
+.scheduler-app .scheduler-break-times.disabled-field { opacity: .52; }
+.scheduler-app .scheduler-break-times input:disabled { border-color: #e2e3e8; background: #eef0f3; color: #8d94a6; box-shadow: none; cursor: not-allowed; }
+.scheduler-app .scheduler-day-off { border-color: #e4e5e9; background: linear-gradient(145deg, #f5f5f3, #edeef0); box-shadow: inset 0 1px 0 #fff, 0 6px 0 #dedfe3, 0 12px 20px rgba(49, 58, 88, .07); }
+.scheduler-app .scheduler-day-off > label:not(:first-of-type),
+.scheduler-app .scheduler-day-off .scheduler-break-times { opacity: .58; }
+.scheduler-app .blackout-row { border-color: #e0e2e9; background: linear-gradient(145deg, #fff, #f8f9fb); box-shadow: 0 8px 18px rgba(45, 52, 82, .07); }
+.scheduler-app button { min-height: 44px; border-color: #d7dae4; background: #fff; color: #33405e; box-shadow: 0 5px 0 #dfe2e9, 0 9px 14px rgba(45, 52, 82, .09); font-weight: 800; }
+.scheduler-app button:hover { transform: translateY(-2px); border-color: #aeb8cc; box-shadow: 0 7px 0 #dfe2e9, 0 12px 17px rgba(45, 52, 82, .11); }
+.scheduler-app button:active { transform: translateY(3px); box-shadow: 0 2px 0 #dfe2e9, 0 4px 7px rgba(45, 52, 82, .09); }
+.scheduler-app button:focus-visible { outline: 3px solid rgba(54, 127, 207, .4); outline-offset: 3px; }
+.scheduler-app .add-button,
+.scheduler-app #generate-schedule {
+  border-color: #3983cf;
+  background: linear-gradient(145deg, #70b4fa, #438bd8);
+  color: #fff;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .48), 0 6px 0 #286bad, 0 12px 18px rgba(39, 107, 174, .22);
+}
+.scheduler-app .add-button:hover,
+.scheduler-app #generate-schedule:hover { border-color: #367fcf; box-shadow: inset 0 1px 0 rgba(255, 255, 255, .48), 0 8px 0 #286bad, 0 15px 21px rgba(39, 107, 174, .24); }
+.scheduler-app .add-button:active,
+.scheduler-app #generate-schedule:active { box-shadow: inset 0 2px 4px rgba(24, 73, 131, .25), 0 2px 0 #286bad; }
+.scheduler-app .date-picker-button { border-color: #d7dae4; background: #fff; color: #33405e; }
+.scheduler-app .generate-controls { padding: 1rem; border: 1px solid #e2e4ea; border-radius: 18px; background: #f7f8fa; }
+.scheduler-app #scheduler-status:not(:empty) { margin-top: 1rem; padding: .8rem 1rem; border-radius: 12px; background: #eaf3fd; color: #315d91; font-weight: 750; }
+.scheduler-app .empty-state { color: #7a8298; }
+
+@media (prefers-reduced-motion: reduce) {
+  .scheduler-app .scheduler-day, .scheduler-app button, .scheduler-app .text-input { transition: none; }
+}
+@media (max-width: 560px) {
+  .scheduler-main { width: min(100% - 1rem, 1440px); margin-top: .75rem; gap: 1rem; }
+  .scheduler-app #scheduler, .scheduler-app .panel { padding: 1rem; }
+  .scheduler-app .scheduler-days { gap: 1.15rem; }
+  .scheduler-app .scheduler-day { padding: 1rem; }
+  .scheduler-app .generate-controls, .scheduler-app .scheduler-date-control { width: 100%; }
+  .scheduler-app #generate-schedule { width: 100%; justify-content: center; }
+}
