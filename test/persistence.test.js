@@ -10,7 +10,7 @@ process.env.NODE_ENV = 'test';
 
 const sampleState = {
   projects: ['Alpha'],
-  projectSettings: { Alpha: { priority: 1, defaultDuration: 60 } },
+  projectSettings: { Alpha: { priority: 1, defaultDuration: 60, color: 'coral' } },
   schedule: [{ time: '09:00', project: 'Alpha', title: 'Plan', duration: 30 }],
   schedules: { '2026-08-03': [{ time: '10:00', project: 'Alpha', title: 'Build', duration: 60 }] },
   activeIndex: 0,
@@ -28,7 +28,7 @@ test('legacy workspaces receive empty Notes and an idle timer without losing exi
   const legacy = { projects: ['Existing'], schedule: [], schedules: {}, activeIndex: 0, autoStartNextTask: false };
   const normalized = normalizeState(legacy);
   assert.deepEqual(normalized.projects, ['Existing']);
-  assert.deepEqual(normalized.projectSettings, { Existing: { priority: 3, defaultDuration: null } });
+  assert.deepEqual(normalized.projectSettings, { Existing: { priority: 3, defaultDuration: null, color: 'blue' } });
   assert.deepEqual(normalized.notes, { parkingLot: '', general: '' });
   assert.equal(normalized.timerState.status, 'idle');
 });
