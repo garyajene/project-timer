@@ -759,14 +759,16 @@ function monthView(dateKey) {
 
 function calendarDetailsPanel(dateKey = selectedCalendarDate) {
   const blocks = getScheduleForDate(dateKey);
-  const items = blocks.map((block) => `<li><div><strong>${escapeHtml(block.title || block.project || 'Task')}</strong><span>${escapeHtml(block.project || 'No project')}</span></div><time>${escapeHtml(formatTime(block.time))}–${escapeHtml(formatTime(getNextStartTime(block)))}</time></li>`).join('');
+  const items = blocks.map((block) => `<li class="calendar-color-${projectSettings(block.project).color}"><div><strong>${escapeHtml(block.title || block.project || 'Task')}</strong><span>${escapeHtml(block.project || 'No project')}</span></div><time>${escapeHtml(formatTime(block.time))}–${escapeHtml(formatTime(getNextStartTime(block)))}</time></li>`).join('');
   return `<aside class="calendar-details-panel" aria-live="polite" aria-labelledby="calendar-detail-title"><span class="calendar-callout-pin" aria-hidden="true"></span><p class="eyebrow">Selected date</p><h3 id="calendar-detail-title">${escapeHtml(formatDateLabel(dateKey))}</h3><ul>${items || '<li class="empty-detail">Nothing scheduled.</li>'}</ul><button type="button" data-plan-selected-date>Plan this day</button></aside>`;
 }
 
 function calendarDateBlock(dateKey, label, { outside = false, workload = 0 } = {}) {
   const parsed = parseDateKey(dateKey);
-  const count = getScheduleForDate(dateKey).length;
-  const classes = [dateKey === toDateKey(new Date()) ? 'is-today' : '', dateKey === selectedCalendarDate ? 'is-selected' : '', outside ? 'outside-month' : ''].filter(Boolean).join(' ');
+  const blocks = getScheduleForDate(dateKey);
+  const count = blocks.length;
+  const projectColor = blocks.length ? projectSettings(blocks[0].project).color : '';
+  const classes = [dateKey === toDateKey(new Date()) ? 'is-today' : '', dateKey === selectedCalendarDate ? 'is-selected' : '', outside ? 'outside-month' : '', projectColor ? `calendar-color-${projectColor}` : ''].filter(Boolean).join(' ');
   return `<button type="button" class="calendar-cube ${classes}" data-calendar-date="${dateKey}" aria-pressed="${dateKey === selectedCalendarDate}" aria-label="${escapeHtml(`${formatDateLabel(dateKey)}, ${count} scheduled ${count === 1 ? 'item' : 'items'}`)}" style="--workload:${workload}"><span class="cube-day">${escapeHtml(label)}</span><strong>${parsed.getDate()}</strong><span class="cube-count">${count ? `${count} ${count === 1 ? 'item' : 'items'}` : 'Free'}</span></button>`;
 }
 
@@ -792,7 +794,7 @@ function perspectiveWeekView(dateKey) {
       const minutes = getScheduleForDate(dayKey).reduce((total, block) => total + Number(block.duration || DEFAULT_BLOCK_MINUTES), 0);
       return calendarDateBlock(dayKey, day.slice(0, 3), { workload: Math.min(1, minutes / 360) });
     }).join('');
-    return `<div class="perspective-item calendar-cube-row week-cube-row" role="row" data-week-start="${start}" style="--scene-row:${rowIndex}">${days}</div>`;
+    return `<div class="perspective-item calendar-cube-row week-cube-row ${rowIndex === 2 ? 'is-focused-week' : 'is-background-week'}" role="row" data-week-start="${start}" aria-label="${rowIndex === 2 ? 'Selected week' : 'Surrounding week'}" style="--scene-row:${rowIndex}">${days}</div>`;
   }).join('');
   return `<div class="calendar-full-view perspective-calendar"><div class="calendar-view-heading"><h3>Week of ${escapeHtml(formatDateLabel(center, { month: 'long', day: 'numeric', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Week</button><button id="calendar-next">Next Week</button></div></div><div class="perspective-stage"><div class="perspective-viewport week-3d-track" data-perspective-viewport role="grid" aria-label="Scrollable weeks">${rows}</div>${calendarDetailsPanel()}</div></div>`;
 }
