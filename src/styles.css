@@ -474,21 +474,25 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   justify-items: start;
   gap: .2rem !important;
   padding: 1rem !important;
-  overflow: visible;
+  overflow: hidden;
   border: 1px solid #98b9e0 !important;
   border-radius: 12px !important;
   background: linear-gradient(145deg, rgba(255,255,255,.85), transparent 42%), var(--cube-color) !important;
-  box-shadow: 13px 15px 0 #8faed3, 3px 26px 34px rgba(45,66,98,.22) !important;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.92), 0 10px 24px rgba(45,66,98,.16) !important;
   transform: translateZ(calc(var(--workload, 0) * 20px));
   transition: transform .18s ease, filter .18s ease, box-shadow .18s ease;
   backface-visibility: hidden;
 }
-/* The blocks recede toward the upper left, matching the upper-left-to-lower-right
-   progression of the rows rather than pointing against it. */
-.calendar-cube::before { content: ''; position: absolute; z-index: -1; left: -18px; right: 0; top: -18px; height: 18px; border-radius: 11px 11px 2px 2px; background: linear-gradient(90deg, #91afd1, color-mix(in srgb, var(--cube-color) 72%, #9ab8da) 38%, #fff); clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 100%, 18px 100%); }
-.calendar-cube::after { content: ''; position: absolute; z-index: -1; top: -18px; left: -18px; bottom: 0; width: 18px; border-radius: 10px 2px 2px 10px; background: linear-gradient(color-mix(in srgb, var(--cube-color) 72%, #779ac2), #587aa6 72%); clip-path: polygon(0 0, 100% 18px, 100% 100%, 0 calc(100% - 18px)); }
-.calendar-cube:hover { transform: translate3d(0,-5px,24px) scale(1.035) !important; filter: saturate(1.12); }
-.calendar-cube.is-selected { z-index: 4; --cube-color: #bdddff; border-color: #3d91ef !important; transform: translate3d(0,-10px,48px) scale(1.13) !important; box-shadow: 14px 18px 0 #4388d4, 0 0 0 4px rgba(61,145,239,.22), 0 0 26px rgba(53,144,244,.35), 0 31px 38px rgba(45,66,98,.28) !important; }
+/* A restrained inset highlight and soft shadow keep the cards dimensional
+   without separate pseudo-element "faces" whose corners could not track the
+   real card radius. Hover transforms only run on true hover devices, avoiding
+   sticky raised cards after taps on touch screens. */
+.calendar-cube::before { content: ''; position: absolute; inset: 0; border-radius: inherit; background: linear-gradient(145deg, rgba(255,255,255,.46), transparent 42%); pointer-events: none; }
+.calendar-cube::after { content: none; }
+@media (hover: hover) and (pointer: fine) {
+  .calendar-cube:hover:not(.is-selected) { transform: translate3d(0,-3px,16px) scale(1.015); filter: saturate(1.08); box-shadow: inset 0 1px 0 #fff, 0 14px 28px rgba(45,66,98,.2) !important; }
+}
+.calendar-cube.is-selected { z-index: 4; --cube-color: #bdddff; border-color: #287fdc !important; transform: translate3d(0,-4px,28px) scale(1.045); box-shadow: inset 0 1px 0 #fff, 0 0 0 3px rgba(61,145,239,.22), 0 16px 30px rgba(45,90,145,.24) !important; }
 .calendar-cube.is-today:not(.is-selected) { --cube-color: #ccebdc; }
 .calendar-cube.calendar-color-coral { --cube-color: #ffd2c9; }
 .calendar-cube.calendar-color-blue { --cube-color: #bfddff; }
