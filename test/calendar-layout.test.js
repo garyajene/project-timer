@@ -89,3 +89,11 @@ test('3D calendar reads left to right, uses project colors, and emphasizes the s
   assert.match(stylesSource, /\.week-3d-track \.week-cube-row\.is-background-week[\s\S]*grayscale/);
   assert.match(stylesSource, /\.week-3d-track \.week-cube-row\.is-focused-week[\s\S]*scale\(1\.14\)/);
 });
+
+test('3D calendar rows progress top down from left to right', () => {
+  const cubeRowStyles = stylesSource.slice(stylesSource.indexOf('.calendar-cube-row {'), stylesSource.indexOf('.calendar-cube-row.is-visual-focus'));
+
+  assert.match(cubeRowStyles, /translate3d\(calc\(var\(--perspective-direction\) \* 5\.5vw\)/);
+  assert.doesNotMatch(cubeRowStyles, /perspective-direction\) \* -5\.5vw/);
+  assert.match(stylesSource, /@media \(max-width: 560px\) \{[\s\S]*?\.calendar-cube-row \{[^}]*translate3d\(calc\(var\(--perspective-direction\) \* 2\.5rem\)/);
+});
