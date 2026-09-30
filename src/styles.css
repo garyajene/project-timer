@@ -445,7 +445,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .perspective-stage { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(17rem, .32fr); gap: clamp(1rem, 3vw, 2.5rem); align-items: center; isolation: isolate; }
 .perspective-stage::before { content: ''; position: absolute; z-index: -1; inset: 9% 19% 6% -3%; border-radius: 50%; background: radial-gradient(ellipse, rgba(102,163,232,.18), rgba(191,220,247,.08) 43%, transparent 72%); filter: blur(12px); transform: rotate(-5deg); pointer-events: none; }
 .month-3d-track, .week-3d-track, .day-3d-track { height: min(72vh, 48rem); min-height: 32rem; padding: 23vh clamp(2rem, 6vw, 6rem); }
-.month-3d-track, .week-3d-track { perspective: 850px; perspective-origin: 48% 45%; background: linear-gradient(155deg, transparent 22%, rgba(224,238,252,.28) 58%, transparent 82%); }
+.month-3d-track, .week-3d-track { perspective: 720px; perspective-origin: 42% 46%; background: linear-gradient(155deg, transparent 22%, rgba(224,238,252,.28) 58%, transparent 82%); }
 .month-3d-track, .week-3d-track, .calendar-cube-row { direction: ltr; }
 .calendar-cube-row {
   display: grid;
@@ -457,7 +457,8 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   transform-origin: left center;
   /* Every week advances along one fixed down-and-right axis. Row position—not
      distance from the viewport focus—controls the subtle, one-way recession. */
-  transform: translate3d(var(--scene-x, 0), 0, var(--scene-z, 0)) scale(var(--scene-scale, 1));
+  transform: translate3d(var(--scene-x, 0), 0, var(--scene-z, 0)) rotateY(11deg) scale(var(--scene-scale, 1));
+  backface-visibility: hidden;
   opacity: 1;
   transition: filter .2s ease;
   filter: none;
@@ -480,6 +481,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   box-shadow: 13px 15px 0 #8faed3, 3px 26px 34px rgba(45,66,98,.22) !important;
   transform: translateZ(calc(var(--workload, 0) * 20px));
   transition: transform .18s ease, filter .18s ease, box-shadow .18s ease;
+  backface-visibility: hidden;
 }
 /* The blocks recede toward the upper left, matching the upper-left-to-lower-right
    progression of the rows rather than pointing against it. */
@@ -526,7 +528,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .week-3d-track .week-cube-row.is-focused-week {
   z-index: 3;
   margin-block: 4.5rem;
-  transform: translate3d(var(--scene-x, 0), 0, 90px) scale(1.08);
+  transform: translate3d(var(--scene-x, 0), 0, 90px) rotateY(11deg) scale(1.08);
   opacity: 1;
   filter: saturate(1.08);
 }
@@ -543,7 +545,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 
 @media (max-width: 560px) {
   .month-3d-track, .week-3d-track { height: min(70vh, 42rem); min-height: 34rem; overflow-x: visible; }
-  .calendar-cube-row { min-width: 34rem; margin-block: 1.2rem; transform: translate3d(var(--scene-x, 0), 0, var(--scene-z, 0)) scale(var(--scene-scale, 1)); }
+  .calendar-cube-row { min-width: 34rem; margin-block: 1.2rem; transform: translate3d(var(--scene-x, 0), 0, var(--scene-z, 0)) rotateY(8deg) scale(var(--scene-scale, 1)); }
   .calendar-cube { min-height: 7.5rem; padding: .72rem !important; }
   .cube-count { display: none; }
 }

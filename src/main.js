@@ -781,7 +781,7 @@ function perspectiveMonthView(dateKey) {
       return calendarDateBlock(cellDate, day.slice(0, 3), { outside: parseDateKey(cellDate).getMonth() !== date.getMonth() });
     }).join('');
     const sceneScale = (1 - row * .012).toFixed(3);
-    return `<div class="perspective-item calendar-cube-row" role="row" style="--scene-row:${row};--scene-x:${(row * 4).toFixed(2)}rem;--scene-z:${row * -8}px;--scene-scale:${sceneScale}">${cells}</div>`;
+    return `<div class="perspective-item calendar-cube-row" role="row" style="--scene-row:${row};--scene-x:${(row * 1.5).toFixed(2)}rem;--scene-z:${row * -8}px;--scene-scale:${sceneScale}">${cells}</div>`;
   }).join('');
   return `<div class="calendar-full-view perspective-calendar"><div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(dateKey, { month: 'long', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Month</button><button id="calendar-next">Next Month</button></div></div><div class="perspective-stage"><div class="perspective-viewport month-3d-track" data-perspective-viewport role="grid" aria-label="3D month calendar">${rows}</div>${calendarDetailsPanel()}</div></div>`;
 }
@@ -796,7 +796,7 @@ function perspectiveWeekView(dateKey) {
       return calendarDateBlock(dayKey, day.slice(0, 3), { workload: Math.min(1, minutes / 360) });
     }).join('');
     const sceneScale = (1 - rowIndex * .012).toFixed(3);
-    return `<div class="perspective-item calendar-cube-row week-cube-row ${rowIndex === 2 ? 'is-focused-week' : 'is-background-week'}" role="row" data-week-start="${start}" aria-label="${rowIndex === 2 ? 'Selected week' : 'Surrounding week'}" style="--scene-row:${rowIndex};--scene-x:${(rowIndex * 4).toFixed(2)}rem;--scene-z:${rowIndex * -8}px;--scene-scale:${sceneScale}">${days}</div>`;
+    return `<div class="perspective-item calendar-cube-row week-cube-row ${rowIndex === 2 ? 'is-focused-week' : 'is-background-week'}" role="row" data-week-start="${start}" aria-label="${rowIndex === 2 ? 'Selected week' : 'Surrounding week'}" style="--scene-row:${rowIndex};--scene-x:${(rowIndex * 1.5).toFixed(2)}rem;--scene-z:${rowIndex * -8}px;--scene-scale:${sceneScale}">${days}</div>`;
   }).join('');
   return `<div class="calendar-full-view perspective-calendar"><div class="calendar-view-heading"><h3>Week of ${escapeHtml(formatDateLabel(center, { month: 'long', day: 'numeric', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Week</button><button id="calendar-next">Next Week</button></div></div><div class="perspective-stage"><div class="perspective-viewport week-3d-track" data-perspective-viewport role="grid" aria-label="Scrollable weeks">${rows}</div>${calendarDetailsPanel()}</div></div>`;
 }
@@ -939,11 +939,13 @@ function setupPerspectiveController() {
   let frame = 0;
   const update = () => {
     frame = 0;
-    const bounds = viewport.getBoundingClientRect();
-    const focus = bounds.top + bounds.height * .58;
+    const focus = viewport.scrollTop + viewport.clientHeight * .58;
     items.forEach((item) => {
-      const rect = item.getBoundingClientRect();
-      const signedDistance = (rect.top + rect.height / 2 - focus) / Math.max(bounds.height * .55, 1);
+      // Use layout coordinates rather than the transformed client rect. Reading a
+      // transform to calculate its next transform creates a feedback loop while
+      // scrolling, which made edge rows flicker or briefly disappear.
+      const itemCenter = item.offsetTop + item.offsetHeight / 2;
+      const signedDistance = (itemCenter - focus) / Math.max(viewport.clientHeight * .55, 1);
       const distance = Math.min(1.35, Math.abs(signedDistance));
       item.style.setProperty('--perspective-distance', distance.toFixed(3));
       item.style.setProperty('--perspective-direction', Math.max(-1, Math.min(1, signedDistance)).toFixed(3));
