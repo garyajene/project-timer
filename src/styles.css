@@ -346,9 +346,9 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .today-app-header .header-meta { position: absolute; top: 1rem; right: clamp(1rem, 3vw, 2.5rem); color: #65708d; }
 .today-app-header .top-nav { grid-row: 2; justify-content: center; }
 .today-navigation { grid-column: auto; justify-content: center; margin-top: 0; }
-.today-navigation a { border-color: transparent; color: #65708d; font-weight: 700; }
-.today-navigation a:hover { border-color: #c9cde0; color: #101a38; }
-.today-navigation a[aria-current="page"] { border-color: #d9dceb; background: #fff; color: #101a38; box-shadow: 0 5px 14px rgba(46,54,85,.08); }
+.today-app-header .top-nav a { border-color: transparent; color: #65708d; font-weight: 700; }
+.today-app-header .top-nav a:hover { border-color: #c9cde0; color: #101a38; }
+.today-app-header .top-nav a[aria-current="page"] { border-color: #d9dceb; background: #fff; color: #101a38; box-shadow: 0 5px 14px rgba(46,54,85,.08); }
 .today-main { width: min(1080px, calc(100% - 2rem)); margin-top: 0; }
 .today-overview { display: grid; gap: clamp(2.5rem, 6vw, 5rem); padding: clamp(2rem, 6vw, 5rem) 0 5rem; }
 .today-page-heading { max-width: 40rem; }

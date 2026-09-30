@@ -5,6 +5,11 @@ import test from 'node:test';
 const mainSource = await readFile(new URL('../src/main.js', import.meta.url), 'utf8');
 const stylesSource = await readFile(new URL('../src/styles.css', import.meta.url), 'utf8');
 
+test('Calendar header navigation stays legible on the light universal banner', () => {
+  assert.match(stylesSource, /\.today-app-header \.top-nav a \{[^}]*color: #65708d/);
+  assert.match(stylesSource, /\.today-app-header \.top-nav a\[aria-current="page"\] \{[^}]*color: #101a38/);
+});
+
 test('Calendar shows the calculated end time underneath Block Length', () => {
   const planner = mainSource.slice(mainSource.indexOf('function calendarPlanner()'), mainSource.indexOf('function calendarSection()'));
   const blockLengthPosition = planner.indexOf('Block Length');
