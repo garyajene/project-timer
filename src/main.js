@@ -780,7 +780,8 @@ function perspectiveMonthView(dateKey) {
       const cellDate = addDays(gridStart, row * 7 + column);
       return calendarDateBlock(cellDate, day.slice(0, 3), { outside: parseDateKey(cellDate).getMonth() !== date.getMonth() });
     }).join('');
-    return `<div class="perspective-item calendar-cube-row" role="row" style="--scene-row:${row}">${cells}</div>`;
+    const sceneScale = (1 - row * .012).toFixed(3);
+    return `<div class="perspective-item calendar-cube-row" role="row" style="--scene-row:${row};--scene-x:${(row * 4).toFixed(2)}rem;--scene-z:${row * -8}px;--scene-scale:${sceneScale}">${cells}</div>`;
   }).join('');
   return `<div class="calendar-full-view perspective-calendar"><div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(dateKey, { month: 'long', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Month</button><button id="calendar-next">Next Month</button></div></div><div class="perspective-stage"><div class="perspective-viewport month-3d-track" data-perspective-viewport role="grid" aria-label="3D month calendar">${rows}</div>${calendarDetailsPanel()}</div></div>`;
 }
@@ -794,7 +795,8 @@ function perspectiveWeekView(dateKey) {
       const minutes = getScheduleForDate(dayKey).reduce((total, block) => total + Number(block.duration || DEFAULT_BLOCK_MINUTES), 0);
       return calendarDateBlock(dayKey, day.slice(0, 3), { workload: Math.min(1, minutes / 360) });
     }).join('');
-    return `<div class="perspective-item calendar-cube-row week-cube-row ${rowIndex === 2 ? 'is-focused-week' : 'is-background-week'}" role="row" data-week-start="${start}" aria-label="${rowIndex === 2 ? 'Selected week' : 'Surrounding week'}" style="--scene-row:${rowIndex}">${days}</div>`;
+    const sceneScale = (1 - rowIndex * .012).toFixed(3);
+    return `<div class="perspective-item calendar-cube-row week-cube-row ${rowIndex === 2 ? 'is-focused-week' : 'is-background-week'}" role="row" data-week-start="${start}" aria-label="${rowIndex === 2 ? 'Selected week' : 'Surrounding week'}" style="--scene-row:${rowIndex};--scene-x:${(rowIndex * 4).toFixed(2)}rem;--scene-z:${rowIndex * -8}px;--scene-scale:${sceneScale}">${days}</div>`;
   }).join('');
   return `<div class="calendar-full-view perspective-calendar"><div class="calendar-view-heading"><h3>Week of ${escapeHtml(formatDateLabel(center, { month: 'long', day: 'numeric', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Week</button><button id="calendar-next">Next Week</button></div></div><div class="perspective-stage"><div class="perspective-viewport week-3d-track" data-perspective-viewport role="grid" aria-label="Scrollable weeks">${rows}</div>${calendarDetailsPanel()}</div></div>`;
 }

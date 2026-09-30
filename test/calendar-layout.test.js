@@ -64,14 +64,14 @@ test('3D month and week views retain semantic date buttons and details', () => {
   assert.match(perspective, /perspective-viewport/);
 });
 
-test('3D calendar uses a foreshortened three-quarter scene with an anchored detail callout', () => {
+test('3D calendar uses a consistent three-quarter scene with an anchored detail callout', () => {
   const perspective = mainSource.slice(mainSource.indexOf('function calendarDetailsPanel('), mainSource.indexOf('function calendarTimeSelector('));
 
   assert.match(perspective, /calendar-callout-pin/);
   assert.match(perspective, /--scene-row:/);
-  assert.match(stylesSource, /\.calendar-cube-row[\s\S]*rotateX\(15deg\)[\s\S]*rotateY\(-11deg\)/);
+  assert.match(stylesSource, /\.calendar-cube-row[\s\S]*translate3d\(var\(--scene-x, 0\), 0, var\(--scene-z, 0\)\)[\s\S]*scale\(var\(--scene-scale, 1\)\)/);
   assert.match(stylesSource, /\.calendar-callout-pin::after/);
-  assert.match(stylesSource, /\.calendar-cube\.is-selected[\s\S]*translate3d\(0,-10px,38px\)/);
+  assert.match(stylesSource, /\.calendar-cube\.is-selected[\s\S]*translate3d\(0,-10px,48px\) scale\(1\.13\)/);
 });
 
 test('foreshortened calendar has mobile and reduced-motion treatments', () => {
@@ -87,15 +87,18 @@ test('3D calendar reads left to right, uses project colors, and emphasizes the s
   assert.match(perspective, /is-background-week/);
   assert.match(stylesSource, /\.month-3d-track, \.week-3d-track, \.calendar-cube-row \{ direction: ltr; \}/);
   assert.match(stylesSource, /\.week-3d-track \.week-cube-row\.is-background-week[\s\S]*grayscale/);
-  assert.match(stylesSource, /\.week-3d-track \.week-cube-row\.is-focused-week[\s\S]*scale\(1\.14\)/);
+  assert.match(stylesSource, /\.week-3d-track \.week-cube-row\.is-focused-week[\s\S]*scale\(1\.08\)/);
 });
 
-test('3D calendar rows progress top down from left to right', () => {
+test('3D calendar rows progress top down on one fixed left-to-right axis', () => {
   const cubeRowStyles = stylesSource.slice(stylesSource.indexOf('.calendar-cube-row {'), stylesSource.indexOf('.calendar-cube-row.is-visual-focus'));
+  const perspective = mainSource.slice(mainSource.indexOf('function perspectiveMonthView('), mainSource.indexOf('function perspectiveDayView('));
 
-  assert.match(cubeRowStyles, /translate3d\(calc\(var\(--perspective-direction\) \* 5\.5vw\)/);
-  assert.doesNotMatch(cubeRowStyles, /perspective-direction\) \* -5\.5vw/);
-  assert.match(stylesSource, /@media \(max-width: 560px\) \{[\s\S]*?\.calendar-cube-row \{[^}]*translate3d\(calc\(var\(--perspective-direction\) \* 2\.5rem\)/);
+  assert.match(perspective, /--scene-x:\$\{\(row \* 4\)\.toFixed\(2\)\}rem/);
+  assert.match(perspective, /--scene-scale:\$\{sceneScale\}/);
+  assert.match(cubeRowStyles, /translate3d\(var\(--scene-x, 0\), 0, var\(--scene-z, 0\)\)/);
+  assert.doesNotMatch(cubeRowStyles, /perspective-direction/);
+  assert.match(stylesSource, /@media \(max-width: 560px\) \{[\s\S]*?\.calendar-cube-row \{[^}]*translate3d\(var\(--scene-x, 0\), 0, var\(--scene-z, 0\)\)/);
 });
 
 test('3D calendar blocks recede upper left in the same direction as the rows', () => {
