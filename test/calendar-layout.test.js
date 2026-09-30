@@ -78,3 +78,14 @@ test('foreshortened calendar has mobile and reduced-motion treatments', () => {
   assert.match(stylesSource, /@media \(max-width: 560px\)[\s\S]*\.calendar-cube-row/);
   assert.match(stylesSource, /@media \(prefers-reduced-motion: reduce\)[\s\S]*\.calendar-cube-row/);
 });
+
+test('3D calendar reads left to right, uses project colors, and emphasizes the selected week', () => {
+  const perspective = mainSource.slice(mainSource.indexOf('function calendarDetailsPanel('), mainSource.indexOf('function calendarTimeSelector('));
+
+  assert.match(perspective, /calendar-color-\$\{projectColor\}/);
+  assert.match(perspective, /is-focused-week/);
+  assert.match(perspective, /is-background-week/);
+  assert.match(stylesSource, /\.month-3d-track, \.week-3d-track, \.calendar-cube-row \{ direction: ltr; \}/);
+  assert.match(stylesSource, /\.week-3d-track \.week-cube-row\.is-background-week[\s\S]*grayscale/);
+  assert.match(stylesSource, /\.week-3d-track \.week-cube-row\.is-focused-week[\s\S]*scale\(1\.14\)/);
+});
