@@ -332,17 +332,20 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 /* The DoAbl visual language is deliberately isolated to Today for review. */
 .today-app { min-height: 100vh; color: #101a38; background: #f7f7f4; }
 .today-app-header {
-  position: relative;
-  grid-template-columns: auto 1fr;
-  padding: 1.4rem clamp(1.25rem, 5vw, 4.5rem) 1rem;
+  position: sticky;
+  grid-template-columns: 1fr;
+  justify-items: center;
+  gap: .65rem;
+  padding: 1.15rem clamp(1.25rem, 5vw, 4.5rem) .85rem;
   border: 0;
   background: rgba(247,247,244,.9);
   color: #101a38;
-  box-shadow: none;
+  box-shadow: 0 8px 22px rgba(46,54,85,.07);
 }
-.today-app-header .app-brand { padding: 0; background: transparent; }
-.today-app-header .header-meta { justify-self: end; color: #65708d; }
-.today-navigation { grid-column: 1 / -1; justify-content: flex-start; margin-top: .75rem; }
+.today-app-header .app-brand { grid-row: 1; width: clamp(8rem, 12vw, 10.5rem); padding: 0; background: transparent; }
+.today-app-header .header-meta { position: absolute; top: 1rem; right: clamp(1rem, 3vw, 2.5rem); color: #65708d; }
+.today-app-header .top-nav { grid-row: 2; justify-content: center; }
+.today-navigation { grid-column: auto; justify-content: center; margin-top: 0; }
 .today-navigation a { border-color: transparent; color: #65708d; font-weight: 700; }
 .today-navigation a:hover { border-color: #c9cde0; color: #101a38; }
 .today-navigation a[aria-current="page"] { border-color: #d9dceb; background: #fff; color: #101a38; box-shadow: 0 5px 14px rgba(46,54,85,.08); }
@@ -397,9 +400,10 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .today-expanded-detail a { margin-left: auto; color: #111b3a; font-weight: 850; }
 @media (prefers-reduced-motion: reduce) { .today-schedule-row { transition: none; } }
 @media (max-width: 700px) {
-  .today-app-header { grid-template-columns: 1fr auto; padding: 1rem; }
+  .today-app-header { grid-template-columns: 1fr; padding: 1rem; }
+  .today-app-header .header-meta { position: static; grid-row: 3; justify-self: center; white-space: normal; }
   .today-app-header .header-meta svg { display: none; }
-  .today-navigation { flex-wrap: nowrap; overflow-x: auto; margin-inline: -1rem; padding: .35rem 1rem .6rem; scrollbar-width: none; }
+  .today-app-header .top-nav, .today-navigation { width: calc(100% + 2rem); flex-wrap: nowrap; justify-content: flex-start; overflow-x: auto; margin-inline: -1rem; padding: .35rem 1rem .6rem; scrollbar-width: none; }
   .today-navigation a { flex: 0 0 auto; min-height: 44px; display: grid; place-items: center; }
   .today-main { width: min(100% - 2rem, 1080px); }
   .today-overview { padding-top: 2.75rem; }
@@ -435,7 +439,9 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 }
 .perspective-item.is-visual-focus { will-change: transform; opacity: 1; }
 .today-3d-track { height: min(68vh, 46rem); gap: 2.2rem; padding: 24vh clamp(.25rem, 4vw, 3rem); background: radial-gradient(ellipse at 50% 58%, rgba(163,200,244,.2), transparent 55%); }
-.today-3d-track .today-schedule-row { min-height: 14rem; transform: translate3d(calc(var(--perspective-direction) * -10px), calc(var(--perspective-direction) * 15px), calc(var(--perspective-distance) * -120px)) rotateX(calc(var(--perspective-direction) * -8deg)) rotateY(-4deg) scale(calc(1 - var(--perspective-distance) * .18)); }
+.today-3d-track { perspective: 720px; perspective-origin: 42% 46%; }
+.today-3d-track .today-schedule-row { min-height: 14rem; transform-origin: left center; transform: translate3d(var(--scene-x, 0), calc(var(--perspective-direction) * 8px), calc(var(--scene-z, 0) - var(--perspective-distance) * 55px)) rotateY(11deg) rotateX(calc(var(--perspective-direction) * -3deg)) scale(calc(var(--scene-scale, 1) - var(--perspective-distance) * .08)); }
+.today-3d-track .today-schedule-row.is-selected { z-index: 5; }
 .today-3d-track .today-schedule-row.is-visual-focus { box-shadow: inset 0 1px 0 #fff, 18px 22px 0 -10px color-mix(in srgb, var(--card-border) 75%, #71809f), 0 30px 40px rgba(42,49,78,.2); }
 .today-schedule-row:focus-visible, .calendar-cube:focus-visible, .day-3d-card:focus-visible { outline: 4px solid #367fd0; outline-offset: 5px; }
 
@@ -464,6 +470,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   filter: none;
 }
 .calendar-cube-row.is-visual-focus { opacity: 1; filter: saturate(1.06); }
+.calendar-cube-row.contains-selection { z-index: 6; opacity: 1 !important; filter: saturate(1.08) !important; }
 .calendar-cube {
   --cube-color: #dcecff;
   position: relative;
@@ -519,10 +526,13 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .calendar-color-sky { --detail-color: #62aee8; }
 .calendar-color-gray { --detail-color: #8b93a5; }
 .calendar-details-panel li div { display: grid; }
+.calendar-details-panel li strong { font-size: clamp(1rem, 1.4vw, 1.2rem); line-height: 1.12; }
 .calendar-details-panel li span, .calendar-details-panel time { color: #66718c; font-size: .75rem; }
+.calendar-day-task strong, .calendar-task strong, .month-task strong { font-size: 1.05em; line-height: 1.15; }
 .day-3d-track { display: grid; gap: 2rem; perspective: 720px; perspective-origin: 42% 46%; background: linear-gradient(155deg, transparent 22%, rgba(224,238,252,.28) 58%, transparent 82%); }
 .day-3d-card { position: relative; width: min(100%, 48rem); min-height: 9rem; display: grid !important; justify-items: start; align-content: center; gap: .4rem !important; margin-inline: auto; border-radius: 22px !important; background: linear-gradient(145deg,#dcecff,#b9d7fa) !important; box-shadow: 15px 17px 0 -7px #89add7, 0 25px 35px rgba(45,66,98,.2) !important; transform-origin: left center; transform: translate3d(var(--scene-x, 0), 0, var(--scene-z, 0)) rotateY(11deg) scale(var(--scene-scale, 1)); opacity: 1; }
 .day-3d-card.is-visual-focus { filter: saturate(1.06); }
+.day-3d-card > strong { max-width: calc(100% - 4.5rem); font-size: clamp(1.25rem, 2.2vw, 1.75rem); line-height: 1.08; text-align: left; }
 .day-3d-card > b { position: absolute; right: 1.2rem; color: rgba(17,27,58,.12); font-size: 4rem; }
 
 /* The week scene has one unmistakable subject: the requested week. Nearby

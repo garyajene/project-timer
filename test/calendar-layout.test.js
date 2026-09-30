@@ -72,6 +72,8 @@ test('3D calendar uses a consistent three-quarter scene with an anchored detail 
   assert.match(stylesSource, /\.calendar-cube-row[\s\S]*translate3d\(var\(--scene-x, 0\), 0, var\(--scene-z, 0\)\)[\s\S]*rotateY\(11deg\)[\s\S]*scale\(var\(--scene-scale, 1\)\)/);
   assert.match(stylesSource, /\.calendar-callout path/);
   assert.match(stylesSource, /\.calendar-cube\.is-selected[\s\S]*translate3d\(0,-4px,28px\) scale\(1\.045\)/);
+  assert.match(perspective, /contains-selection/);
+  assert.match(stylesSource, /\.calendar-cube-row\.contains-selection \{ z-index: 6;/);
 });
 
 test('3D day view follows the same down-and-right foreshortened axis as month and week', () => {

@@ -31,6 +31,15 @@ test('Today 3D mode uses a native-scroll perspective track and selectable cards'
   assert.match(todayPage, /perspective-item/);
   assert.match(todayPage, /data-today-index/);
   assert.match(todayPage, /aria-expanded/);
+  assert.match(todayPage, /--scene-x:/);
+  assert.match(todayPage, /--scene-z:/);
+  assert.match(todayPage, /--scene-scale:/);
+});
+
+test('the centered DoAbl header and primary menu are shared by every route', () => {
+  assert.match(mainSource, /universal-app-header/);
+  assert.match(mainSource, /class="app-header today-app-header universal-app-header/);
+  assert.match(mainSource, /primaryNavigation\(/);
 });
 
 test('Today shows project, calculated start and end times, and duration', () => {
