@@ -455,7 +455,10 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   margin: 2.1rem 0;
   transform-style: preserve-3d;
   transform-origin: 50% 55%;
-  transform: translate3d(calc(var(--perspective-direction) * -5.5vw), calc(var(--perspective-direction) * 18px), calc(var(--perspective-distance) * -190px)) rotateX(15deg) rotateY(-11deg) rotateZ(-1.5deg) scale(calc(1 - var(--perspective-distance) * .23));
+  /* Rows above the focal point sit to the left and rows below it move right,
+     so the month advances top-to-bottom in the same left-to-right direction
+     as the dates within each week. */
+  transform: translate3d(calc(var(--perspective-direction) * 5.5vw), calc(var(--perspective-direction) * 18px), calc(var(--perspective-distance) * -190px)) rotateX(15deg) rotateY(-11deg) rotateZ(-1.5deg) scale(calc(1 - var(--perspective-distance) * .23));
   opacity: calc(1 - var(--perspective-distance) * .38);
   transition: transform .14s linear, opacity .14s linear, filter .2s ease;
   filter: saturate(calc(1 - var(--perspective-distance) * .22));
@@ -539,7 +542,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 
 @media (max-width: 560px) {
   .month-3d-track, .week-3d-track { height: min(70vh, 42rem); min-height: 34rem; overflow-x: visible; }
-  .calendar-cube-row { min-width: 34rem; margin-block: 2.8rem; transform: translate3d(calc(var(--perspective-direction) * -2.5rem), calc(var(--perspective-direction) * 24px), calc(var(--perspective-distance) * -210px)) rotateX(17deg) rotateY(-9deg) rotateZ(-1deg) scale(calc(1 - var(--perspective-distance) * .28)); }
+  .calendar-cube-row { min-width: 34rem; margin-block: 2.8rem; transform: translate3d(calc(var(--perspective-direction) * 2.5rem), calc(var(--perspective-direction) * 24px), calc(var(--perspective-distance) * -210px)) rotateX(17deg) rotateY(-9deg) rotateZ(-1deg) scale(calc(1 - var(--perspective-distance) * .28)); }
   .calendar-cube { min-height: 7.5rem; padding: .72rem !important; }
   .cube-count { display: none; }
 }
