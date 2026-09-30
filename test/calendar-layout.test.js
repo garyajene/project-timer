@@ -69,7 +69,7 @@ test('3D calendar uses a consistent three-quarter scene with an anchored detail 
 
   assert.match(perspective, /calendar-callout-pin/);
   assert.match(perspective, /--scene-row:/);
-  assert.match(stylesSource, /\.calendar-cube-row[\s\S]*translate3d\(var\(--scene-x, 0\), 0, var\(--scene-z, 0\)\)[\s\S]*scale\(var\(--scene-scale, 1\)\)/);
+  assert.match(stylesSource, /\.calendar-cube-row[\s\S]*translate3d\(var\(--scene-x, 0\), 0, var\(--scene-z, 0\)\)[\s\S]*rotateY\(11deg\)[\s\S]*scale\(var\(--scene-scale, 1\)\)/);
   assert.match(stylesSource, /\.calendar-callout-pin::after/);
   assert.match(stylesSource, /\.calendar-cube\.is-selected[\s\S]*translate3d\(0,-10px,48px\) scale\(1\.13\)/);
 });
@@ -94,11 +94,19 @@ test('3D calendar rows progress top down on one fixed left-to-right axis', () =>
   const cubeRowStyles = stylesSource.slice(stylesSource.indexOf('.calendar-cube-row {'), stylesSource.indexOf('.calendar-cube-row.is-visual-focus'));
   const perspective = mainSource.slice(mainSource.indexOf('function perspectiveMonthView('), mainSource.indexOf('function perspectiveDayView('));
 
-  assert.match(perspective, /--scene-x:\$\{\(row \* 4\)\.toFixed\(2\)\}rem/);
+  assert.match(perspective, /--scene-x:\$\{\(row \* 1\.5\)\.toFixed\(2\)\}rem/);
   assert.match(perspective, /--scene-scale:\$\{sceneScale\}/);
-  assert.match(cubeRowStyles, /translate3d\(var\(--scene-x, 0\), 0, var\(--scene-z, 0\)\)/);
+  assert.match(cubeRowStyles, /translate3d\(var\(--scene-x, 0\), 0, var\(--scene-z, 0\)\) rotateY\(11deg\)/);
   assert.doesNotMatch(cubeRowStyles, /perspective-direction/);
-  assert.match(stylesSource, /@media \(max-width: 560px\) \{[\s\S]*?\.calendar-cube-row \{[^}]*translate3d\(var\(--scene-x, 0\), 0, var\(--scene-z, 0\)\)/);
+  assert.match(stylesSource, /@media \(max-width: 560px\) \{[\s\S]*?\.calendar-cube-row \{[^}]*translate3d\(var\(--scene-x, 0\), 0, var\(--scene-z, 0\)\) rotateY\(8deg\)/);
+});
+
+test('perspective scrolling measures stable layout geometry instead of transformed rectangles', () => {
+  const controller = mainSource.slice(mainSource.indexOf('function setupPerspectiveController()'), mainSource.indexOf('function bindAuthEvents()'));
+
+  assert.match(controller, /viewport\.scrollTop \+ viewport\.clientHeight/);
+  assert.match(controller, /item\.offsetTop \+ item\.offsetHeight \/ 2/);
+  assert.doesNotMatch(controller, /item\.getBoundingClientRect/);
 });
 
 test('3D calendar blocks recede upper left in the same direction as the rows', () => {
