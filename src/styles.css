@@ -482,8 +482,10 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   transform: translateZ(calc(var(--workload, 0) * 20px));
   transition: transform .18s ease, filter .18s ease, box-shadow .18s ease;
 }
-.calendar-cube::before { content: ''; position: absolute; z-index: -1; left: 7px; right: -2px; top: -18px; height: 18px; border-radius: 11px 11px 2px 2px; background: linear-gradient(90deg, #fff, color-mix(in srgb, var(--cube-color) 72%, #9ab8da) 62%, #91afd1); transform: skewX(-38deg); transform-origin: bottom; }
-.calendar-cube::after { content: ''; position: absolute; z-index: -1; top: -7px; right: -19px; bottom: -14px; width: 19px; border-radius: 2px 10px 10px 2px; background: linear-gradient(color-mix(in srgb, var(--cube-color) 72%, #779ac2), #587aa6 72%); transform: skewY(-42deg); transform-origin: left; }
+/* The blocks recede toward the upper left, matching the upper-left-to-lower-right
+   progression of the rows rather than pointing against it. */
+.calendar-cube::before { content: ''; position: absolute; z-index: -1; left: -18px; right: 0; top: -18px; height: 18px; border-radius: 11px 11px 2px 2px; background: linear-gradient(90deg, #91afd1, color-mix(in srgb, var(--cube-color) 72%, #9ab8da) 38%, #fff); clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 100%, 18px 100%); }
+.calendar-cube::after { content: ''; position: absolute; z-index: -1; top: -18px; left: -18px; bottom: 0; width: 18px; border-radius: 10px 2px 2px 10px; background: linear-gradient(color-mix(in srgb, var(--cube-color) 72%, #779ac2), #587aa6 72%); clip-path: polygon(0 0, 100% 18px, 100% 100%, 0 calc(100% - 18px)); }
 .calendar-cube:hover { transform: translate3d(0,-5px,24px) !important; filter: saturate(1.12); }
 .calendar-cube.is-selected { --cube-color: #bdddff; border-color: #3d91ef !important; transform: translate3d(0,-10px,38px) !important; box-shadow: 14px 18px 0 #4388d4, 0 0 0 4px rgba(61,145,239,.22), 0 0 26px rgba(53,144,244,.35), 0 31px 38px rgba(45,66,98,.28) !important; }
 .calendar-cube.is-today:not(.is-selected) { --cube-color: #ccebdc; }

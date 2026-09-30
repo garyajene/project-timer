@@ -97,3 +97,14 @@ test('3D calendar rows progress top down from left to right', () => {
   assert.doesNotMatch(cubeRowStyles, /perspective-direction\) \* -5\.5vw/);
   assert.match(stylesSource, /@media \(max-width: 560px\) \{[\s\S]*?\.calendar-cube-row \{[^}]*translate3d\(calc\(var\(--perspective-direction\) \* 2\.5rem\)/);
 });
+
+test('3D calendar blocks recede upper left in the same direction as the rows', () => {
+  const topFace = stylesSource.slice(stylesSource.indexOf('.calendar-cube::before'), stylesSource.indexOf('.calendar-cube::after'));
+  const leftFace = stylesSource.slice(stylesSource.indexOf('.calendar-cube::after'), stylesSource.indexOf('.calendar-cube:hover'));
+
+  assert.match(topFace, /left: -18px; right: 0; top: -18px/);
+  assert.match(topFace, /clip-path: polygon\(0 0, calc\(100% - 18px\) 0, 100% 100%, 18px 100%\)/);
+  assert.match(leftFace, /top: -18px; left: -18px; bottom: 0/);
+  assert.match(leftFace, /clip-path: polygon\(0 0, 100% 18px, 100% 100%, 0 calc\(100% - 18px\)\)/);
+  assert.doesNotMatch(leftFace, /right: -19px/);
+});
