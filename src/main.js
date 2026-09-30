@@ -761,7 +761,11 @@ function monthView(dateKey) {
 function calendarDetailsPanel(dateKey = selectedCalendarDate) {
   const blocks = getScheduleForDate(dateKey);
   const items = blocks.map((block) => `<li class="calendar-color-${projectSettings(block.project).color}"><div><strong>${escapeHtml(block.title || block.project || 'Task')}</strong><span>${escapeHtml(block.project || 'No project')}</span></div><time>${escapeHtml(formatTime(block.time))}–${escapeHtml(formatTime(getNextStartTime(block)))}</time></li>`).join('');
-  return `<aside class="calendar-details-panel" aria-live="polite" aria-labelledby="calendar-detail-title"><span class="calendar-callout-pin" aria-hidden="true"></span><p class="eyebrow">Selected date</p><h3 id="calendar-detail-title">${escapeHtml(formatDateLabel(dateKey))}</h3><ul>${items || '<li class="empty-detail">Nothing scheduled.</li>'}</ul><button type="button" data-plan-selected-date>Plan this day</button></aside>`;
+  return `<aside class="calendar-details-panel" aria-live="polite" aria-labelledby="calendar-detail-title"><p class="eyebrow">Selected date</p><h3 id="calendar-detail-title">${escapeHtml(formatDateLabel(dateKey))}</h3><ul>${items || '<li class="empty-detail">Nothing scheduled.</li>'}</ul><button type="button" data-plan-selected-date>Plan this day</button></aside>`;
+}
+
+function calendarCallout() {
+  return '<svg class="calendar-callout" data-calendar-callout aria-hidden="true"><path></path><circle r="7"></circle></svg>';
 }
 
 function calendarDateBlock(dateKey, label, { outside = false, workload = 0 } = {}) {
@@ -770,7 +774,7 @@ function calendarDateBlock(dateKey, label, { outside = false, workload = 0 } = {
   const count = blocks.length;
   const projectColor = blocks.length ? projectSettings(blocks[0].project).color : '';
   const classes = [dateKey === toDateKey(new Date()) ? 'is-today' : '', dateKey === selectedCalendarDate ? 'is-selected' : '', outside ? 'outside-month' : '', projectColor ? `calendar-color-${projectColor}` : ''].filter(Boolean).join(' ');
-  return `<button type="button" class="calendar-cube ${classes}" data-calendar-date="${dateKey}" aria-pressed="${dateKey === selectedCalendarDate}" aria-label="${escapeHtml(`${formatDateLabel(dateKey)}, ${count} scheduled ${count === 1 ? 'item' : 'items'}`)}" style="--workload:${workload}"><span class="cube-day">${escapeHtml(label)}</span><strong>${parsed.getDate()}</strong><span class="cube-count">${count ? `${count} ${count === 1 ? 'item' : 'items'}` : 'Free'}</span></button>`;
+  return `<button type="button" class="calendar-cube ${classes}" data-calendar-date="${dateKey}" ${dateKey === selectedCalendarDate ? 'data-calendar-callout-target' : ''} aria-pressed="${dateKey === selectedCalendarDate}" aria-label="${escapeHtml(`${formatDateLabel(dateKey)}, ${count} scheduled ${count === 1 ? 'item' : 'items'}`)}" style="--workload:${workload}"><span class="cube-day">${escapeHtml(label)}</span><strong>${parsed.getDate()}</strong><span class="cube-count">${count ? `${count} ${count === 1 ? 'item' : 'items'}` : 'Free'}</span></button>`;
 }
 
 function perspectiveMonthView(dateKey) {
@@ -784,7 +788,7 @@ function perspectiveMonthView(dateKey) {
     const sceneScale = (1 - row * .012).toFixed(3);
     return `<div class="perspective-item calendar-cube-row" role="row" style="--scene-row:${row};--scene-x:${(row * 1.5).toFixed(2)}rem;--scene-z:${row * -8}px;--scene-scale:${sceneScale}">${cells}</div>`;
   }).join('');
-  return `<div class="calendar-full-view perspective-calendar"><div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(dateKey, { month: 'long', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Month</button><button id="calendar-next">Next Month</button></div></div><div class="perspective-stage"><div class="perspective-viewport month-3d-track" data-perspective-viewport role="grid" aria-label="3D month calendar">${rows}</div>${calendarDetailsPanel()}</div></div>`;
+  return `<div class="calendar-full-view perspective-calendar"><div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(dateKey, { month: 'long', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Month</button><button id="calendar-next">Next Month</button></div></div><div class="perspective-stage"><div class="perspective-viewport month-3d-track" data-perspective-viewport role="grid" aria-label="3D month calendar">${rows}</div>${calendarCallout()}${calendarDetailsPanel()}</div></div>`;
 }
 
 function perspectiveWeekView(dateKey) {
@@ -799,13 +803,16 @@ function perspectiveWeekView(dateKey) {
     const sceneScale = (1 - rowIndex * .012).toFixed(3);
     return `<div class="perspective-item calendar-cube-row week-cube-row ${rowIndex === 2 ? 'is-focused-week' : 'is-background-week'}" role="row" data-week-start="${start}" aria-label="${rowIndex === 2 ? 'Selected week' : 'Surrounding week'}" style="--scene-row:${rowIndex};--scene-x:${(rowIndex * 1.5).toFixed(2)}rem;--scene-z:${rowIndex * -8}px;--scene-scale:${sceneScale}">${days}</div>`;
   }).join('');
-  return `<div class="calendar-full-view perspective-calendar"><div class="calendar-view-heading"><h3>Week of ${escapeHtml(formatDateLabel(center, { month: 'long', day: 'numeric', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Week</button><button id="calendar-next">Next Week</button></div></div><div class="perspective-stage"><div class="perspective-viewport week-3d-track" data-perspective-viewport role="grid" aria-label="Scrollable weeks">${rows}</div>${calendarDetailsPanel()}</div></div>`;
+  return `<div class="calendar-full-view perspective-calendar"><div class="calendar-view-heading"><h3>Week of ${escapeHtml(formatDateLabel(center, { month: 'long', day: 'numeric', year: 'numeric' }))}</h3><div class="actions"><button id="calendar-prev">Previous Week</button><button id="calendar-next">Next Week</button></div></div><div class="perspective-stage"><div class="perspective-viewport week-3d-track" data-perspective-viewport role="grid" aria-label="Scrollable weeks">${rows}</div>${calendarCallout()}${calendarDetailsPanel()}</div></div>`;
 }
 
 function perspectiveDayView(dateKey) {
   const blocks = getScheduleForDate(dateKey);
-  const cards = blocks.map((block, index) => `<button type="button" class="perspective-item day-3d-card" data-calendar-task-time="${escapeHtml(block.time)}"><span>${escapeHtml(formatTime(block.time))}–${escapeHtml(formatTime(getNextStartTime(block)))}</span><strong>${escapeHtml(block.title || block.project || 'Task')}</strong><small>${escapeHtml(block.project || formatMinutes(block.duration))}</small><b>${index + 1}</b></button>`).join('') || '<p class="empty-state">Nothing scheduled. Use “Plan this day” to add a block.</p>';
-  return `<div class="calendar-full-view perspective-calendar"><div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(dateKey))}</h3><div class="actions"><button id="calendar-prev">Previous Day</button><button id="calendar-next">Next Day</button></div></div><div class="perspective-stage"><div class="perspective-viewport day-3d-track" data-perspective-viewport>${cards}</div>${calendarDetailsPanel(dateKey)}</div></div>`;
+  const cards = blocks.map((block, index) => {
+    const sceneScale = (1 - index * .018).toFixed(3);
+    return `<button type="button" class="perspective-item day-3d-card" ${index === 0 ? 'data-calendar-callout-target' : ''} data-calendar-task-time="${escapeHtml(block.time)}" style="--scene-x:${(index * 1.5).toFixed(2)}rem;--scene-z:${index * -10}px;--scene-scale:${sceneScale}"><span>${escapeHtml(formatTime(block.time))}–${escapeHtml(formatTime(getNextStartTime(block)))}</span><strong>${escapeHtml(block.title || block.project || 'Task')}</strong><small>${escapeHtml(block.project || formatMinutes(block.duration))}</small><b>${index + 1}</b></button>`;
+  }).join('') || '<p class="empty-state day-callout-target" data-calendar-callout-target>Nothing scheduled. Use “Plan this day” to add a block.</p>';
+  return `<div class="calendar-full-view perspective-calendar"><div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(dateKey))}</h3><div class="actions"><button id="calendar-prev">Previous Day</button><button id="calendar-next">Next Day</button></div></div><div class="perspective-stage"><div class="perspective-viewport day-3d-track" data-perspective-viewport aria-label="3D schedule for ${escapeHtml(formatDateLabel(dateKey))}">${cards}</div>${calendarCallout()}${calendarDetailsPanel(dateKey)}</div></div>`;
 }
 
 function calendarTimeSelector(block, index) {
@@ -942,6 +949,27 @@ function setupPerspectiveController() {
   const viewport = document.querySelector('[data-perspective-viewport]');
   if (!viewport?.classList.contains('perspective-viewport')) return;
   const items = [...viewport.querySelectorAll('.perspective-item')];
+  const stage = viewport.closest('.perspective-stage');
+  const callout = stage?.querySelector('[data-calendar-callout]');
+  const calloutPath = callout?.querySelector('path');
+  const calloutDot = callout?.querySelector('circle');
+  const updateCallout = () => {
+    const target = stage?.querySelector('[data-calendar-callout-target]');
+    const panel = stage?.querySelector('.calendar-details-panel');
+    if (!stage || !callout || !calloutPath || !calloutDot || !target || !panel) return;
+    const stageRect = stage.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const panelRect = panel.getBoundingClientRect();
+    const startX = panelRect.left - stageRect.left;
+    const startY = Math.min(panelRect.bottom - stageRect.top - 34, Math.max(panelRect.top - stageRect.top + 34, targetRect.top + targetRect.height / 2 - stageRect.top));
+    const endX = targetRect.right - stageRect.left + 8;
+    const endY = targetRect.top + targetRect.height / 2 - stageRect.top;
+    const bendX = startX - Math.max(24, Math.min(72, (startX - endX) * .35));
+    callout.setAttribute('viewBox', `0 0 ${stageRect.width} ${stageRect.height}`);
+    calloutPath.setAttribute('d', `M ${startX} ${startY} H ${bendX} Q ${endX} ${startY} ${endX} ${endY}`);
+    calloutDot.setAttribute('cx', endX);
+    calloutDot.setAttribute('cy', endY);
+  };
   let frame = 0;
   const update = () => {
     frame = 0;
@@ -957,6 +985,7 @@ function setupPerspectiveController() {
       item.style.setProperty('--perspective-direction', Math.max(-1, Math.min(1, signedDistance)).toFixed(3));
       item.classList.toggle('is-visual-focus', distance < .22);
     });
+    updateCallout();
   };
   const requestUpdate = () => { if (!frame) frame = requestAnimationFrame(update); };
   viewport.addEventListener('scroll', requestUpdate, { passive: true });
@@ -971,6 +1000,7 @@ function setupPerspectiveController() {
   // A smooth scroll here used to overlap the next full render when users
   // clicked dates quickly, leaving cards in stale hover/focus-looking poses.
   selected?.scrollIntoView({ block: 'center', behavior: 'auto' });
+  requestUpdate();
 }
 
 function bindAuthEvents() {

@@ -504,9 +504,10 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .cube-day { color: #546581; font-size: .66rem; font-weight: 900; letter-spacing: .1em; text-transform: uppercase; }
 .calendar-cube > strong { color: #111b3a; font-size: clamp(1.65rem, 3vw, 2.6rem); line-height: 1; }
 .cube-count { color: #52617d; font-size: .7rem; font-weight: 750; }
-.calendar-details-panel { position: sticky; top: 2rem; padding: clamp(1.2rem, 3vw, 2rem); border: 1px solid #a9cff7; border-radius: 24px; background: rgba(255,255,255,.94); color: #111b3a; box-shadow: 0 25px 50px rgba(45,57,90,.16); backdrop-filter: blur(14px); transform: rotateY(-3deg) rotateZ(-1deg); transform-origin: left center; }
-.calendar-callout-pin { position: absolute; left: -3.3rem; top: 52%; width: 3.3rem; height: 4.5rem; border-top: 2px solid #4d9bf0; border-left: 2px solid #4d9bf0; border-radius: 18px 0 0 0; pointer-events: none; }
-.calendar-callout-pin::after { content: ''; position: absolute; left: -6px; bottom: -2px; width: 11px; height: 11px; border: 3px solid #fff; border-radius: 50%; background: #378dec; box-shadow: 0 2px 8px rgba(35,107,188,.35); }
+.calendar-details-panel { position: sticky; z-index: 2; top: 2rem; padding: clamp(1.2rem, 3vw, 2rem); border: 1px solid #a9cff7; border-radius: 24px; background: rgba(255,255,255,.94); color: #111b3a; box-shadow: 0 25px 50px rgba(45,57,90,.16); backdrop-filter: blur(14px); transform: rotateY(-3deg) rotateZ(-1deg); transform-origin: left center; }
+.calendar-callout { position: absolute; z-index: 3; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.calendar-callout path { fill: none; stroke: #4d9bf0; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.calendar-callout circle { fill: #378dec; stroke: #fff; stroke-width: 4; filter: drop-shadow(0 2px 4px rgba(35,107,188,.4)); vector-effect: non-scaling-stroke; }
 .calendar-details-panel h3 { font-size: clamp(1.3rem, 2.4vw, 2rem); }
 .calendar-details-panel ul { display: grid; gap: .65rem; margin: 1.2rem 0; padding: 0; list-style: none; }
 .calendar-details-panel li { display: flex; justify-content: space-between; gap: .7rem; padding: .75rem; border-radius: 13px; background: #f0f3f8; }
@@ -519,8 +520,9 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .calendar-color-gray { --detail-color: #8b93a5; }
 .calendar-details-panel li div { display: grid; }
 .calendar-details-panel li span, .calendar-details-panel time { color: #66718c; font-size: .75rem; }
-.day-3d-track { display: grid; gap: 2rem; }
-.day-3d-card { position: relative; width: min(100%, 48rem); min-height: 9rem; display: grid !important; justify-items: start; align-content: center; gap: .4rem !important; margin-inline: auto; border-radius: 22px !important; background: linear-gradient(145deg,#dcecff,#b9d7fa) !important; box-shadow: 15px 17px 0 -7px #89add7, 0 25px 35px rgba(45,66,98,.2) !important; }
+.day-3d-track { display: grid; gap: 2rem; perspective: 720px; perspective-origin: 42% 46%; background: linear-gradient(155deg, transparent 22%, rgba(224,238,252,.28) 58%, transparent 82%); }
+.day-3d-card { position: relative; width: min(100%, 48rem); min-height: 9rem; display: grid !important; justify-items: start; align-content: center; gap: .4rem !important; margin-inline: auto; border-radius: 22px !important; background: linear-gradient(145deg,#dcecff,#b9d7fa) !important; box-shadow: 15px 17px 0 -7px #89add7, 0 25px 35px rgba(45,66,98,.2) !important; transform-origin: left center; transform: translate3d(var(--scene-x, 0), 0, var(--scene-z, 0)) rotateY(11deg) scale(var(--scene-scale, 1)); opacity: 1; }
+.day-3d-card.is-visual-focus { filter: saturate(1.06); }
 .day-3d-card > b { position: absolute; right: 1.2rem; color: rgba(17,27,58,.12); font-size: 4rem; }
 
 /* The week scene has one unmistakable subject: the requested week. Nearby
@@ -542,7 +544,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   .today-overview > .presentation-toggle { justify-self: start; margin-top: -1.5rem; }
   .perspective-stage { grid-template-columns: 1fr; }
   .calendar-details-panel { position: relative; z-index: 2; width: min(92%, 32rem); margin: -3.5rem auto 1rem; transform: none; }
-  .calendar-callout-pin { display: none; }
+  .calendar-callout { display: none; }
   .month-3d-track, .week-3d-track { margin-inline: -.75rem; padding: 24vh 1rem 28vh; perspective-origin: 50% 48%; }
   .calendar-cube-row { min-width: 37rem; }
 }
@@ -558,6 +560,7 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   html { scroll-behavior: auto; }
   .perspective-viewport { scroll-snap-type: none; }
   .perspective-item, .today-3d-track .today-schedule-row, .calendar-cube-row { transform: scale(calc(1 - var(--perspective-distance) * .06)); transition: none; opacity: calc(1 - var(--perspective-distance) * .12); }
+  .day-3d-card { transform: translateX(var(--scene-x, 0)) scale(var(--scene-scale, 1)); opacity: 1; }
 }
 @media (max-width: 420px) {
   .today-app-header .header-meta span:first-of-type { display: none; }
