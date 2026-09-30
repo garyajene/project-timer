@@ -67,11 +67,33 @@ test('3D month and week views retain semantic date buttons and details', () => {
 test('3D calendar uses a consistent three-quarter scene with an anchored detail callout', () => {
   const perspective = mainSource.slice(mainSource.indexOf('function calendarDetailsPanel('), mainSource.indexOf('function calendarTimeSelector('));
 
-  assert.match(perspective, /calendar-callout-pin/);
+  assert.match(perspective, /calendarCallout/);
   assert.match(perspective, /--scene-row:/);
   assert.match(stylesSource, /\.calendar-cube-row[\s\S]*translate3d\(var\(--scene-x, 0\), 0, var\(--scene-z, 0\)\)[\s\S]*rotateY\(11deg\)[\s\S]*scale\(var\(--scene-scale, 1\)\)/);
-  assert.match(stylesSource, /\.calendar-callout-pin::after/);
+  assert.match(stylesSource, /\.calendar-callout path/);
   assert.match(stylesSource, /\.calendar-cube\.is-selected[\s\S]*translate3d\(0,-4px,28px\) scale\(1\.045\)/);
+});
+
+test('3D day view follows the same down-and-right foreshortened axis as month and week', () => {
+  const day = mainSource.slice(mainSource.indexOf('function perspectiveDayView('), mainSource.indexOf('function calendarTimeSelector('));
+  const dayCardStyles = stylesSource.slice(stylesSource.indexOf('.day-3d-card {'), stylesSource.indexOf('.day-3d-card.is-visual-focus'));
+
+  assert.match(day, /--scene-x:\$\{\(index \* 1\.5\)\.toFixed\(2\)\}rem/);
+  assert.match(day, /--scene-z:\$\{index \* -10\}px/);
+  assert.match(day, /--scene-scale:\$\{sceneScale\}/);
+  assert.match(dayCardStyles, /translate3d\(var\(--scene-x, 0\), 0, var\(--scene-z, 0\)\) rotateY\(11deg\)/);
+});
+
+test('3D detail callout is measured from the selected date to the panel', () => {
+  const perspective = mainSource.slice(mainSource.indexOf('function calendarDetailsPanel('), mainSource.indexOf('function calendarTimeSelector('));
+  const controller = mainSource.slice(mainSource.indexOf('function setupPerspectiveController()'), mainSource.indexOf('function bindAuthEvents()'));
+
+  assert.match(perspective, /data-calendar-callout-target/);
+  assert.match(perspective, /data-calendar-callout/);
+  assert.match(controller, /target\.getBoundingClientRect\(\)/);
+  assert.match(controller, /panel\.getBoundingClientRect\(\)/);
+  assert.match(controller, /calloutPath\.setAttribute\('d'/);
+  assert.match(controller, /calloutDot\.setAttribute\('cx'/);
 });
 
 test('foreshortened calendar has mobile and reduced-motion treatments', () => {
