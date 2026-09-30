@@ -71,7 +71,7 @@ test('3D calendar uses a consistent three-quarter scene with an anchored detail 
   assert.match(perspective, /--scene-row:/);
   assert.match(stylesSource, /\.calendar-cube-row[\s\S]*translate3d\(var\(--scene-x, 0\), 0, var\(--scene-z, 0\)\)[\s\S]*rotateY\(11deg\)[\s\S]*scale\(var\(--scene-scale, 1\)\)/);
   assert.match(stylesSource, /\.calendar-callout-pin::after/);
-  assert.match(stylesSource, /\.calendar-cube\.is-selected[\s\S]*translate3d\(0,-10px,48px\) scale\(1\.13\)/);
+  assert.match(stylesSource, /\.calendar-cube\.is-selected[\s\S]*translate3d\(0,-4px,28px\) scale\(1\.045\)/);
 });
 
 test('foreshortened calendar has mobile and reduced-motion treatments', () => {
@@ -107,15 +107,18 @@ test('perspective scrolling measures stable layout geometry instead of transform
   assert.match(controller, /viewport\.scrollTop \+ viewport\.clientHeight/);
   assert.match(controller, /item\.offsetTop \+ item\.offsetHeight \/ 2/);
   assert.doesNotMatch(controller, /item\.getBoundingClientRect/);
+  assert.match(controller, /cleanupPerspectiveController\?\.\(\)/);
+  assert.match(controller, /removeEventListener\('resize', requestUpdate\)/);
+  assert.match(controller, /behavior: 'auto'/);
 });
 
-test('3D calendar blocks recede upper left in the same direction as the rows', () => {
+test('3D calendar cards use aligned corners and soft shadows instead of offset faces', () => {
   const topFace = stylesSource.slice(stylesSource.indexOf('.calendar-cube::before'), stylesSource.indexOf('.calendar-cube::after'));
   const leftFace = stylesSource.slice(stylesSource.indexOf('.calendar-cube::after'), stylesSource.indexOf('.calendar-cube:hover'));
 
-  assert.match(topFace, /left: -18px; right: 0; top: -18px/);
-  assert.match(topFace, /clip-path: polygon\(0 0, calc\(100% - 18px\) 0, 100% 100%, 18px 100%\)/);
-  assert.match(leftFace, /top: -18px; left: -18px; bottom: 0/);
-  assert.match(leftFace, /clip-path: polygon\(0 0, 100% 18px, 100% 100%, 0 calc\(100% - 18px\)\)/);
-  assert.doesNotMatch(leftFace, /right: -19px/);
+  assert.match(topFace, /inset: 0/);
+  assert.match(topFace, /border-radius: inherit/);
+  assert.match(leftFace, /content: none/);
+  assert.doesNotMatch(stylesSource, /13px 15px 0 #8faed3/);
+  assert.match(stylesSource, /@media \(hover: hover\) and \(pointer: fine\)/);
 });

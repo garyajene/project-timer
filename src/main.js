@@ -68,6 +68,7 @@ let scheduleSaveMessage = '';
 let viewedIndex = null;
 let viewedBlockDraft = null;
 let timerBlockSaveMessage = '';
+let cleanupPerspectiveController = null;
 let timerBlockConflictOpen = false;
 let runningIndex = null;
 let projectedEndTime = null;
@@ -933,6 +934,11 @@ function render() {
 }
 
 function setupPerspectiveController() {
+  // Rendering replaces the viewport. Tear down callbacks from the previous
+  // viewport first so detached calendar rows cannot continue receiving visual
+  // state updates during a new scroll or selection.
+  cleanupPerspectiveController?.();
+  cleanupPerspectiveController = null;
   const viewport = document.querySelector('[data-perspective-viewport]');
   if (!viewport?.classList.contains('perspective-viewport')) return;
   const items = [...viewport.querySelectorAll('.perspective-item')];
@@ -954,10 +960,17 @@ function setupPerspectiveController() {
   };
   const requestUpdate = () => { if (!frame) frame = requestAnimationFrame(update); };
   viewport.addEventListener('scroll', requestUpdate, { passive: true });
-  window.addEventListener('resize', requestUpdate, { passive: true, once: true });
-  requestUpdate();
+  window.addEventListener('resize', requestUpdate, { passive: true });
+  cleanupPerspectiveController = () => {
+    viewport.removeEventListener('scroll', requestUpdate);
+    window.removeEventListener('resize', requestUpdate);
+    if (frame) cancelAnimationFrame(frame);
+  };
+  update();
   const selected = viewport.querySelector('.is-selected')?.closest('.perspective-item');
-  selected?.scrollIntoView({ block: 'center', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  // A smooth scroll here used to overlap the next full render when users
+  // clicked dates quickly, leaving cards in stale hover/focus-looking poses.
+  selected?.scrollIntoView({ block: 'center', behavior: 'auto' });
 }
 
 function bindAuthEvents() {
