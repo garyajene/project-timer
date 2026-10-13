@@ -1,8 +1,6 @@
 const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-const MINIMUM_BLOCK_GAP_MINUTES = 60;
-const START_WINDOW_MINUTES = 30;
-const MINIMUM_FINAL_START_BUFFER_MINUTES = 60;
-const MAXIMUM_FINAL_START_BUFFER_MINUTES = 120;
+const CUSHION_RANGES = { tight: [15, 30], medium: [45, 90], loose: [90, 120] };
+const cushionRange = (rule) => CUSHION_RANGES[rule.cushion] || CUSHION_RANGES.medium;
 
 function hashSeed(value) {
   let hash = 2166136261;
@@ -21,7 +19,7 @@ function seededRandom(seed) {
   };
 }
 
-const minutes = (time) => { const [hour, minute] = time.split(':').map(Number); return hour * 60 + minute; };
+const minutes = (time) => { const [hour, minute] = String(time || '').split(':').map(Number); return hour * 60 + minute; };
 const time = (value) => `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
 const dateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 const isOffDay = (rule) => !rule?.enabled || String(rule.type).toLowerCase() === 'off';
@@ -39,7 +37,7 @@ function findAvailableStart(target, duration, minimumStart, latestStart, unavail
   return null;
 }
 
-function assertMinimumSpacing(schedules) {
+function assertMinimumSpacing(schedules, dayRules) {
   Object.entries(schedules).forEach(([date, blocks]) => {
     const ordered = [...blocks].sort((a, b) => a.time.localeCompare(b.time));
     for (let index = 1; index < ordered.length; index += 1) {
@@ -47,8 +45,8 @@ function assertMinimumSpacing(schedules) {
       const current = ordered[index];
       const previousEnd = minutes(previous.time) + Number(previous.duration);
       const gap = minutes(current.time) - previousEnd;
-      if (gap < MINIMUM_BLOCK_GAP_MINUTES) {
-        throw new Error(`Generated schedule failed spacing validation on ${date}. Every work block requires at least one hour between blocks.`);
+      if (gap < cushionRange(dayRules[DAY_NAMES[new Date(`${date}T12:00:00`).getDay()]])[0]) {
+        throw new Error(`Generated schedule failed spacing validation on ${date}. Work blocks must respect the selected cushion.`);
       }
     }
   });
@@ -59,7 +57,7 @@ function assertNoOffDayBlocks(schedules, dayRules) {
     const date = new Date(`${dateValue}T12:00:00`);
     const dayName = DAY_NAMES[date.getDay()];
     if (isOffDay(dayRules[dayName])) {
-      throw new Error(`Generated schedule failed day-type validation on ${dateValue}. Off days cannot contain work blocks.`);
+      throw new Error(`Generated schedule failed work-day validation on ${dateValue}. Off days cannot contain work blocks.`);
     }
   });
 }
@@ -81,9 +79,15 @@ export function generateSchedule({ weekStart, rangeEnd = null, dayRules, blackou
 
     const requestedBlocks = Math.max(0, Number(rule.blocks) || 0);
     const earliestStart = minutes(rule.start);
-    const latestStart = minutes(rule.end);
-    if (!requestedBlocks || !eligible.length || earliestStart > latestStart) continue;
+    const latestFinish = rule.end === '00:00' ? 24 * 60 : minutes(rule.end);
+    if (!requestedBlocks) continue;
+    if (!Number.isFinite(earliestStart) || !Number.isFinite(latestFinish) || earliestStart >= latestFinish) {
+      throw new Error(`Review ${DAY_NAMES[date.getDay()]}: latest project finish must be later than earliest start.`);
+    }
 
+    if (rule.breakEnabled && !(minutes(rule.breakEnd) > minutes(rule.breakStart))) {
+      throw new Error(`Review ${DAY_NAMES[date.getDay()]}: break ends must be later than break starts.`);
+    }
     const scheduledBreak = rule.breakEnabled ? [{ start: rule.breakStart, end: rule.breakEnd }] : [];
     const dayBlackouts = [
       ...blackouts.filter((item) => item.date === dateValue || (item.recurring && item.days?.includes(DAY_NAMES[date.getDay()]))),
@@ -92,22 +96,13 @@ export function generateSchedule({ weekStart, rangeEnd = null, dayRules, blackou
       .filter((item) => item.start && item.end && minutes(item.end) > minutes(item.start))
       .sort((a, b) => minutes(a.start) - minutes(b.start));
 
-    const startWindow = Math.min(START_WINDOW_MINUTES, Math.max(0, latestStart - earliestStart));
-    const firstTarget = earliestStart + (random() < 0.5 ? 0 : startWindow);
-    const averageDuration = eligible.reduce((sum, project) => sum + Number(project.duration), 0) / eligible.length;
-    const finalStartBuffer = Math.min(
-      MAXIMUM_FINAL_START_BUFFER_MINUTES,
-      Math.max(MINIMUM_FINAL_START_BUFFER_MINUTES, Math.round(averageDuration / 30) * 30),
-    );
-    const finalTarget = requestedBlocks === 1
-      ? firstTarget
-      : Math.max(firstTarget, latestStart - finalStartBuffer);
-    const targetStep = requestedBlocks > 1 ? (finalTarget - firstTarget) / (requestedBlocks - 1) : 0;
+    const [minimumGap, maximumGap] = cushionRange(rule);
     let previousEnd = null;
 
     for (let index = 0; index < requestedBlocks; index += 1) {
-      const target = firstTarget + (targetStep * index);
-      const minimumStart = previousEnd === null ? earliestStart : previousEnd + MINIMUM_BLOCK_GAP_MINUTES;
+      const minimumStart = previousEnd === null ? earliestStart : previousEnd + minimumGap;
+      const target = previousEnd === null ? earliestStart
+        : previousEnd + minimumGap + Math.floor(random() * ((maximumGap - minimumGap) / 15 + 1)) * 15;
       const ranked = eligible.map((project) => ({
         project,
         score: (counts[project.name] + 1) / (6 - project.priority),
@@ -117,7 +112,11 @@ export function generateSchedule({ weekStart, rangeEnd = null, dayRules, blackou
       let placement = null;
       for (const { project } of ranked) {
         const duration = Number(project.duration);
-        let blockStart = findAvailableStart(target, duration, minimumStart, latestStart, dayBlackouts);
+        const latestStart = latestFinish - duration;
+        const shortestDuration = Math.min(...eligible.map((item) => Number(item.duration)));
+        const reserve = (requestedBlocks - index - 1) * (shortestDuration + minimumGap);
+        const preferredTarget = Math.max(minimumStart, Math.min(target, latestStart - reserve));
+        let blockStart = findAvailableStart(preferredTarget, duration, minimumStart, latestStart, dayBlackouts);
         if (blockStart === null && target > minimumStart) {
           blockStart = findAvailableStart(minimumStart, duration, minimumStart, Math.min(latestStart, Math.floor(target)), dayBlackouts);
         }
@@ -130,8 +129,9 @@ export function generateSchedule({ weekStart, rangeEnd = null, dayRules, blackou
       if (!placement) {
         unfilled.push({
           date: dateValue,
-          time: time(Math.min(latestStart, Math.max(earliestStart, Math.round(target)))),
-          capacity: Math.max(0, latestStart - minimumStart),
+          time: time(Math.min(latestFinish, Math.max(earliestStart, Math.round(target)))),
+          capacity: Math.max(0, latestFinish - minimumStart),
+          missingBlocks: requestedBlocks - index,
         });
         break;
       }
@@ -149,7 +149,7 @@ export function generateSchedule({ weekStart, rangeEnd = null, dayRules, blackou
   }
 
   Object.values(schedules).forEach((blocks) => blocks.sort((a, b) => a.time.localeCompare(b.time)));
-  assertMinimumSpacing(schedules);
+  assertMinimumSpacing(schedules, dayRules);
   assertNoOffDayBlocks(schedules, dayRules);
   return { schedules, counts, unfilled, seed: String(seed) };
 }
