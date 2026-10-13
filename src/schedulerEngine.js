@@ -153,3 +153,55 @@ export function generateSchedule({ weekStart, rangeEnd = null, dayRules, blackou
   assertNoOffDayBlocks(schedules, dayRules);
   return { schedules, counts, unfilled, seed: String(seed) };
 }
+
+function addDateDays(value, offset) {
+  const date = new Date(`${value}T12:00:00`);
+  date.setDate(date.getDate() + offset);
+  return dateKey(date);
+}
+
+export function planningRange(mode, start) {
+  if (mode === 'month') {
+    const date = new Date(`${start}T12:00:00`);
+    date.setMonth(date.getMonth() + 1, 0);
+    return { start, end: dateKey(date) };
+  }
+  return { start, end: addDateDays(start, mode === '30-days' ? 29 : 6) };
+}
+
+export function repeatWeek({ sourceStart, rangeEnd, schedules, dayRules, blackouts = [] }) {
+  const targetStart = addDateDays(sourceStart, 7);
+  if (!rangeEnd || rangeEnd < targetStart) throw new Error('Choose a repeat end date after the source week.');
+  const result = { schedules: {}, unfilled: [], seed: null };
+  let sourceCount = 0;
+  for (let offset = 0; offset < 7; offset += 1) sourceCount += (schedules[addDateDays(sourceStart, offset)] || []).length;
+  if (!sourceCount) throw new Error('The selected source week has no scheduled blocks to repeat.');
+  for (let date = targetStart, offset = 0; date <= rangeEnd; date = addDateDays(date, 1), offset += 1) {
+    const source = schedules[addDateDays(sourceStart, offset % 7)] || [];
+    const day = DAY_NAMES[new Date(`${date}T12:00:00`).getDay()];
+    const rule = dayRules[day];
+    const blocks = [];
+    let missingBlocks = 0;
+    const unavailable = blackouts.filter(item => item.date === date || (item.recurring && item.days?.includes(day)));
+    if (rule?.breakEnabled) unavailable.push({ start: rule.breakStart, end: rule.breakEnd });
+    for (const block of [...source].sort((a, b) => minutes(a.time) - minutes(b.time))) {
+      const start = minutes(block.time);
+      const duration = Number(block.duration);
+      const end = start + duration;
+      const finish = rule?.end === '00:00' ? 1440 : minutes(rule?.end);
+      const previous = blocks.at(-1);
+      const conflict = unavailable.some(item => start < minutes(item.end) && end > minutes(item.start));
+      if (isOffDay(rule) || !Number.isFinite(start) || !Number.isFinite(duration) || duration <= 0
+        || !Number.isFinite(finish) || !Number.isFinite(minutes(rule.start))
+        || start < minutes(rule.start) || end > finish || conflict
+        || (previous && start < minutes(previous.time) + previous.duration + cushionRange(rule)[0])) {
+        missingBlocks += 1;
+        continue;
+      }
+      blocks.push({ time: block.time, project: block.project, title: block.title || '', duration, done: false });
+    }
+    if (blocks.length) result.schedules[date] = blocks;
+    if (missingBlocks) result.unfilled.push({ date, missingBlocks });
+  }
+  return result;
+}

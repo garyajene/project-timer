@@ -1282,3 +1282,14 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   .scheduler-app .generate-controls, .scheduler-app .scheduler-date-control { width: 100%; }
   .scheduler-app #generate-schedule { width: 100%; justify-content: center; }
 }
+
+/* Planning range preview: included dates remain visible across month boundaries. */
+.planning-date-preview { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 1rem; }
+.planning-month { width: min(100%, 19rem); padding: 1rem; border: 1px solid #d7dae4; border-radius: 14px; background: #fff; color: #111b3a; }
+.planning-month h3 { margin: 0 0 .75rem; font-size: 1rem; }
+.planning-date-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: .3rem; text-align: center; }
+.planning-date-grid > span { padding: .4rem .1rem; }
+.planning-date { border-radius: 7px; color: #9399a8; }
+.planning-date-selected { background: #dcecff; color: #174b83; font-weight: 800; }
+.scheduler-app .calendar-tabs { margin-bottom: 1rem; flex-wrap: wrap; }
+.scheduler-app [aria-pressed="true"][data-scheduler-mode], .scheduler-app [aria-pressed="true"][data-month-span] { background: #111b3a; color: #fff; }
