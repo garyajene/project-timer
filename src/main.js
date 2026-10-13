@@ -27,7 +27,7 @@ const defaultState = {
   schedule: [],
   schedules: {},
   schedulerSettings: {
-    days: Object.fromEntries(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => [day, { enabled: !['Saturday', 'Sunday'].includes(day), type: day === 'Wednesday' ? 'light' : 'normal', start: '10:30', end: day === 'Wednesday' ? '13:00' : '23:30', blocks: day === 'Wednesday' ? 2 : 3, breakEnabled: false, breakStart: '12:00', breakEnd: '13:00' }])),
+    days: Object.fromEntries(['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'].map((day) => [day, { enabled: !['Saturday', 'Sunday'].includes(day), cushion: 'medium', start: '10:30', end: day === 'Wednesday' ? '13:00' : '23:30', blocks: day === 'Wednesday' ? 2 : 3, breakEnabled: false, breakStart: '12:00', breakEnd: '13:00' }])),
     blackouts: [], lastSeed: null,
   },
   activeIndex: 0,
@@ -216,7 +216,8 @@ function normalizeSchedulerSettings(settings) {
   for (const day of weekDays) {
     const value = settings.days?.[day];
     if (!value) continue;
-    normalized.days[day] = { ...normalized.days[day], ...value, enabled: value.enabled === true, blocks: Math.max(0, Number(value.blocks) || 0), breakEnabled: value.breakEnabled === true, breakStart: String(value.breakStart || '12:00'), breakEnd: String(value.breakEnd || '13:00') };
+    normalized.days[day] = { ...normalized.days[day], ...value, enabled: value.enabled === true && String(value.type).toLowerCase() !== 'off', cushion: ['tight', 'medium', 'loose'].includes(value.cushion) ? value.cushion : 'medium', blocks: Math.max(0, Number(value.blocks) || 0), breakEnabled: value.breakEnabled === true, breakStart: String(value.breakStart || '12:00'), breakEnd: String(value.breakEnd || '13:00') };
+    delete normalized.days[day].type;
     delete normalized.days[day].duration;
     delete normalized.days[day].gap;
   }
@@ -862,10 +863,10 @@ function schedulerPage() {
   const weekEnd = schedulerRangeEnd || addDays(weekStart, 6);
   const dayRows = weekDays.map((day) => {
     const rule = settings.days[day];
-    return `<article class="scheduler-day ${rule.type === 'off' ? 'scheduler-day-off' : ''}" data-day="${day}"><header><strong>${day}</strong><span>${rule.type === 'off' ? 'Off day' : 'Work day'}</span></header><label>Day type<select class="text-input scheduler-type"><option value="normal" ${rule.type === 'normal' ? 'selected' : ''}>Normal</option><option value="light" ${rule.type === 'light' ? 'selected' : ''}>Light</option><option value="off" ${rule.type === 'off' ? 'selected' : ''}>Off</option></select></label><label>Earliest start<input class="text-input scheduler-start" type="time" value="${rule.start}"></label><label>Latest project start<input class="text-input scheduler-end" type="time" value="${rule.end}"></label><label>Blocks<input class="text-input scheduler-blocks" type="number" min="0" max="12" value="${rule.blocks}"></label><label class="scheduler-break-toggle"><input class="scheduler-break-enabled" type="checkbox" role="switch" ${rule.breakEnabled ? 'checked' : ''}><span>Add a break</span></label><div class="scheduler-break-times ${rule.breakEnabled ? '' : 'disabled-field'}"><label>Break starts<input class="text-input scheduler-break-start" type="time" value="${rule.breakStart}" ${rule.breakEnabled ? '' : 'disabled'}></label><label>Break ends<input class="text-input scheduler-break-end" type="time" value="${rule.breakEnd}" ${rule.breakEnabled ? '' : 'disabled'}></label></div></article>`;
+    return `<article class="scheduler-day ${!rule.enabled ? 'scheduler-day-off' : ''}" data-day="${day}"><header><strong>${day}</strong><span>${!rule.enabled ? 'Off day' : 'Work day'}</span></header><label class="scheduler-break-toggle"><input class="scheduler-enabled" type="checkbox" role="switch" ${rule.enabled ? 'checked' : ''}><span>Work day</span></label><label>Earliest start<input class="text-input scheduler-start" type="time" value="${rule.start}"></label><label>Latest project finish<input class="text-input scheduler-end" type="time" value="${rule.end}"></label><label>Blocks<input class="text-input scheduler-blocks" type="number" min="0" max="12" value="${rule.blocks}"></label><label>Cushion<select class="text-input scheduler-cushion"><option value="tight" ${rule.cushion === 'tight' ? 'selected' : ''}>Tight (15–30 min)</option><option value="medium" ${rule.cushion === 'medium' ? 'selected' : ''}>Medium (45–90 min)</option><option value="loose" ${rule.cushion === 'loose' ? 'selected' : ''}>Loose (90–120 min)</option></select></label><label class="scheduler-break-toggle"><input class="scheduler-break-enabled" type="checkbox" role="switch" ${rule.breakEnabled ? 'checked' : ''}><span>Add a break</span></label><div class="scheduler-break-times ${rule.breakEnabled ? '' : 'disabled-field'}"><label>Break starts<input class="text-input scheduler-break-start" type="time" value="${rule.breakStart}" ${rule.breakEnabled ? '' : 'disabled'}></label><label>Break ends<input class="text-input scheduler-break-end" type="time" value="${rule.breakEnd}" ${rule.breakEnabled ? '' : 'disabled'}></label></div></article>`;
   }).join('');
   const blackoutRows = settings.blackouts.map((item, index) => `<article class="blackout-row"><label>When<select class="text-input blackout-recurring" data-index="${index}"><option value="date" ${item.recurring ? '' : 'selected'}>This date</option><option value="daily" ${item.recurring ? 'selected' : ''}>Every day</option></select></label><label>Date<input class="text-input blackout-date" data-index="${index}" type="date" value="${escapeHtml(item.date || '')}" ${item.recurring ? 'disabled' : ''}></label><label>Starts<input class="text-input blackout-start" data-index="${index}" type="time" value="${escapeHtml(item.start || '16:00')}"></label><label>Ends<input class="text-input blackout-end" data-index="${index}" type="time" value="${escapeHtml(item.end || '19:00')}"></label><label>Name<input class="text-input blackout-name" data-index="${index}" value="${escapeHtml(item.name || '')}" placeholder="Food, trip, meeting…"></label><button class="delete-blackout" data-index="${index}">${icon.trash} Delete</button></article>`).join('') || '<p class="empty-state">No blackout dates yet.</p>';
-  return `${section({ id: 'scheduler', title: 'Build My Week', eyebrow: 'You shape the time. The scheduler chooses the work.', content: `<p class="helper-text">Set each day before generating. Block lengths come from Projects, and the scheduler leaves at least one hour between blocks. Priority automatically means more often.</p><div class="scheduler-days">${dayRows}</div>` })}${section({ id: 'blackouts', title: 'Blackout Dates', eyebrow: 'Protected time', content: `<div class="blackout-list">${blackoutRows}</div><button id="add-blackout" class="add-button">${icon.plus} Add Blackout</button>` })}${section({ id: 'generate-week', title: 'Generate Schedule', eyebrow: 'Priority-weighted random picker', content: `<div class="generate-controls"><div class="scheduler-date-control"><label>Start date<input id="scheduler-week" class="text-input" type="date" value="${weekStart}"></label><button class="date-picker-button" type="button" data-date-picker="scheduler-week">Choose Start Date</button></div><div class="scheduler-date-control"><label>End date<input id="scheduler-week-end" class="text-input" type="date" value="${weekEnd}"></label><button class="date-picker-button" type="button" data-date-picker="scheduler-week-end">Choose End Date</button></div><button id="generate-schedule" class="primary">Make My Schedule</button></div><p id="scheduler-range-summary" class="helper-text">This schedule covers ${escapeHtml(formatDateLabel(weekStart, { month: 'long', day: 'numeric', year: 'numeric' }))} through ${escapeHtml(formatDateLabel(weekEnd, { month: 'long', day: 'numeric', year: 'numeric' }))}.</p><p id="scheduler-status" class="helper-text" role="status"></p>` })}`;
+  return `${section({ id: 'scheduler', title: 'Build My Week', eyebrow: 'You shape the time. The scheduler chooses the work.', content: `<p class="helper-text">Set each day before generating. Block lengths come from Projects, and cushion sets the breathing room between blocks. Every project ends by your latest finish, and reserved breaks stay protected. Priority automatically means more often.</p><div class="scheduler-days">${dayRows}</div>` })}${section({ id: 'blackouts', title: 'Blackout Dates', eyebrow: 'Protected time', content: `<div class="blackout-list">${blackoutRows}</div><button id="add-blackout" class="add-button">${icon.plus} Add Blackout</button>` })}${section({ id: 'generate-week', title: 'Generate Schedule', eyebrow: 'Priority-weighted random picker', content: `<div class="generate-controls"><div class="scheduler-date-control"><label>Start date<input id="scheduler-week" class="text-input" type="date" value="${weekStart}"></label><button class="date-picker-button" type="button" data-date-picker="scheduler-week">Choose Start Date</button></div><div class="scheduler-date-control"><label>End date<input id="scheduler-week-end" class="text-input" type="date" value="${weekEnd}"></label><button class="date-picker-button" type="button" data-date-picker="scheduler-week-end">Choose End Date</button></div><button id="generate-schedule" class="primary">Make My Schedule</button></div><p id="scheduler-range-summary" class="helper-text">This schedule covers ${escapeHtml(formatDateLabel(weekStart, { month: 'long', day: 'numeric', year: 'numeric' }))} through ${escapeHtml(formatDateLabel(weekEnd, { month: 'long', day: 'numeric', year: 'numeric' }))}.</p><p id="scheduler-status" class="helper-text" role="status"></p>` })}`;
 }
 
 function notesAndReview() {
@@ -1502,10 +1503,9 @@ function viewedBlockHasUnsavedChanges() {
 }
 
 function readSchedulerDayRule(row) {
-  const type = row.querySelector('.scheduler-type').value;
   return {
-    enabled: type !== 'off',
-    type,
+    enabled: row.querySelector('.scheduler-enabled').checked,
+    cushion: row.querySelector('.scheduler-cushion').value,
     start: row.querySelector('.scheduler-start').value,
     end: row.querySelector('.scheduler-end').value,
     blocks: Number(row.querySelector('.scheduler-blocks').value),
@@ -1777,7 +1777,7 @@ function bindEvents() {
       state.schedulerSettings.days[day] = readSchedulerDayRule(row);
       saveState();
     };
-    document.querySelectorAll('.scheduler-day').forEach((row) => row.querySelectorAll('input, select').forEach((input) => input.addEventListener('change', (event) => { saveDay(row); if (event.target.classList.contains('scheduler-break-enabled')) render(); })));
+    document.querySelectorAll('.scheduler-day').forEach((row) => row.querySelectorAll('input, select').forEach((input) => input.addEventListener('change', (event) => { saveDay(row); if (event.target.classList.contains('scheduler-break-enabled') || event.target.classList.contains('scheduler-enabled')) render(); })));
     document.querySelector('#add-blackout')?.addEventListener('click', () => { state.schedulerSettings.blackouts.push({ date: toDateKey(new Date()), start: '16:00', end: '19:00', name: '', recurring: false, days: [] }); saveState(); render(); });
     document.querySelectorAll('.blackout-row input, .blackout-row select').forEach((input) => input.addEventListener('change', (event) => { const item = state.schedulerSettings.blackouts[Number(event.target.dataset.index)]; const key = event.target.className.match(/blackout-(date|start|end|name|recurring)/)?.[1]; if (key === 'recurring') { item.recurring = event.target.value === 'daily'; item.days = item.recurring ? [...weekDays] : []; render(); } else if (key) item[key] = event.target.value; saveState(); }));
     document.querySelectorAll('.delete-blackout').forEach((button) => button.addEventListener('click', (event) => { state.schedulerSettings.blackouts.splice(Number(event.currentTarget.dataset.index), 1); saveState(); render(); }));
@@ -1855,6 +1855,10 @@ function bindEvents() {
         return;
       }
       scheduleGenerationMessage = `Your schedule is ready: ${total} blocks created for ${formatDateLabel(weekStart, { month: 'long', day: 'numeric' })} through ${formatDateLabel(weekEnd, { month: 'long', day: 'numeric', year: 'numeric' })}.`;
+      if (result.unfilled.length) {
+        const missing = result.unfilled.reduce((sum, item) => sum + item.missingBlocks, 0);
+        scheduleGenerationMessage += ` ${missing} requested block${missing === 1 ? '' : 's'} could not fit on ${result.unfilled.map((item) => item.date).join(', ')} within your hours, cushion, and protected breaks. Try fewer blocks, shorter project durations, a tighter cushion, or a later finish.`;
+      }
       calendarDate = weekStart;
       calendarView = 'week';
       window.location.hash = 'calendar';
