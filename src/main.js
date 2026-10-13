@@ -1,6 +1,6 @@
 import { sounds } from './audio.js';
 import { remainingFromTimerState } from './timerPersistence.js';
-import { generateSchedule } from './schedulerEngine.js';
+import { generateSchedule, planningRange, repeatWeek } from './schedulerEngine.js';
 const doablLogoBlack = new URL('./assets/images/doAbl_logo_black.webp', import.meta.url).href;
 const STORAGE_KEY = 'project-timer-state-v1';
 const DEFAULT_BLOCK_MINUTES = 30;
@@ -46,6 +46,10 @@ let calendarPresentation = 'standard';
 let todayPresentation = 'standard';
 let selectedCalendarDate = calendarDate;
 let selectedTodayIndex = null;
+let schedulerMode = 'week';
+let schedulerMonthSpan = 'month';
+let schedulerRepeatSource = '';
+let schedulerRepeatWeeks = 4;
 let schedulerRangeStart = getWeekStart(toDateKey(new Date()));
 let schedulerRangeEnd = addDays(schedulerRangeStart, 6);
 let scheduleGenerationMessage = '';
@@ -840,7 +844,7 @@ function calendarSection() {
   const perspectiveView = calendarView === 'week' ? perspectiveWeekView(calendarDate) : calendarView === 'month' ? perspectiveMonthView(calendarDate) : perspectiveDayView(calendarDate);
   const selectedView = calendarPresentation === 'three-d' ? perspectiveView : standardView;
   const generationNotice = scheduleGenerationMessage ? `<p class="schedule-generation-notice" role="status">${escapeHtml(scheduleGenerationMessage)}</p>` : '';
-  return section({ id: 'calendar', title: 'Calendar', eyebrow: 'Planning', content: `${generationNotice}<div class="calendar-controls"><label>Planning Date <input id="calendar-date" class="text-input" type="date" value="${calendarDate}" /></label><div class="actions"><button class="danger-button clear-schedule" data-clear-schedule="day" type="button">Clear Day</button><button class="danger-button clear-schedule" data-clear-schedule="week" type="button">Clear Week</button><button class="danger-button clear-schedule" data-clear-schedule="month" type="button">Clear Month</button></div></div><div class="calendar-mode-bar"><div class="calendar-tabs" role="group" aria-label="Calendar range"><button class="${calendarView === 'day' ? 'active-tab' : ''}" data-calendar-view="day">Today</button><button class="${calendarView === 'week' ? 'active-tab' : ''}" data-calendar-view="week">Week</button><button class="${calendarView === 'month' ? 'active-tab' : ''}" data-calendar-view="month">Month</button></div><div class="presentation-toggle" role="group" aria-label="Calendar presentation"><button type="button" data-calendar-presentation="standard" aria-pressed="${calendarPresentation === 'standard'}">Standard</button><button type="button" data-calendar-presentation="three-d" aria-pressed="${calendarPresentation === 'three-d'}">3D</button></div></div><div class="calendar-layout single-calendar-view">${selectedView}</div>` });
+  return section({ id: 'calendar', title: 'Calendar', eyebrow: 'Planning', content: `${generationNotice}<div class="calendar-controls"><label>Planning Date <input id="calendar-date" class="text-input" type="date" value="${calendarDate}" /></label><div class="actions"><button class="danger-button clear-schedule" data-clear-schedule="day" type="button">Clear Day</button><button class="danger-button clear-schedule" data-clear-schedule="week" type="button">Clear Week</button><button class="danger-button clear-schedule" data-clear-schedule="month" type="button">Clear Month</button></div></div><div class="calendar-mode-bar"><div class="calendar-tabs" role="group" aria-label="Calendar range"><button class="${calendarView === 'day' ? 'active-tab' : ''}" data-calendar-view="day">Today</button><button class="${calendarView === 'week' ? 'active-tab' : ''}" data-calendar-view="week">Week</button><button class="${calendarView === 'month' ? 'active-tab' : ''}" data-calendar-view="month">Month</button></div><div class="presentation-toggle" role="group" aria-label="Calendar presentation"><button type="button" data-calendar-presentation="standard" aria-pressed="${calendarPresentation === 'standard'}">Standard</button><button type="button" data-calendar-presentation="three-d" aria-pressed="${calendarPresentation === 'three-d'}">3D</button></div></div>${calendarView === 'week' ? '<button id="repeat-calendar-week" type="button" class="primary">Repeat this week</button>' : ''}<div class="calendar-layout single-calendar-view">${selectedView}</div>` });
 }
 
 function calendarClearDates(scope, dateKey) {
@@ -857,6 +861,24 @@ function calendarClearDates(scope, dateKey) {
   return dates;
 }
 
+function schedulerDatePreview(start, end) {
+  const first = parseDateKey(start);
+  const last = parseDateKey(end);
+  const panels = [];
+  for (let month = new Date(first.getFullYear(), first.getMonth(), 1); month <= last; month.setMonth(month.getMonth() + 1)) {
+    const monthEnd = new Date(month.getFullYear(), month.getMonth() + 1, 0);
+    const days = [];
+    for (let blank = 0; blank < (month.getDay() + 6) % 7; blank += 1) days.push('<span aria-hidden="true"></span>');
+    for (let day = 1; day <= monthEnd.getDate(); day += 1) {
+      const date = toDateKey(new Date(month.getFullYear(), month.getMonth(), day));
+      const selected = date >= start && date <= end;
+      days.push(`<span class="planning-date ${selected ? 'planning-date-selected' : ''}" aria-label="${escapeHtml(formatDateLabel(date))}${selected ? ', included in schedule' : ', outside schedule'}">${day}</span>`);
+    }
+    panels.push(`<section class="planning-month"><h3>${escapeHtml(formatDateLabel(toDateKey(month), {month: 'long', year: 'numeric'}))}</h3><div class="planning-date-grid">${['M','T','W','T','F','S','S'].map(day => `<span aria-hidden="true">${day}</span>`).join('')}${days.join('')}</div></section>`);
+  }
+  return `<div class="planning-date-preview" aria-label="Highlighted dates are included in your schedule">${panels.join('')}</div>`;
+}
+
 function schedulerPage() {
   const settings = state.schedulerSettings;
   const weekStart = schedulerRangeStart || getWeekStart(toDateKey(new Date()));
@@ -866,7 +888,7 @@ function schedulerPage() {
     return `<article class="scheduler-day ${!rule.enabled ? 'scheduler-day-off' : ''}" data-day="${day}"><header><strong>${day}</strong><span>${!rule.enabled ? 'Off day' : 'Work day'}</span></header><label class="scheduler-break-toggle"><input class="scheduler-enabled" type="checkbox" role="switch" ${rule.enabled ? 'checked' : ''}><span>Work day</span></label><label>Earliest start<input class="text-input scheduler-start" type="time" value="${rule.start}"></label><label>Latest project finish<input class="text-input scheduler-end" type="time" value="${rule.end}"></label><label>Blocks<input class="text-input scheduler-blocks" type="number" min="0" max="12" value="${rule.blocks}"></label><label>Cushion<select class="text-input scheduler-cushion"><option value="tight" ${rule.cushion === 'tight' ? 'selected' : ''}>Tight (15–30 min)</option><option value="medium" ${rule.cushion === 'medium' ? 'selected' : ''}>Medium (45–90 min)</option><option value="loose" ${rule.cushion === 'loose' ? 'selected' : ''}>Loose (90–120 min)</option></select></label><label class="scheduler-break-toggle"><input class="scheduler-break-enabled" type="checkbox" role="switch" ${rule.breakEnabled ? 'checked' : ''}><span>Add a break</span></label><div class="scheduler-break-times ${rule.breakEnabled ? '' : 'disabled-field'}"><label>Break starts<input class="text-input scheduler-break-start" type="time" value="${rule.breakStart}" ${rule.breakEnabled ? '' : 'disabled'}></label><label>Break ends<input class="text-input scheduler-break-end" type="time" value="${rule.breakEnd}" ${rule.breakEnabled ? '' : 'disabled'}></label></div></article>`;
   }).join('');
   const blackoutRows = settings.blackouts.map((item, index) => `<article class="blackout-row"><label>When<select class="text-input blackout-recurring" data-index="${index}"><option value="date" ${item.recurring ? '' : 'selected'}>This date</option><option value="daily" ${item.recurring ? 'selected' : ''}>Every day</option></select></label><label>Date<input class="text-input blackout-date" data-index="${index}" type="date" value="${escapeHtml(item.date || '')}" ${item.recurring ? 'disabled' : ''}></label><label>Starts<input class="text-input blackout-start" data-index="${index}" type="time" value="${escapeHtml(item.start || '16:00')}"></label><label>Ends<input class="text-input blackout-end" data-index="${index}" type="time" value="${escapeHtml(item.end || '19:00')}"></label><label>Name<input class="text-input blackout-name" data-index="${index}" value="${escapeHtml(item.name || '')}" placeholder="Food, trip, meeting…"></label><button class="delete-blackout" data-index="${index}">${icon.trash} Delete</button></article>`).join('') || '<p class="empty-state">No blackout dates yet.</p>';
-  return `${section({ id: 'scheduler', title: 'Build My Week', eyebrow: 'You shape the time. The scheduler chooses the work.', content: `<p class="helper-text">Set each day before generating. Block lengths come from Projects, and cushion sets the breathing room between blocks. Every project ends by your latest finish, and reserved breaks stay protected. Priority automatically means more often.</p><div class="scheduler-days">${dayRows}</div>` })}${section({ id: 'blackouts', title: 'Blackout Dates', eyebrow: 'Protected time', content: `<div class="blackout-list">${blackoutRows}</div><button id="add-blackout" class="add-button">${icon.plus} Add Blackout</button>` })}${section({ id: 'generate-week', title: 'Generate Schedule', eyebrow: 'Priority-weighted random picker', content: `<div class="generate-controls"><div class="scheduler-date-control"><label>Start date<input id="scheduler-week" class="text-input" type="date" value="${weekStart}"></label><button class="date-picker-button" type="button" data-date-picker="scheduler-week">Choose Start Date</button></div><div class="scheduler-date-control"><label>End date<input id="scheduler-week-end" class="text-input" type="date" value="${weekEnd}"></label><button class="date-picker-button" type="button" data-date-picker="scheduler-week-end">Choose End Date</button></div><button id="generate-schedule" class="primary">Make My Schedule</button></div><p id="scheduler-range-summary" class="helper-text">This schedule covers ${escapeHtml(formatDateLabel(weekStart, { month: 'long', day: 'numeric', year: 'numeric' }))} through ${escapeHtml(formatDateLabel(weekEnd, { month: 'long', day: 'numeric', year: 'numeric' }))}.</p><p id="scheduler-status" class="helper-text" role="status"></p>` })}`;
+  return `${section({ id: 'scheduler', title: schedulerMode === 'month' ? 'Build My Month' : schedulerMode === 'repeat' ? 'Repeat Week' : 'Build My Week', eyebrow: 'You shape the time. The scheduler chooses the work.', content: `<div class="calendar-tabs" role="group" aria-label="Schedule planning mode"><button type="button" data-scheduler-mode="week" aria-pressed="${schedulerMode === 'week'}">Build My Week</button><button type="button" data-scheduler-mode="month" aria-pressed="${schedulerMode === 'month'}">Build My Month</button><button type="button" data-scheduler-mode="repeat" aria-pressed="${schedulerMode === 'repeat'}">Repeat Week</button></div>${schedulerMode === 'month' ? `<div class="calendar-tabs" role="group" aria-label="Month schedule span"><button type="button" data-month-span="month" aria-pressed="${schedulerMonthSpan === 'month'}">Through Month End</button><button type="button" data-month-span="30-days" aria-pressed="${schedulerMonthSpan === '30-days'}">30-Day Schedule</button></div><p class="helper-text">Start today or choose another date. Through Month End covers the rest of that month; 30-Day Schedule includes the start date and the following 29 days.</p>` : ''}${schedulerMode === 'repeat' ? `<div class="generate-controls"><label>Source week (choose any day)<input id="repeat-source" class="text-input" type="date" value="${schedulerRepeatSource || getWeekStart(toDateKey(new Date()))}"></label><label>Number of future weeks<input id="repeat-weeks" class="text-input" type="number" min="1" max="52" value="${schedulerRepeatWeeks}"></label></div><p class="helper-text">Copy this Monday–Sunday week’s projects and times into future weeks. Completed blocks become unfinished. Change the end date below to repeat through a specific date. Blocks that conflict with protected time or your daily settings are skipped and reported.</p>` : ''}<p class="helper-text">Set each day before generating. Block lengths come from Projects, and cushion sets the breathing room between blocks. Every project ends by your latest finish, and reserved breaks stay protected. Priority automatically means more often.</p><div class="scheduler-days">${dayRows}</div>` })}${section({ id: 'blackouts', title: 'Blackout Dates', eyebrow: 'Protected time', content: `<div class="blackout-list">${blackoutRows}</div><button id="add-blackout" class="add-button">${icon.plus} Add Blackout</button>` })}${section({ id: 'generate-week', title: 'Generate Schedule', eyebrow: 'Priority-weighted random picker', content: `<div class="generate-controls"><div class="scheduler-date-control"><label>Start date<input id="scheduler-week" class="text-input" type="date" value="${weekStart}" ${schedulerMode === 'repeat' ? 'disabled' : ''}></label><button class="date-picker-button" type="button" data-date-picker="scheduler-week" ${schedulerMode === 'repeat' ? 'disabled' : ''}>Choose Start Date</button></div><div class="scheduler-date-control"><label>End date<input id="scheduler-week-end" class="text-input" type="date" value="${weekEnd}"></label><button class="date-picker-button" type="button" data-date-picker="scheduler-week-end">Choose End Date</button></div><button id="generate-schedule" class="primary">${schedulerMode === 'repeat' ? 'Repeat Week' : schedulerMode === 'month' ? 'Build My Month' : 'Build My Week'}</button></div><p id="scheduler-range-summary" class="helper-text">This schedule covers ${escapeHtml(formatDateLabel(weekStart, { month: 'long', day: 'numeric', year: 'numeric' }))} through ${escapeHtml(formatDateLabel(weekEnd, { month: 'long', day: 'numeric', year: 'numeric' }))}.</p><div id="scheduler-date-preview">${schedulerDatePreview(weekStart, weekEnd)}</div><p id="scheduler-status" class="helper-text" role="status"></p>` })}`;
 }
 
 function notesAndReview() {
@@ -1463,8 +1485,10 @@ function handleRouteChange() {
   timerBlockConflictOpen = false;
   const route = getRoute();
   if (route === 'scheduler') {
-    schedulerRangeStart = getWeekStart(toDateKey(new Date()));
-    schedulerRangeEnd = addDays(schedulerRangeStart, 6);
+    if (schedulerMode !== 'repeat') {
+      schedulerRangeStart = schedulerMode === 'month' ? toDateKey(new Date()) : getWeekStart(toDateKey(new Date()));
+      schedulerRangeEnd = planningRange(schedulerMode === 'month' ? schedulerMonthSpan : 'week', schedulerRangeStart).end;
+    }
   }
   if (route === 'timer') syncTimerToClock();
   render();
@@ -1772,6 +1796,40 @@ function bindEvents() {
     render();
   }));
   if (document.querySelector('#scheduler')) {
+    const setRepeatRange = () => {
+      schedulerRepeatSource = getWeekStart(schedulerRepeatSource || toDateKey(new Date()));
+      schedulerRangeStart = addDays(schedulerRepeatSource, 7);
+      schedulerRangeEnd = addDays(schedulerRangeStart, schedulerRepeatWeeks * 7 - 1);
+    };
+    document.querySelectorAll('[data-scheduler-mode]').forEach(button => button.addEventListener('click', () => {
+      synchronizeSchedulerDayRules();
+      schedulerMode = button.dataset.schedulerMode;
+      if (schedulerMode === 'repeat') setRepeatRange();
+      else {
+        schedulerRangeStart = schedulerMode === 'month' ? toDateKey(new Date()) : getWeekStart(toDateKey(new Date()));
+        schedulerRangeEnd = planningRange(schedulerMode === 'month' ? schedulerMonthSpan : 'week', schedulerRangeStart).end;
+      }
+      render();
+    }));
+    document.querySelectorAll('[data-month-span]').forEach(button => button.addEventListener('click', () => {
+      synchronizeSchedulerDayRules();
+      schedulerMonthSpan = button.dataset.monthSpan;
+      schedulerRangeEnd = planningRange(schedulerMonthSpan, schedulerRangeStart).end;
+      render();
+    }));
+    document.querySelector('#repeat-source')?.addEventListener('change', event => {
+      if (!event.target.value) return;
+      synchronizeSchedulerDayRules();
+      schedulerRepeatSource = event.target.value;
+      setRepeatRange();
+      render();
+    });
+    document.querySelector('#repeat-weeks')?.addEventListener('change', event => {
+      synchronizeSchedulerDayRules();
+      schedulerRepeatWeeks = Math.min(52, Math.max(1, Math.floor(Number(event.target.value) || 1)));
+      setRepeatRange();
+      render();
+    });
     const saveDay = (row) => {
       const day = row.dataset.day;
       state.schedulerSettings.days[day] = readSchedulerDayRule(row);
@@ -1791,11 +1849,14 @@ function bindEvents() {
       const start = document.querySelector('#scheduler-week')?.value;
       const end = document.querySelector('#scheduler-week-end')?.value;
       const summary = document.querySelector('#scheduler-range-summary');
+      const preview = document.querySelector('#scheduler-date-preview');
+      if (preview && start && end && end >= start) preview.innerHTML = schedulerDatePreview(start, end);
+      else if (preview) preview.innerHTML = '';
       if (summary && start && end) summary.textContent = `This schedule covers ${formatDateLabel(start, { month: 'long', day: 'numeric', year: 'numeric' })} through ${formatDateLabel(end, { month: 'long', day: 'numeric', year: 'numeric' })}.`;
     };
     document.querySelector('#scheduler-week')?.addEventListener('change', (event) => {
       schedulerRangeStart = event.target.value || getWeekStart(toDateKey(new Date()));
-      schedulerRangeEnd = addDays(schedulerRangeStart, 6);
+      schedulerRangeEnd = planningRange(schedulerMode === 'month' ? schedulerMonthSpan : 'week', schedulerRangeStart).end;
       const endInput = document.querySelector('#scheduler-week-end');
       if (endInput) endInput.value = schedulerRangeEnd;
       updateSchedulerRangeSummary();
@@ -1819,7 +1880,7 @@ function bindEvents() {
       }
       schedulerRangeStart = weekStart;
       schedulerRangeEnd = weekEnd;
-      if (!state.projects.length) { document.querySelector('#scheduler-status').textContent = 'Add at least one project first.'; return; }
+      if (schedulerMode !== 'repeat' && !state.projects.length) { document.querySelector('#scheduler-status').textContent = 'Add at least one project first.'; return; }
       const rangeDates = [];
       for (let date = weekStart; date <= weekEnd; date = addDays(date, 1)) rangeDates.push(date);
       const existingDates = rangeDates.map((date) => ({ date, blocks: getScheduleForDate(date) })).filter((item) => item.blocks.length);
@@ -1836,7 +1897,9 @@ function bindEvents() {
       const seed = `${Date.now()}-${Math.random()}`;
       let result;
       try {
-        result = generateSchedule({ weekStart, rangeEnd: weekEnd, dayRules: state.schedulerSettings.days, blackouts: state.schedulerSettings.blackouts, projects: state.projects.map((name) => ({ name, priority: projectSettings(name).priority, duration: projectSettings(name).defaultDuration || DEFAULT_BLOCK_MINUTES })), seed });
+        result = schedulerMode === 'repeat'
+          ? repeatWeek({ sourceStart: schedulerRepeatSource, rangeEnd: weekEnd, schedules: Object.fromEntries(Array.from({ length: 7 }, (_, offset) => { const date = addDays(schedulerRepeatSource, offset); return [date, getScheduleForDate(date)]; })), dayRules: state.schedulerSettings.days, blackouts: state.schedulerSettings.blackouts })
+          : generateSchedule({ weekStart, rangeEnd: weekEnd, dayRules: state.schedulerSettings.days, blackouts: state.schedulerSettings.blackouts, projects: state.projects.map((name) => ({ name, priority: projectSettings(name).priority, duration: projectSettings(name).defaultDuration || DEFAULT_BLOCK_MINUTES })), seed });
       } catch (error) {
         const status = document.querySelector('#scheduler-status');
         if (status) status.textContent = error instanceof Error ? error.message : 'The schedule could not be generated safely. Please review your hours and try again.';
@@ -1860,12 +1923,19 @@ function bindEvents() {
         scheduleGenerationMessage += ` ${missing} requested block${missing === 1 ? '' : 's'} could not fit on ${result.unfilled.map((item) => item.date).join(', ')} within your hours, cushion, and protected breaks. Try fewer blocks, shorter project durations, a tighter cushion, or a later finish.`;
       }
       calendarDate = weekStart;
-      calendarView = 'week';
+      calendarView = schedulerMode === 'month' ? 'month' : 'week';
       window.location.hash = 'calendar';
     });
     return;
   }
   if (document.querySelector('#calendar')) {
+    document.querySelector('#repeat-calendar-week')?.addEventListener('click', () => {
+      schedulerMode = 'repeat';
+      schedulerRepeatSource = getWeekStart(calendarDate);
+      schedulerRangeStart = addDays(schedulerRepeatSource, 7);
+      schedulerRangeEnd = addDays(schedulerRangeStart, schedulerRepeatWeeks * 7 - 1);
+      window.location.hash = 'scheduler';
+    });
     document.querySelectorAll('[data-calendar-presentation]').forEach((button) => button.addEventListener('click', (event) => {
       calendarPresentation = event.currentTarget.dataset.calendarPresentation;
       localStorage.setItem('doabl-calendar-presentation', calendarPresentation);
