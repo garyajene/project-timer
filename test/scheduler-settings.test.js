@@ -7,7 +7,7 @@ const mainSource = readFileSync(new URL('../src/main.js', import.meta.url), 'utf
 const styles = readFileSync(new URL('../src/styles.css', import.meta.url), 'utf8');
 
 test('Scheduler replaces daily duration and gap inputs with a custom break toggle and times', () => {
-  const schedulerPage = mainSource.slice(mainSource.indexOf('function schedulerPage()'), mainSource.indexOf('function notesAndReview'));
+  const schedulerPage = mainSource.slice(mainSource.indexOf('function schedulerDayCard('), mainSource.indexOf('function notesAndReview'));
   assert.doesNotMatch(schedulerPage, /scheduler-duration|scheduler-gap/);
   assert.match(schedulerPage, /scheduler-break-enabled/);
   assert.match(schedulerPage, /scheduler-break-start/);
@@ -28,7 +28,7 @@ test('Scheduler rereads visible work-day and cushion settings immediately before
 });
 
  test('Scheduler exposes work-day, cushion and a finish cutoff without day types', () => {
-  const page = mainSource.slice(mainSource.indexOf('function schedulerPage()'), mainSource.indexOf('function notesAndReview'));
+  const page = mainSource.slice(mainSource.indexOf('function schedulerDayCard('), mainSource.indexOf('function notesAndReview'));
   assert.doesNotMatch(page, /Day type|scheduler-type|Latest project start/);
   assert.match(page, /scheduler-enabled/);
   assert.match(page, /scheduler-cushion/);
