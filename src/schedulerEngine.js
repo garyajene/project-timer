@@ -37,7 +37,7 @@ function findAvailableStart(target, duration, minimumStart, latestStart, unavail
   return null;
 }
 
-function assertMinimumSpacing(schedules, dayRules) {
+function assertMinimumSpacing(schedules, dayRules, dateRules = {}) {
   Object.entries(schedules).forEach(([date, blocks]) => {
     const ordered = [...blocks].sort((a, b) => a.time.localeCompare(b.time));
     for (let index = 1; index < ordered.length; index += 1) {
@@ -45,24 +45,24 @@ function assertMinimumSpacing(schedules, dayRules) {
       const current = ordered[index];
       const previousEnd = minutes(previous.time) + Number(previous.duration);
       const gap = minutes(current.time) - previousEnd;
-      if (gap < cushionRange(dayRules[DAY_NAMES[new Date(`${date}T12:00:00`).getDay()]])[0]) {
+      if (gap < cushionRange(dateRules[date] || dayRules[DAY_NAMES[new Date(`${date}T12:00:00`).getDay()]])[0]) {
         throw new Error(`Generated schedule failed spacing validation on ${date}. Work blocks must respect the selected cushion.`);
       }
     }
   });
 }
 
-function assertNoOffDayBlocks(schedules, dayRules) {
+function assertNoOffDayBlocks(schedules, dayRules, dateRules = {}) {
   Object.keys(schedules).forEach((dateValue) => {
     const date = new Date(`${dateValue}T12:00:00`);
     const dayName = DAY_NAMES[date.getDay()];
-    if (isOffDay(dayRules[dayName])) {
+    if (isOffDay(dateRules[dateValue] || dayRules[dayName])) {
       throw new Error(`Generated schedule failed work-day validation on ${dateValue}. Off days cannot contain work blocks.`);
     }
   });
 }
 
-export function generateSchedule({ weekStart, rangeEnd = null, dayRules, blackouts = [], projects, seed = Date.now() }) {
+export function generateSchedule({ weekStart, rangeEnd = null, dayRules, dateRules = {}, blackouts = [], projects, seed = Date.now() }) {
   const random = seededRandom(seed);
   const schedules = {};
   const eligible = projects.filter((project) => project.name && project.duration > 0);
@@ -74,7 +74,7 @@ export function generateSchedule({ weekStart, rangeEnd = null, dayRules, blackou
 
   for (let date = new Date(startDate); date <= endDate; date.setDate(date.getDate() + 1)) {
     const dateValue = dateKey(date);
-    const rule = dayRules[DAY_NAMES[date.getDay()]];
+    const rule = dateRules[dateValue] || dayRules[DAY_NAMES[date.getDay()]];
     if (isOffDay(rule)) continue;
 
     const requestedBlocks = Math.max(0, Number(rule.blocks) || 0);
@@ -149,8 +149,8 @@ export function generateSchedule({ weekStart, rangeEnd = null, dayRules, blackou
   }
 
   Object.values(schedules).forEach((blocks) => blocks.sort((a, b) => a.time.localeCompare(b.time)));
-  assertMinimumSpacing(schedules, dayRules);
-  assertNoOffDayBlocks(schedules, dayRules);
+  assertMinimumSpacing(schedules, dayRules, dateRules);
+  assertNoOffDayBlocks(schedules, dayRules, dateRules);
   return { schedules, counts, unfilled, seed: String(seed) };
 }
 
@@ -169,7 +169,7 @@ export function planningRange(mode, start) {
   return { start, end: addDateDays(start, mode === '30-days' ? 29 : 6) };
 }
 
-export function repeatWeek({ sourceStart, rangeEnd, schedules, dayRules, blackouts = [] }) {
+export function repeatWeek({ sourceStart, rangeEnd, schedules, dayRules, dateRules = {}, draftSchedules = {}, blackouts = [] }) {
   const targetStart = addDateDays(sourceStart, 7);
   if (!rangeEnd || rangeEnd < targetStart) throw new Error('Choose a repeat end date after the source week.');
   const result = { schedules: {}, unfilled: [], seed: null };
@@ -177,9 +177,9 @@ export function repeatWeek({ sourceStart, rangeEnd, schedules, dayRules, blackou
   for (let offset = 0; offset < 7; offset += 1) sourceCount += (schedules[addDateDays(sourceStart, offset)] || []).length;
   if (!sourceCount) throw new Error('The selected source week has no scheduled blocks to repeat.');
   for (let date = targetStart, offset = 0; date <= rangeEnd; date = addDateDays(date, 1), offset += 1) {
-    const source = schedules[addDateDays(sourceStart, offset % 7)] || [];
+    const source = draftSchedules[date] || schedules[addDateDays(sourceStart, offset % 7)] || [];
     const day = DAY_NAMES[new Date(`${date}T12:00:00`).getDay()];
-    const rule = dayRules[day];
+    const rule = dateRules[date] || dateRules[addDateDays(sourceStart, offset % 7)] || dayRules[day];
     const blocks = [];
     let missingBlocks = 0;
     const unavailable = blackouts.filter(item => item.date === date || (item.recurring && item.days?.includes(day)));

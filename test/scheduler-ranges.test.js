@@ -57,3 +57,27 @@ test('repeat rejects an empty source and a target ending before the next week', 
   assert.throws(() => repeatWeek({sourceStart: '2026-10-12', rangeEnd: '2026-10-25', schedules: {}, dayRules: rules}), /no scheduled blocks/);
   assert.throws(() => repeatWeek({sourceStart: '2026-10-12', rangeEnd: '2026-10-18', schedules: {'2026-10-12': [block]}, dayRules: rules}), /after the source week/);
 });
+
+test('date-specific rules change only the selected date, including Off days', () => {
+  const dayRules = structuredClone(rules);
+  Object.values(dayRules).forEach(rule => {rule.blocks = 1;});
+  const dateRules = {'2026-10-13': {...dayRules.Tuesday, start: '13:00', blocks: 2}, '2026-10-14': {...dayRules.Wednesday, enabled: false}};
+  const result = generateSchedule({weekStart: '2026-10-13', rangeEnd: '2026-10-20', dayRules, dateRules, projects: [{name: 'Work', priority: 1, duration: 60}], seed: 'overrides'});
+  assert.equal(result.schedules['2026-10-13'].length, 2);
+  assert.equal(result.schedules['2026-10-13'][0].time, '13:00');
+  assert.equal(result.schedules['2026-10-14'], undefined);
+  assert.equal(result.schedules['2026-10-20'].length, 1);
+  assert.equal(result.schedules['2026-10-20'][0].time, '09:00');
+});
+
+test('repeat accepts independent draft edits and source-date settings without mutating schedules', () => {
+  const schedules = {'2026-10-12': [block]};
+  const draftSchedules = {'2026-10-19': [{...block, time: '13:00', duration: 90}]};
+  const dateRules = {'2026-10-12': {...rules.Monday, start: '13:00'}};
+  const result = repeatWeek({sourceStart: '2026-10-12', rangeEnd: '2026-10-26', schedules, dayRules: rules, dateRules, draftSchedules});
+  assert.equal(result.schedules['2026-10-19'][0].time, '13:00');
+  assert.equal(result.schedules['2026-10-19'][0].duration, 90);
+  assert.equal(result.schedules['2026-10-26'], undefined);
+  assert.equal(result.unfilled[0].date, '2026-10-26');
+  assert.equal(schedules['2026-10-12'][0].time, '09:00');
+});
