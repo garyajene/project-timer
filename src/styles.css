@@ -1326,7 +1326,21 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .scheduler-planner-layout .planner-color-gray { --planner-color: #e8eaf2; --planner-border: #c7cddd; }
 .scheduler-app .scheduler-planner-layout .month-day,
 .scheduler-app .scheduler-planner-layout .calendar-cube { background: linear-gradient(145deg, rgba(255,255,255,.8), transparent 48%), var(--planner-color, #dcecff) !important; border-color: var(--planner-border, #98b9e0) !important; color: #111b3a; box-shadow: inset 0 1px 0 #fff, 0 8px 18px rgba(45,66,98,.09) !important; }
-.scheduler-app .scheduler-planner-layout .outside-month { opacity: .58; filter: none; }
+.scheduler-app .scheduler-planner-layout .month-day.outside-month,
+.scheduler-app .scheduler-planner-layout .calendar-cube.outside-month {
+  --planner-color: #ececec;
+  --planner-border: #d2d2d2;
+  background: linear-gradient(145deg, #f5f5f5, #e7e7e7) !important;
+  border-color: #d2d2d2 !important;
+  color: #777;
+  opacity: 1;
+  filter: none;
+  box-shadow: inset 0 1px 0 #fff, 0 4px 10px rgba(0,0,0,.04) !important;
+}
+.scheduler-app .scheduler-planner-layout .outside-month .month-task,
+.scheduler-app .scheduler-planner-layout .outside-month .cube-day,
+.scheduler-app .scheduler-planner-layout .outside-month .cube-count,
+.scheduler-app .scheduler-planner-layout .outside-month small { color: #777; opacity: 1; }
 .scheduler-app .scheduler-planner-layout .month-task { color: #53637f; }
 .scheduler-app .scheduler-planner-layout .planner-source { outline: 2px solid #83b5ea; outline-offset: -2px; }
 .scheduler-app .scheduler-planner-layout .planner-target { border-color: #abc9e8 !important; }
