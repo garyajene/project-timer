@@ -1,0 +1,25 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import vm from 'node:vm';
+import { readFileSync } from 'node:fs';
+const source = readFileSync(new URL('../src/main.js', import.meta.url), 'utf8');
+test('planner connector follows low selections and cleans up listeners on rerender', () => {
+  const attributes = {};
+  const element = name => ({setAttribute: (key,value) => {attributes[`${name}.${key}`] = value;}});
+  const svg = {...element('svg'), style: {}, querySelector: selector => element(selector)};
+  const target = {getBoundingClientRect: () => ({right: 600, top: 700, bottom: 800, height:100}), closest: () => null};
+  const panel = {getBoundingClientRect: () => ({left: 850, top:100, bottom:500})};
+  const stage = {getBoundingClientRect: () => ({left:0,top:0,width:1200,height:1000}),querySelector: selector => selector === '[data-planner-callout]' ? svg : selector === '[data-planner-callout-target]' ? target : panel};
+  let callback;
+  let removed = 0;
+  const context = vm.createContext({cleanupPlannerCallout:null,document:{querySelector:()=>stage,addEventListener:()=>{},removeEventListener:()=>{removed++;}},window:{addEventListener:()=>{},removeEventListener:()=>{removed++;}},requestAnimationFrame: fn => {callback=fn;return 1;}, cancelAnimationFrame:()=>{}});
+  vm.runInContext(source.slice(source.indexOf('function setupPlannerCallout()'),source.indexOf('function setupPerspectiveController()')),context);
+  context.setupPlannerCallout();
+  callback();
+  assert.equal(svg.style.visibility, 'visible');
+  assert.equal(attributes['circle.cx'],608);
+  assert.equal(attributes['circle.cy'],750);
+  assert.match(attributes['path.d'], /^M 850 466 H .* Q 608 466 608 750$/);
+  context.setupPlannerCallout();
+  assert.equal(removed,2);
+});

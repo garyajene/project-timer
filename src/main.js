@@ -55,6 +55,7 @@ let plannerMonth = '';
 let plannerPresentation = 'standard';
 let repeatDrafts = {};
 let repeatRules = {};
+let cleanupPlannerCallout = null;
 let schedulerRangeStart = getWeekStart(toDateKey(new Date()));
 let schedulerRangeEnd = addDays(schedulerRangeStart, 6);
 let scheduleGenerationMessage = '';
@@ -914,13 +915,14 @@ function schedulerMonthPlanner() {
     const included = date >= schedulerRangeStart && date <= schedulerRangeEnd;
     const blocks = plannerBlocks(date);
     const label = source ? 'Original week' : included && schedulerMode === 'repeat' ? 'Copy preview' : included ? 'Included' : 'Outside range';
-    const classes = `${plannerPresentation === 'three-d' ? 'calendar-cube' : 'month-day'} ${source ? 'planner-source' : included ? 'planner-target' : 'outside-month'} ${date === plannerDate ? 'planner-selected' : ''}`;
-    return `<button type="button" class="${classes}" data-planner-date="${date}" aria-pressed="${date === plannerDate}" aria-label="${escapeHtml(formatDateLabel(date))}, ${label}"><span class="cube-day">${weekDays[index % 7].slice(0,3)}</span><strong>${parseDateKey(date).getDate()}</strong><small>${label}</small>${plannerPresentation === 'three-d' ? `<span class="cube-count">${blocks.length} items</span>` : blocks.map(block => `<span class="month-task">${escapeHtml(block.project)} · ${escapeHtml(formatTime(block.time))}</span>`).join('') || '<small>No tasks</small>'}</button>`;
+    const projectColor = blocks.length ? projectSettings(blocks[0].project).color : 'blue';
+    const classes = `planner-color-${projectColor} ${plannerPresentation === 'three-d' ? 'calendar-cube' : 'month-day'} ${source ? 'planner-source' : included ? 'planner-target' : 'outside-month'} ${date === plannerDate ? 'planner-selected' : ''}`;
+    return `<button type="button" class="${classes}" data-planner-date="${date}" ${date === plannerDate ? 'data-planner-callout-target' : ''} aria-pressed="${date === plannerDate}" aria-label="${escapeHtml(formatDateLabel(date))}, ${label}"><span class="cube-day">${weekDays[index % 7].slice(0,3)}</span><strong>${parseDateKey(date).getDate()}</strong><small>${label}</small>${plannerPresentation === 'three-d' ? `<span class="cube-count">${blocks.length} items</span>` : blocks.map(block => `<span class="month-task">${escapeHtml(block.project)} · ${escapeHtml(formatTime(block.time))}</span>`).join('') || '<small>No tasks</small>'}</button>`;
   });
   const grid = plannerPresentation === 'three-d' ? `<div class="planner-3d">${Array.from({length:6}, (_, row) => `<div class="calendar-cube-row">${cells.slice(row*7,row*7+7).join('')}</div>`).join('')}</div>` : `<div class="month-view">${weekDays.map(day => `<div class="month-weekday">${day.slice(0,3)}</div>`).join('')}${cells.join('')}</div>`;
   const editable = plannerDate >= schedulerRangeStart && plannerDate <= schedulerRangeEnd;
   const blockEditor = schedulerMode === 'repeat' && editable ? `<div class="repeat-block-editor"><h4>Copied blocks — not saved yet</h4>${plannerBlocks(plannerDate).map((block,index) => `<div class="repeat-block" data-repeat-block="${index}"><label>Project<select class="text-input" data-repeat-field="project">${[...new Set([...state.projects,block.project])].map(project => `<option ${project === block.project ? 'selected' : ''}>${escapeHtml(project)}</option>`).join('')}</select></label><label>Start<input class="text-input" type="time" data-repeat-field="time" value="${escapeHtml(block.time)}"></label><label>Minutes<input class="text-input" type="number" min="1" data-repeat-field="duration" value="${block.duration}"></label></div>`).join('') || '<p>No copied blocks.</p>'}</div>` : '';
-  return `<div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(plannerMonth,{month:'long',year:'numeric'}))}</h3><div class="actions"><button type="button" data-planner-month="-1">Previous Month</button><button type="button" data-planner-month="1">Next Month</button></div></div><div class="presentation-toggle"><button type="button" data-planner-presentation="standard" aria-pressed="${plannerPresentation === 'standard'}">Standard</button><button type="button" data-planner-presentation="three-d" aria-pressed="${plannerPresentation === 'three-d'}">3D</button></div>${schedulerMode === 'repeat' ? '<p class="helper-text">Blue: original week. Green: copied weeks. Copies remain a preview until you confirm.</p>' : '<p class="helper-text">Highlighted dates are included. Select a date to change only that day.</p>'}<div class="scheduler-planner-layout"><div>${grid}</div><aside class="planner-settings"><h3>${escapeHtml(formatDateLabel(plannerDate))}</h3>${editable ? schedulerDayCard(weekDays[(parseDateKey(plannerDate).getDay()+6)%7],plannerRule(plannerDate),plannerDate) : '<p>Outside the target range. Original schedules remain unchanged.</p>'}${blockEditor}</aside></div>`;
+  return `<div class="calendar-view-heading"><h3>${escapeHtml(formatDateLabel(plannerMonth,{month:'long',year:'numeric'}))}</h3><div class="actions"><button type="button" data-planner-month="-1">Previous Month</button><button type="button" data-planner-month="1">Next Month</button></div></div><div class="presentation-toggle"><button type="button" data-planner-presentation="standard" aria-pressed="${plannerPresentation === 'standard'}">Standard</button><button type="button" data-planner-presentation="three-d" aria-pressed="${plannerPresentation === 'three-d'}">3D</button></div>${schedulerMode === 'repeat' ? '<p class="helper-text">Blue outline: original week. Pastel highlighted dates: copied weeks. Copies remain a preview until you confirm.</p>' : '<p class="helper-text">Highlighted dates are included. Select a date to change only that day.</p>'}<div class="scheduler-planner-layout"><div>${grid}</div><aside class="planner-settings"><p class="eyebrow">Selected date</p><h3>${escapeHtml(formatDateLabel(plannerDate))}</h3>${editable ? schedulerDayCard(weekDays[(parseDateKey(plannerDate).getDay()+6)%7],plannerRule(plannerDate),plannerDate) : '<p>Outside the target range. Original schedules remain unchanged.</p>'}${blockEditor}</aside><svg class="calendar-callout planner-callout" data-planner-callout aria-hidden="true"><path></path><circle r="7"></circle></svg></div>`;
 }
 
 function schedulerPage() {
@@ -995,6 +997,7 @@ function render() {
     if (!renderShell(mainContent())) return;
     bindEvents();
     setupPerspectiveController();
+    setupPlannerCallout();
   } catch (error) {
     console.error('DoAbl render failed.', error);
     try {
@@ -1004,6 +1007,48 @@ function render() {
       console.error('DoAbl shell render failed.', shellError);
     }
   }
+}
+
+function setupPlannerCallout() {
+  cleanupPlannerCallout?.();
+  cleanupPlannerCallout = null;
+  const stage = document.querySelector('.scheduler-planner-layout');
+  const svg = stage?.querySelector('[data-planner-callout]');
+  const target = stage?.querySelector('[data-planner-callout-target]');
+  const panel = stage?.querySelector('.planner-settings');
+  if (!svg || !target || !panel) return;
+  let frame = 0;
+  const update = () => {
+    frame = 0;
+    const bounds = stage.getBoundingClientRect();
+    const cell = target.getBoundingClientRect();
+    const card = panel.getBoundingClientRect();
+    const viewport = target.closest('.planner-3d');
+    const visible = !viewport || (cell.bottom > viewport.getBoundingClientRect().top && cell.top < viewport.getBoundingClientRect().bottom);
+    svg.style.visibility = visible && card.left >= cell.right ? 'visible' : 'hidden';
+    const x = cell.right - bounds.left + 8;
+    const y = cell.top + cell.height / 2 - bounds.top;
+    const endX = card.left - bounds.left;
+    const endY = Math.min(card.bottom - bounds.top - 34, Math.max(card.top - bounds.top + 34, y));
+    const bendX = endX - Math.max(24, Math.min(72, (endX - x) * .35));
+    svg.setAttribute('viewBox', `0 0 ${bounds.width} ${bounds.height}`);
+    svg.querySelector('path').setAttribute('d', `M ${endX} ${endY} H ${bendX} Q ${x} ${endY} ${x} ${y}`);
+    svg.querySelector('circle').setAttribute('cx', x);
+    svg.querySelector('circle').setAttribute('cy', y);
+  };
+  const requestUpdate = () => { if (!frame) frame = requestAnimationFrame(update); };
+  window.addEventListener('resize', requestUpdate);
+  document.addEventListener('scroll', requestUpdate, true);
+  const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(requestUpdate) : null;
+  observer?.observe(stage);
+  observer?.observe(panel);
+  cleanupPlannerCallout = () => {
+    window.removeEventListener('resize', requestUpdate);
+    document.removeEventListener('scroll', requestUpdate, true);
+    observer?.disconnect();
+    if (frame) cancelAnimationFrame(frame);
+  };
+  requestUpdate();
 }
 
 function setupPerspectiveController() {
