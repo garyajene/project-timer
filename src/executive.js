@@ -1,8 +1,9 @@
 export function createExecutivePanel({ approve, today }) {
-  const panel = document.createElement('details');
+  const panel = document.createElement('section');
+  panel.setAttribute('aria-labelledby', 'executive-heading');
   panel.className = 'panel executive-panel';
   panel.innerHTML = `
-    <summary>Executive</summary>
+    <h2 id="executive-heading">Executive</h2>
     <div class="executive-body">
       <div class="executive-history" role="log" aria-label="Conversation" tabindex="0"></div>
       <section class="executive-suggestions" aria-label="Suggested changes" hidden></section>
@@ -207,7 +208,7 @@ export function createExecutivePanel({ approve, today }) {
         process('transcribe', blob, blob.type, 'Transcribing recording…', ({ text }) => {
           input.value = [input.value.trimEnd(), text].filter(Boolean).join(' ').slice(0, 4000);
           status.textContent = 'Review your transcript, then send when ready.';
-          if (panel.open && panel.isConnected) input.focus();
+          if (panel.isConnected) input.focus();
         });
       });
       if (document.hidden) return stopCapture(true);
@@ -244,6 +245,5 @@ export function createExecutivePanel({ approve, today }) {
   }
   clearButton.addEventListener('click', clear);
   cancelButton.addEventListener('click', () => stopCapture(true));
-  panel.addEventListener('toggle', () => { if (!panel.open) stopCapture(true); });
   return { panel, suspend: () => stopCapture(true), clear };
 }

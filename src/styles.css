@@ -1359,9 +1359,9 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
   min-inline-size: 0;
 }
 
-.executive-panel > summary {
-  cursor: pointer;
-  font-size: 1.125rem;
+.executive-panel > h2 {
+  margin: 0;
+  font-size: clamp(1.35rem, 3vw, 1.75rem);
   font-weight: 700;
 }
 
@@ -1406,6 +1406,9 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 }
 
 .executive-form {
+  padding: clamp(.75rem, 2vw, 1.25rem);
+  border: 1px solid #b7cce3;
+  border-radius: 1rem;
   display: grid;
   gap: .75rem;
 }
