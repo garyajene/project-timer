@@ -137,7 +137,7 @@ test('Replicate uses bearer auth and creates a version-pinned Whisper prediction
   const run = replicateClient('mock-token', async (url, options) => {
     assert.equal(url, 'https://api.replicate.com/v1/predictions');
     assert.equal(options.headers.Authorization, 'Bearer mock-token');
-    assert.equal(options.headers['Cancel-After'], '3s');
+    assert.equal(options.headers['Cancel-After'], '5s');
     assert.deepEqual(JSON.parse(options.body), { version: WHISPER.split(':')[1], input: { audio: 'mock' } });
     return Response.json({ status: 'succeeded', id: 'p123', output: { text: 'Hello' } });
   });
@@ -155,4 +155,11 @@ test('Replicate bounds pending predictions and sends a cancellation without crea
     ['https://api.replicate.com/v1/models/openai/gpt-5.6-luna/predictions', 'POST'],
     ['https://api.replicate.com/v1/predictions/pending1/cancel', 'POST'],
   ]);
+});
+
+test('Replicate billing errors reach Executive without including private provider details', async () => {
+  const run = replicateClient('mock-token', async () => Response.json({ detail: 'private' }, { status: 402 }));
+  await assert.rejects(run(WHISPER, {}, 50000, () => {}), {
+    status: 502, message: 'Replicate requires billing credit before it can process requests.',
+  });
 });
