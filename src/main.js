@@ -1,3 +1,4 @@
+import { createExecutivePanel } from './executive.js';
 import { sounds } from './audio.js';
 import { remainingFromTimerState } from './timerPersistence.js';
 import { generateSchedule, planningRange, repeatWeek } from './schedulerEngine.js';
@@ -94,6 +95,8 @@ let noteSaveTimer;
 let authEnabled = false;
 let registrationEnabled = false;
 let currentUser = null;
+let executive;
+let executiveApproval = false;
 let stateRevision = 0;
 let accountGeneration = 0;
 
@@ -244,7 +247,8 @@ function normalizeProjectSettings(settings, projects) {
     const priority = Math.min(5, Math.max(1, Number(value.priority) || 3));
     const defaultDuration = value.defaultDuration == null ? null : Math.max(1, Number(value.defaultDuration) || DEFAULT_BLOCK_MINUTES);
     const color = PROJECT_COLORS.some((option) => option.id === value.color) ? value.color : DEFAULT_PROJECT_COLOR;
-    return [name, { priority, defaultDuration, color }];
+    const { deadline, parent } = value;
+    return [name, { priority, defaultDuration, color, ...(deadline ? { deadline } : {}), ...(parent && projects.includes(parent) ? { parent } : {}) }];
   }));
 }
 
@@ -270,10 +274,15 @@ function saveState() {
   state.activeIndex = clampActiveIndex(state.activeIndex);
   captureTimerState();
   const snapshot = structuredClone(state);
+  const refreshProjects = executiveApproval;
   if (!authEnabled) localStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
   const generation = accountGeneration;
   pendingSave = pendingSave.catch(() => {}).then(async () => {
     if (generation !== accountGeneration || (authEnabled && !currentUser)) return false;
+    if (refreshProjects) {
+      snapshot.projects = structuredClone(state.projects);
+      snapshot.projectSettings = structuredClone(state.projectSettings);
+    }
     const response = await fetch('/api/state', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
@@ -289,6 +298,31 @@ function saveState() {
     return false;
   });
   return pendingSave;
+}
+
+async function approveExecutive(proposalId) {
+  const generation = accountGeneration;
+  executiveApproval = true;
+  const approval = pendingSave.catch(() => {}).then(async () => {
+    if (generation !== accountGeneration) throw new Error('Your session changed.');
+    const response = await fetch('/api/executive/approve', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proposalId, revision: stateRevision }),
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error);
+    if (generation !== accountGeneration) return;
+    stateRevision = result.revision;
+    for (const { action, name, settings } of result.changes) {
+      if (action === 'add' && !state.projects.includes(name)) state.projects.push(name);
+      if (state.projects.includes(name)) state.projectSettings[name] = { ...state.projectSettings[name], ...settings };
+    }
+    if (getRoute() === 'projects') render();
+  });
+  pendingSave = approval;
+  try { await approval; } finally {
+    executiveApproval = false;
+  }
 }
 
 function captureTimerState() {
@@ -553,7 +587,7 @@ function viewedBlockCard(block) {
   if (!block) return '';
   const draft = viewedBlockDraft || block;
   const projectChoices = state.projects.map((project) => `<option value="${escapeHtml(project)}" ${project === draft.project ? 'selected' : ''}>${escapeHtml(project)}</option>`).join('');
-  return `<article class="project-card viewed-block-card selected-block-editor"><div class="selected-block-heading"><div><p class="eyebrow">Edit Selected Project</p><h3>${escapeHtml(draft.project || 'Task')}</h3></div><label class="selected-done"><input id="selected-block-done" type="checkbox" ${draft.done ? 'checked' : ''} /> Completed</label></div><div class="selected-block-fields"><label>Project<select id="selected-block-project" class="text-input">${projectChoices}</select></label><label>Task<input id="selected-block-title" class="text-input" value="${escapeHtml(draft.title || '')}" placeholder="Task description" /></label><label>Start Time<input id="selected-block-time" class="text-input" type="time" value="${escapeHtml(draft.time)}" /></label><label>Timer Length<select id="selected-block-duration" class="text-input">${CALENDAR_DURATION_OPTIONS.map((minutes) => `<option value="${minutes}" ${Number(draft.duration) === minutes ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label><label>Zen Break<select id="selected-block-zen-duration" class="text-input">${ZEN_BREAK_PRESETS.map((minutes) => `<option value="${minutes}" ${Number(draft.zenBreakMinutes) === minutes ? 'selected' : ''}>${minutes ? formatMinutes(minutes) : 'Off'}</option>`).join('')}</select></label>${zenBreakTimingControl({ value: draft.zenBreakTiming || 'midpoint', id: 'selected-block-zen-timing' })}</div><div class="selected-block-actions"><button id="save-selected-block" class="primary" type="button">Save Changes</button><p id="timer-block-save-status" class="helper-text" role="status" aria-live="polite">${escapeHtml(timerBlockSaveMessage)}</p></div></article>`;
+  return `<article class="project-card viewed-block-card selected-block-editor"><div class="selected-block-heading"><div><p class="eyebrow">Edit Selected Project</p><h3>${escapeHtml(draft.project || 'Task')}</h3></div><label class="selected-done"><input id="selected-block-done" type="checkbox" ${draft.done ? 'checked' : ''} /> Completed</label></div><div class="selected-block-fields"><label>Project<select id="selected-block-project" class="text-input">${projectChoices}</select></label><label>Task<input id="selected-block-title" class="text-input" value="${escapeHtml(draft.title || '')}" placeholder="Task description" /></label><label>Start Time<input id="selected-block-time" class="text-input" type="time" value="${escapeHtml(draft.time)}" /></label><label>Timer Length<select id="selected-block-duration" class="text-input">${[...new Set([...CALENDAR_DURATION_OPTIONS, Number(draft.duration)])].sort((a, b) => a - b).map((minutes) => `<option value="${minutes}" ${Number(draft.duration) === minutes ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label><label>Zen Break<select id="selected-block-zen-duration" class="text-input">${ZEN_BREAK_PRESETS.map((minutes) => `<option value="${minutes}" ${Number(draft.zenBreakMinutes) === minutes ? 'selected' : ''}>${minutes ? formatMinutes(minutes) : 'Off'}</option>`).join('')}</select></label>${zenBreakTimingControl({ value: draft.zenBreakTiming || 'midpoint', id: 'selected-block-zen-timing' })}</div><div class="selected-block-actions"><button id="save-selected-block" class="primary" type="button">Save Changes</button><p id="timer-block-save-status" class="helper-text" role="status" aria-live="polite">${escapeHtml(timerBlockSaveMessage)}</p></div></article>`;
 }
 
 function getTimerStatus(current) {
@@ -711,9 +745,11 @@ function todayPlanner() {
 function masterProjectList() {
   return section({ id: 'projects', title: 'Master Project List', eyebrow: 'Projects', className: 'projects-panel', content: `<div class="project-list">${state.projects.map((project, index) => {
     const settings = projectSettings(project);
+    const durations = [...new Set([...CALENDAR_DURATION_OPTIONS, settings.defaultDuration || DEFAULT_BLOCK_MINUTES])].sort((a, b) => a - b);
+    const planningNote = [settings.parent && `Subtask of ${settings.parent}`, settings.deadline && `Due ${settings.deadline}`].filter(Boolean).join(' · ');
     const priorities = [1, 2, 3, 4, 5].map((priority) => `<label class="priority-option"><input class="project-priority" data-index="${index}" type="radio" name="project-priority-${index}" value="${priority}" ${settings.priority === priority ? 'checked' : ''} required /><span>${priority}</span></label>`).join('');
     const colors = PROJECT_COLORS.map(({ id, label }) => `<label class="project-color-option color-${id}" title="${label}"><input class="project-color" data-index="${index}" type="radio" name="project-color-${index}" value="${id}" ${settings.color === id ? 'checked' : ''} /><span><b aria-hidden="true">${settings.color === id ? icon.check : ''}</b><span class="sr-only">${label}</span></span></label>`).join('');
-    return `<article class="project-row"><div class="project-main"><label class="project-name-field"><span>Project name</span><input class="text-input project-name" data-index="${index}" value="${escapeHtml(project)}" aria-label="Project name" /></label><fieldset class="priority-control"><legend>Priority <small>1 highest · 5 lowest</small></legend><div>${priorities}</div></fieldset><label class="project-duration-field">Default block length<select class="text-input project-duration" data-index="${index}">${CALENDAR_DURATION_OPTIONS.map((minutes) => `<option value="${minutes}" ${settings.defaultDuration === minutes || (settings.defaultDuration === null && minutes === DEFAULT_BLOCK_MINUTES) ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label><fieldset class="project-color-control"><legend>Project color</legend><div>${colors}</div></fieldset></div><div class="row-actions"><button class="delete-project" data-index="${index}" aria-label="Delete ${escapeHtml(project)}">${icon.trash} Delete</button></div></article>`;
+    return `<article class="project-row"><div class="project-main"><label class="project-name-field"><span>Project name</span><input class="text-input project-name" data-index="${index}" value="${escapeHtml(project)}" aria-label="Project name" /></label><fieldset class="priority-control"><legend>Priority <small>1 highest · 5 lowest</small></legend><div>${priorities}</div></fieldset><label class="project-duration-field">Default block length<select class="text-input project-duration" data-index="${index}">${durations.map((minutes) => `<option value="${minutes}" ${settings.defaultDuration === minutes || (settings.defaultDuration === null && minutes === DEFAULT_BLOCK_MINUTES) ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label><fieldset class="project-color-control"><legend>Project color</legend><div>${colors}</div></fieldset></div>${planningNote ? `<p class="helper-text">${escapeHtml(planningNote)}</p>` : ''}<div class="row-actions"><button class="delete-project" data-index="${index}" aria-label="Delete ${escapeHtml(project)}">${icon.trash} Delete</button></div></article>`;
   }).join('') || '<p class="empty-state">No projects yet.</p>'}</div><button id="add-project" class="add-button"><span>${icon.plus}</span> Add Project</button>` });
 }
 
@@ -841,7 +877,7 @@ function calendarTimeSelector(block, index) {
 function calendarPlanner() {
   const draftConflicts = findScheduleConflicts(calendarDraft);
   const rows = calendarDraft.map((block, index) => {
-    return `<article class="calendar-block-card ${draftConflicts.has(index) ? 'conflict-block' : ''}" data-index="${index}">${draftConflicts.has(index) ? '<strong class="conflict-label">OVERLAPS ANOTHER BLOCK</strong>' : ''}<div class="calendar-card-fields"><label>Project<select class="text-input calendar-project project-select" data-index="${index}" required>${projectOptions(block.project)}</select></label><label>Task <span class="optional-label">(optional)</span><input class="text-input calendar-title" data-index="${index}" value="${escapeHtml(block.title)}" placeholder="Task description" /></label><fieldset><legend>Start Time</legend>${calendarTimeSelector(block, index)}</fieldset><div class="calendar-timing-summary"><label>Block Length<select class="text-input calendar-duration" data-index="${index}" aria-label="Block Length">${CALENDAR_DURATION_OPTIONS.map((minutes) => `<option value="${minutes}" ${block.duration === minutes ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label><div class="calendar-ends-at" aria-live="polite"><span>Ends At</span><strong data-calendar-end-time="${index}">${escapeHtml(formatTime(getNextStartTime(block)))}</strong></div></div></div><button class="calendar-delete-block" data-index="${index}" aria-label="Delete project block">${icon.trash} Delete</button></article>`;
+    return `<article class="calendar-block-card ${draftConflicts.has(index) ? 'conflict-block' : ''}" data-index="${index}">${draftConflicts.has(index) ? '<strong class="conflict-label">OVERLAPS ANOTHER BLOCK</strong>' : ''}<div class="calendar-card-fields"><label>Project<select class="text-input calendar-project project-select" data-index="${index}" required>${projectOptions(block.project)}</select></label><label>Task <span class="optional-label">(optional)</span><input class="text-input calendar-title" data-index="${index}" value="${escapeHtml(block.title)}" placeholder="Task description" /></label><fieldset><legend>Start Time</legend>${calendarTimeSelector(block, index)}</fieldset><div class="calendar-timing-summary"><label>Block Length<select class="text-input calendar-duration" data-index="${index}" aria-label="Block Length">${[...new Set([...CALENDAR_DURATION_OPTIONS, block.duration])].sort((a, b) => a - b).map((minutes) => `<option value="${minutes}" ${block.duration === minutes ? 'selected' : ''}>${formatMinutes(minutes)}</option>`).join('')}</select></label><div class="calendar-ends-at" aria-live="polite"><span>Ends At</span><strong data-calendar-end-time="${index}">${escapeHtml(formatTime(getNextStartTime(block)))}</strong></div></div></div><button class="calendar-delete-block" data-index="${index}" aria-label="Delete project block">${icon.trash} Delete</button></article>`;
   }).join('') || '<p class="empty-state">No blocks planned for this date.</p>';
   return `<div class="calendar-planner"><div class="schedule-list">${rows}</div><div class="calendar-editor-actions"><button id="calendar-add-block" class="add-button"><span>${icon.plus}</span> Add Project Block</button><button id="calendar-save" class="primary save-button">Save Schedule</button></div>${saveStatus()}</div>`;
 }
@@ -947,7 +983,7 @@ function mainContent() {
   const route = getRoute();
   if (route === 'projects') return masterProjectList();
   if (route === 'timer') return timerPage();
-  if (route === 'scheduler') return schedulerPage();
+  if (route === 'scheduler') return (currentUser ? '<div id="executive-mount"></div>' : '') + schedulerPage();
   if (route === 'calendar') return calendarSection();
   if (route === 'notes') return notesAndReview();
   return todayPlanner();
@@ -995,6 +1031,11 @@ function render() {
       return;
     }
     if (!renderShell(mainContent())) return;
+    const mount = document.querySelector('#executive-mount');
+    if (mount) {
+      executive ??= createExecutivePanel({ approve: approveExecutive, today: () => toDateKey(new Date()) });
+      mount.replaceWith(executive.panel);
+    } else executive?.suspend();
     bindEvents();
     setupPerspectiveController();
     setupPlannerCallout();
@@ -1527,6 +1568,8 @@ function bindGlobalEvents() {
     currentUser = null;
     stateRevision = 0;
     state = structuredClone(defaultState);
+    executive?.clear();
+    executive = undefined;
     todayDraft = [];
     calendarDraft = [];
     quickTask = null;
@@ -1843,7 +1886,12 @@ function bindEvents() {
       const nextName = event.target.value;
       state.projects[index] = nextName;
       state.projectSettings[nextName] = state.projectSettings[previousName] || { priority: 3, defaultDuration: null, color: DEFAULT_PROJECT_COLOR };
-      if (previousName !== nextName) delete state.projectSettings[previousName];
+      if (previousName !== nextName) {
+        delete state.projectSettings[previousName];
+        for (const settings of Object.values(state.projectSettings)) {
+          if (settings.parent === previousName) settings.parent = nextName;
+        }
+      }
       state.schedule.forEach((block) => { if (block.project === previousName) block.project = nextName; });
       Object.values(state.schedules || {}).forEach((schedule) => schedule.forEach((block) => { if (block.project === previousName) block.project = nextName; }));
       todayDraft.forEach((block) => { if (block.project === previousName) block.project = nextName; });
@@ -1879,8 +1927,11 @@ function bindEvents() {
   }));
   document.querySelectorAll('.delete-project').forEach((button) => button.addEventListener('click', (event) => {
     const index = Number(event.currentTarget.dataset.index);
-    delete state.projectSettings[state.projects[index]];
-    state.projects.splice(index, 1);
+    const [deleted] = state.projects.splice(index, 1);
+    delete state.projectSettings[deleted];
+    for (const settings of Object.values(state.projectSettings)) {
+      if (settings.parent === deleted) delete settings.parent;
+    }
     saveState();
     render();
   }));
@@ -2249,6 +2300,8 @@ async function initializeApp() {
     console.error('DoAbl startup failed while loading saved state.', error);
     if (authEnabled) currentUser = null;
     state = structuredClone(defaultState);
+    executive?.clear();
+    executive = undefined;
     todayDraft = [];
     remainingSeconds = DEFAULT_BLOCK_MINUTES * 60;
   } finally {

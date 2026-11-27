@@ -1353,3 +1353,93 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .scheduler-app [aria-pressed="true"][data-month-span],
 .scheduler-app .presentation-toggle button[aria-pressed="true"] { background: #dcecff; color: #244c7a; border-color: #98b9e0; }
 @media (max-width: 900px) { .planner-callout { display: none; } }
+
+.executive-panel {
+  margin-block-end: 1rem;
+  min-inline-size: 0;
+}
+
+.executive-panel > summary {
+  cursor: pointer;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.executive-body {
+  display: grid;
+  gap: .75rem;
+  margin-block-start: .75rem;
+}
+
+.executive-history {
+  display: grid;
+  gap: .5rem;
+  max-block-size: 24rem;
+  overflow: auto;
+}
+
+.executive-history:empty,
+.executive-status:empty {
+  display: none;
+}
+
+.executive-message,
+.executive-suggestions {
+  min-inline-size: 0;
+  padding: .75rem;
+  border: 1px solid currentColor;
+  border-radius: .75rem;
+  overflow-wrap: anywhere;
+}
+
+.executive-user {
+  margin-inline-start: clamp(0rem, 5vw, 3rem);
+}
+
+.executive-message p {
+  margin: .25rem 0 0;
+  white-space: pre-wrap;
+}
+
+.executive-suggestions h3 {
+  margin-block: 0 .4rem;
+}
+
+.executive-form {
+  display: grid;
+  gap: .75rem;
+}
+
+.executive-form textarea {
+  display: block;
+  inline-size: 100%;
+  min-block-size: 5rem;
+  margin-block-start: .25rem;
+  resize: vertical;
+}
+
+.executive-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .5rem;
+}
+
+.executive-context {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+}
+
+.executive-context input {
+  flex: none;
+}
+
+@media (max-width: 600px) {
+  .executive-history {
+    max-block-size: 45vh;
+  }
+
+  .executive-actions button {
+    min-block-size: 44px;
+  }
+}
