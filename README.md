@@ -25,3 +25,27 @@ Do these steps in order. Do not remove or change the existing volume mount or `D
 Anyone can register from the login screen at any time. New non-owner users receive an empty private workspace. The unique email and workspace constraints refuse duplicate owner claims rather than overwriting a workspace.
 
 Session cookies are opaque, server-managed, `HttpOnly`, `SameSite=Lax`, and `Secure` in production. Passwords use Node's scrypt. Authenticated state writes include a revision and stale writes receive HTTP 409.
+
+## Scheduler Executive
+
+Executive uses the signed-in account and keeps chat history in the current browser tab until cleared, reloaded or logged out. Users can choose to include up to 30 project names and planning settings. Executive sends recent messages and any selected project context to Replicate. Microphone audio is decoded, checked for duration, and normalized in memory before transcription. Review and edit the transcript before sending it.
+
+Approved suggestions add or update Projects. Subtasks are linked work items in Projects, and deadlines are planning notes. Generate Schedule continues to use the existing Scheduler rules. Suggestions expire after 30 minutes or when replaced by a newer reply.
+
+Set `REPLICATE_API_TOKEN` on the server. No additional Railway variable is required. Local development requires the `sqlite3` and `ffmpeg` command-line tools, which Nixpacks installs on Railway. Use HTTPS for microphone access outside localhost.
+
+| Optional environment variable | Default |
+| --- | --- |
+| `EXECUTIVE_CHAT_MODEL` | `openai/gpt-5.6-luna` |
+| `EXECUTIVE_WHISPER_MODEL` | `vaibhavs10/incredibly-fast-whisper` with the version pinned in the adapter |
+| `EXECUTIVE_REQUESTS_PER_HOUR` | 15 |
+| `EXECUTIVE_REQUESTS_PER_DAY` | 40 |
+| `EXECUTIVE_CONTEXT_MESSAGES` | 12 |
+| `EXECUTIVE_CONTEXT_CHARS` | 12,000 |
+| `EXECUTIVE_OUTPUT_TOKENS` | 1,150 |
+| `EXECUTIVE_RECORDING_SECONDS` | 60 |
+| `EXECUTIVE_TIMEOUT_MS` | 50,000 |
+
+The SQLite usage table records model, request and prediction IDs, status, and available usage metrics and cost estimates. It does not store messages, transcripts, or recordings.
+
+[Replicate Luna API](https://replicate.com/openai/gpt-5.6-luna/api/schema) · [Replicate Whisper API](https://replicate.com/vaibhavs10/incredibly-fast-whisper/api/schema)

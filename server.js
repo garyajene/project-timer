@@ -1,6 +1,7 @@
 import { createReadStream, existsSync, statSync } from 'node:fs';
 import { extname, join, normalize, resolve } from 'node:path';
 import { createServer } from 'node:http';
+import { createExecutive } from './src/server/executive.js';
 import { StateStore } from './src/server/stateStore.js';
 
 const port = Number.parseInt(process.env.PORT ?? '4173', 10);
@@ -23,11 +24,13 @@ const mimeTypes = {
 };
 
 function safePath(urlPath) {
-  const decodedPath = decodeURIComponent(urlPath.split('?')[0] ?? '/');
+  let decodedPath;
+  try { decodedPath = decodeURIComponent(urlPath.split('?')[0] ?? '/'); } catch { return null; }
   const normalizedPath = normalize(decodedPath).replace(/^[/\\]+/, '');
   const filePath = resolve(join(root, normalizedPath || 'index.html'));
 
-  if (!filePath.startsWith(root)) {
+  const relative = filePath.slice(root.length + 1);
+  if (!filePath.startsWith(root + '/') || relative.split('/').some((part) => part.startsWith('.')) || relative.startsWith('src/server/')) {
     return null;
   }
 
@@ -74,6 +77,7 @@ export function createAppServer(stateStore = store, options = {}) {
   // override remains available for tests and private integrations.
   const registrationEnabled = options.registrationEnabled ?? true;
   const ownerEmail = options.ownerEmail ?? process.env.OWNER_EMAIL ?? '';
+  const executive = createExecutive(stateStore, options.executive);
   return createServer(async (request, response) => {
     const pathname = new URL(request.url ?? '/', 'http://localhost').pathname;
     if (pathname.startsWith('/api/auth/')) {
@@ -113,6 +117,19 @@ export function createAppServer(stateStore = store, options = {}) {
         const status = error.code === 'EMAIL_EXISTS' ? 409 : (error instanceof TypeError || error instanceof SyntaxError ? 400 : 500);
         console.error('Auth API failed.', error);
         return sendJson(response, status, { error: status === 500 ? 'Authentication unavailable' : (error.code === 'EMAIL_EXISTS' ? 'Email is already registered' : error.message) });
+      }
+    }
+    if (pathname.startsWith('/api/executive/')) {
+      try {
+        if (request.headers['sec-fetch-site'] === 'cross-site') return sendJson(response, 403, { error: 'Open Executive from DoAbl.' });
+        const user = authEnabled && await stateStore.sessionUser(cookies(request)[SESSION_COOKIE]);
+        if (!user) return sendJson(response, 401, { error: 'Log in to use Executive.' });
+        const result = await executive(request, user.id, pathname.slice('/api/executive/'.length));
+        return sendJson(response, 200, result);
+      } catch (error) {
+        const status = error.code === 'STALE_REVISION' ? 409 : (error.status || 500);
+        return sendJson(response, status, { error: status === 500 ? 'Executive is temporarily unavailable.'
+          : (error.code === 'STALE_REVISION' ? 'Your workspace changed. Reload it before approving.' : error.message) });
       }
     }
     if (pathname === '/api/state') {

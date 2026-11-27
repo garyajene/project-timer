@@ -42,7 +42,9 @@ export function normalizeState(value) {
     const priority = Math.min(5, Math.max(1, Number(candidate.priority) || 3));
     const defaultDuration = candidate.defaultDuration == null ? null : Math.max(1, Number(candidate.defaultDuration) || 30);
     const color = PROJECT_COLORS.has(candidate.color) ? candidate.color : DEFAULT_PROJECT_COLOR;
-    return [project, { priority, defaultDuration, color }];
+    const deadline = typeof candidate.deadline === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(candidate.deadline) ? candidate.deadline : null;
+    const parent = typeof candidate.parent === 'string' && candidate.parent !== project && projects.includes(candidate.parent) ? candidate.parent : null;
+    return [project, { priority, defaultDuration, color, ...(deadline ? { deadline } : {}), ...(parent ? { parent } : {}) }];
   }));
   return {
     projects, projectSettings, schedule: value.schedule,
@@ -74,15 +76,43 @@ async function verifyPassword(password, encoded) {
 
 export class StateStore {
   constructor(filePath) { this.filePath = filePath; this.pendingWrite = Promise.resolve(); }
-  async query(sql) { const { stdout } = await execFileAsync('sqlite3', ['-batch', '-noheader', '-separator', '\t', this.filePath, sql]); return stdout.trim(); }
+  async query(sql) { const { stdout } = await execFileAsync('sqlite3', ['-batch', '-cmd', '.timeout 3000', '-noheader', '-separator', '\t', this.filePath, sql]); return stdout.trim(); }
   async initialize() {
     await mkdir(dirname(this.filePath), { recursive: true });
     await this.query(`PRAGMA journal_mode=WAL;
+      CREATE TABLE IF NOT EXISTS executive_usage (
+        user_id TEXT NOT NULL REFERENCES users(id), request_id TEXT NOT NULL, model TEXT NOT NULL,
+        started_at INTEGER NOT NULL, status TEXT NOT NULL, prediction_id TEXT, metrics_json TEXT,
+        PRIMARY KEY (user_id, request_id)
+      );
+      CREATE INDEX IF NOT EXISTS executive_usage_by_user_time ON executive_usage(user_id, started_at);
       CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY CHECK (id = 1), state_json TEXT NOT NULL, updated_at TEXT NOT NULL);
       INSERT OR IGNORE INTO app_state VALUES (1, ${sqlString(JSON.stringify(EMPTY_STATE))}, CURRENT_TIMESTAMP);
       CREATE TABLE IF NOT EXISTS users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS user_sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, expires_at TEXT NOT NULL, created_at TEXT NOT NULL);
       CREATE TABLE IF NOT EXISTS user_states (user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, state_json TEXT NOT NULL, revision INTEGER NOT NULL DEFAULT 0, updated_at TEXT NOT NULL);`);
+  }
+  async reserveExecutiveRequest(userId, requestId, model, perHour, perDay) {
+    const user = sqlString(userId);
+    const id = sqlString(requestId);
+    const result = await this.query(`BEGIN IMMEDIATE;
+      SELECT CASE
+        WHEN EXISTS (SELECT 1 FROM executive_usage WHERE user_id=${user} AND request_id=${id}) THEN 'duplicate'
+        WHEN (SELECT COUNT(*) FROM executive_usage WHERE user_id=${user} AND started_at > unixepoch()-3600) >= ${perHour}
+          OR (SELECT COUNT(*) FROM executive_usage WHERE user_id=${user} AND started_at > unixepoch()-86400) >= ${perDay} THEN 'limited'
+        ELSE 'accepted' END;
+      INSERT OR IGNORE INTO executive_usage (user_id,request_id,model,started_at,status)
+        SELECT ${user},${id},${sqlString(model)},unixepoch(),'pending'
+        WHERE (SELECT COUNT(*) FROM executive_usage WHERE user_id=${user} AND started_at > unixepoch()-3600) < ${perHour}
+          AND (SELECT COUNT(*) FROM executive_usage WHERE user_id=${user} AND started_at > unixepoch()-86400) < ${perDay};
+      COMMIT;`);
+    return result.split('\n').at(-1);
+  }
+  async updateExecutiveUsage(userId, requestId, status, { predictionId, ...metrics } = {}) {
+    await this.query(`UPDATE executive_usage SET status=${sqlString(status)},
+      prediction_id=COALESCE(${predictionId ? sqlString(predictionId) : 'NULL'}, prediction_id),
+      metrics_json=${sqlString(JSON.stringify(metrics))}
+      WHERE user_id=${sqlString(userId)} AND request_id=${sqlString(requestId)};`);
   }
   async load() { await this.pendingWrite.catch(() => {}); return normalizeState(JSON.parse(await this.query('SELECT state_json FROM app_state WHERE id = 1;'))); }
   save(value) {
