@@ -1,4 +1,4 @@
-export function createExecutivePanel({ approve, today }) {
+export function createExecutivePanel({ approve, today, page = 'scheduler' }) {
   const panel = document.createElement('section');
   panel.setAttribute('aria-labelledby', 'executive-heading');
   panel.className = 'panel executive-panel';
@@ -24,6 +24,7 @@ export function createExecutivePanel({ approve, today }) {
         </div>
       </form>
     </div>`;
+  if (page === 'brain-dump') panel.querySelector('h2').textContent = 'Brain Dump';
   const find = (selector) => panel.querySelector(selector);
   const input = find('textarea');
   const history = find('.executive-history');
@@ -105,7 +106,7 @@ export function createExecutivePanel({ approve, today }) {
       controls();
       status.textContent = 'Saving approved changes…';
       try {
-        await approve(id);
+        await approve(id, page);
         showProposal([], null);
         status.textContent = 'Changes saved to Projects.';
       } catch (error) {
@@ -163,7 +164,7 @@ export function createExecutivePanel({ approve, today }) {
     }
     const message = { role: 'user', text };
     input.value = '';
-    process('chat', JSON.stringify({ messages: [...messages, message].slice(-(limits?.contextTurns ?? 24)),
+    process('chat', JSON.stringify({ page, messages: [...messages, message].slice(-(limits?.contextTurns ?? 24)),
       includeProjects: find('[type=checkbox]').checked, today: today() }), 'application/json', 'Executive is thinking…', (data) => {
       const reply = { role: 'assistant', text: data.reply };
       messages.push(message, reply);

@@ -1461,3 +1461,10 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 
 .executive-composer .executive-waveform { flex: 1 1 0%; min-width: 0; height: 3rem; }
 .executive-form .executive-composer textarea[hidden] { display: none; }
+
+.brain-dump-app main {
+  width: min(100%, 56rem);
+  margin-inline: auto;
+  padding: clamp(1rem, 4vw, 3rem);
+}
+.brain-dump-app .executive-panel > h2 { text-align: center; }
