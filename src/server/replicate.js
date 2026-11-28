@@ -4,6 +4,24 @@ const api = 'https://api.replicate.com/v1';
 export const LUNA = 'openai/gpt-5.6-luna';
 export const WHISPER = 'vaibhavs10/incredibly-fast-whisper:3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c';
 
+async function validationReason(response) {
+  const problem = await response.json().catch(() => null);
+  // Validation errors can echo the submitted input. Only return known descriptions.
+  const issues = Array.isArray(problem?.detail) ? problem.detail : [];
+  const detail = [problem?.title, problem?.detail, ...issues.map(issue =>
+    [Array.isArray(issue?.loc) ? issue.loc.join('.') : '', issue?.msg].join(' ')
+  )].filter(value => typeof value === 'string').join(' ');
+  if (/invalid version or not permitted|does not exist.*permission/i.test(detail))
+    return 'Replicate says the model version is unavailable or this account cannot use it.';
+  if (/\bversion\b/i.test(detail)) return 'Replicate rejected the configured model version.';
+  if (/\baudio\b/i.test(detail)) {
+    if (/required|missing/i.test(detail)) return 'Replicate says the required audio file is missing.';
+    if (/uri|url/i.test(detail)) return 'Replicate rejected the file address supplied for the recording.';
+    return 'Replicate rejected the recording supplied in the audio field.';
+  }
+  return 'Replicate rejected the request. The app could not identify the field from its response.';
+}
+
 export function replicateClient(token, fetcher = fetch) {
   return async (model, input, timeout, recordId) => {
     const match = /^([\w-]+\/[\w.-]+)(?::([a-f0-9]{64}))?$/.exec(model);
@@ -22,7 +40,8 @@ export function replicateClient(token, fetcher = fetch) {
           422: 'Replicate rejected the model input or version.',
           429: 'Replicate is rate limiting requests. Try again shortly.',
         };
-        console.warn('Executive provider request failed', { model, httpStatus: response.status });
+        if (response.status === 422) reasons[422] = await validationReason(response);
+        console.warn('Executive provider request failed', { model, httpStatus: response.status, reason: reasons[response.status] });
         throw Object.assign(new Error(reasons[response.status] || 'Replicate is temporarily unavailable.'), {
           status: response.status === 429 ? 429 : 502,
         });

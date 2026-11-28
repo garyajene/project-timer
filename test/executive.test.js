@@ -163,3 +163,12 @@ test('Replicate billing errors reach Executive without including private provide
     status: 502, message: 'Replicate requires billing credit before it can process requests.',
   });
 });
+
+test('Replicate validation identifies an invalid audio URI without echoing submitted audio', async () => {
+  const run = replicateClient('mock-token', async () => Response.json({
+    detail: [{ loc: ['body', 'input', 'audio'], msg: 'Invalid URI', input: 'private recording' }],
+  }, { status: 422 }));
+  await assert.rejects(run(WHISPER, {}, 5000, () => {}), {
+    message: 'Replicate rejected the file address supplied for the recording.',
+  });
+});
