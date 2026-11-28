@@ -7,10 +7,10 @@ export function createExecutivePanel({ approve, today }) {
     <div class="executive-body">
       <div class="executive-history" role="log" aria-label="Conversation" tabindex="0"></div>
       <section class="executive-suggestions" aria-label="Suggested changes" hidden></section>
-      <meter data-level aria-label="Microphone input level" min="0" max="1" value="0" hidden></meter>
       <p class="executive-status helper-text" role="status"></p>
       <form class="executive-form">
         <div class="executive-composer">
+          <canvas class="executive-waveform" role="img" aria-label="Live microphone waveform" hidden></canvas>
           <textarea aria-label="Message" maxlength="4000" rows="2" placeholder="What would you like help planning?"></textarea>
           <button type="button" data-record aria-label="Record voice" title="Record voice">
             <svg aria-hidden="true" viewBox="0 0 24 24"><g class="mic-symbol" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 11a7 7 0 0 0 14 0m-7 7v4m-4 0h8"/></g><rect class="stop-symbol" x="5" y="5" width="14" height="14" rx="3"/></svg>
@@ -174,39 +174,65 @@ export function createExecutivePanel({ approve, today }) {
     }, () => { if (!input.value) input.value = text; });
   }
 
-  const level = find('[data-level]');
+  const waveform = find('.executive-waveform');
   function monitorInput(item) {
     const Context = globalThis.AudioContext || globalThis.webkitAudioContext;
     if (!Context) return;
     try {
+      const pen = waveform.getContext('2d');
+      if (!pen) return;
       item.context = new Context();
       const source = item.context.createMediaStreamSource(item.stream);
       const analyser = item.context.createAnalyser();
       source.connect(analyser);
       const samples = new Uint8Array(analyser.fftSize);
-      item.measure = () => {
+      const peaks = [];
+      const draw = () => {
+        if (item.context.state !== 'running') return;
+        input.hidden = true;
+        waveform.hidden = false;
+        const width = waveform.clientWidth;
+        const height = waveform.clientHeight;
+        const scale = window.devicePixelRatio || 1;
+        if (waveform.width !== Math.round(width * scale)) waveform.width = Math.round(width * scale);
+        if (waveform.height !== Math.round(height * scale)) waveform.height = Math.round(height * scale);
+        pen.setTransform(scale, 0, 0, scale, 0, 0);
+        pen.clearRect(0, 0, width, height);
         analyser.getByteTimeDomainData(samples);
         let peak = 0;
         for (const sample of samples) peak = Math.max(peak, Math.abs(sample - 128) / 128);
-        level.value = Math.min(1, peak * 3);
-        level.hidden = item.context.state !== 'running';
+        const count = Math.floor(width / 6);
+        peaks.push(Math.min(1, peak * 3));
+        if (peaks.length > count) peaks.splice(0, peaks.length - count);
+        pen.strokeStyle = '#637595';
+        pen.lineWidth = 3;
+        pen.lineCap = 'round';
+        pen.beginPath();
+        for (let i = 0; i < count; i++) {
+          const amplitude = peaks[i - (count - peaks.length)] || 0;
+          const halfHeight = Math.max(.1, amplitude * (height / 2 - 3));
+          pen.moveTo(i * 6 + 3, height / 2 - halfHeight);
+          pen.lineTo(i * 6 + 3, height / 2 + halfHeight);
+        }
+        pen.stroke();
       };
+      item.waveTimer = setInterval(draw, 60);
       item.context.resume().catch(() => {});
     } catch { /* Recording can continue without an input meter. */ }
   }
-  function stopMeter(item) {
-    item.measure = undefined;
+  function stopWaveform(item) {
+    clearInterval(item.waveTimer);
     item.context?.close().catch(() => {});
     item.context = undefined;
-    level.hidden = true;
-    level.value = 0;
+    waveform.hidden = true;
+    input.hidden = false;
   }
 
   function stopCapture(discard) {
     const item = capture;
     if (!item) return;
     item.discard = discard;
-    stopMeter(item);
+    stopWaveform(item);
     clearInterval(item.clock);
     clearTimeout(item.timeout);
     if (item.onHide) document.removeEventListener('visibilitychange', item.onHide);
@@ -251,7 +277,7 @@ export function createExecutivePanel({ approve, today }) {
       recorder.addEventListener('stop', () => {
         item.stream.getTracks().forEach((track) => track.stop());
         if (capture !== item || item.discard) return;
-        stopMeter(item);
+        stopWaveform(item);
         clearInterval(item.clock);
         clearTimeout(item.timeout);
         if (item.onHide) document.removeEventListener('visibilitychange', item.onHide);
@@ -279,7 +305,7 @@ export function createExecutivePanel({ approve, today }) {
       item.onHide = () => { if (document.hidden) stopCapture(true); };
       document.addEventListener('visibilitychange', item.onHide);
       const start = performance.now();
-      const update = () => { item.measure?.(); status.textContent = `Recording · Stop to review or tap Send · ${Math.floor((performance.now() - start) / 1000)}s / ${limits.audioLimit}s`; };
+      const update = () => { status.textContent = `Recording · Stop to review or tap Send · ${Math.floor((performance.now() - start) / 1000)}s / ${limits.audioLimit}s`; };
       item.clock = setInterval(update, 250);
       item.timeout = setTimeout(() => stopCapture(false), limits.audioLimit * 1000 - 250);
       setRecording(true);

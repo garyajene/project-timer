@@ -1458,3 +1458,6 @@ main { width: min(1220px, calc(100% - 2rem)); margin: 1.25rem auto 4rem; display
 .executive-composer .stop-symbol, .executive-composer .recording .mic-symbol { display: none; }
 .executive-composer .recording .stop-symbol { display: inline; fill: #b42332; }
 .executive-status:not(:empty) { padding: .5rem .75rem; border-left: 3px solid #4571b6; }
+
+.executive-composer .executive-waveform { flex: 1 1 0%; min-width: 0; height: 3rem; }
+.executive-form .executive-composer textarea[hidden] { display: none; }
