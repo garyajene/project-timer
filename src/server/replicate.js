@@ -13,14 +13,27 @@ export function replicateClient(token, fetcher = fetch) {
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
     async function call(path, options) {
       const response = await fetcher(api + path, { headers, signal, redirect: 'error', ...options });
-      if (!response.ok) throw new Error('Provider request failed');
+      if (!response.ok) {
+        const reasons = {
+          401: 'Replicate rejected the service credential.',
+          402: 'Replicate requires billing credit before it can process requests.',
+          403: 'Replicate denied access to the configured model.',
+          404: 'The configured Replicate model or prediction is unavailable.',
+          422: 'Replicate rejected the model input or version.',
+          429: 'Replicate is rate limiting requests. Try again shortly.',
+        };
+        console.warn('Executive provider request failed', { model, httpStatus: response.status });
+        throw Object.assign(new Error(reasons[response.status] || 'Replicate is temporarily unavailable.'), {
+          status: response.status === 429 ? 429 : 502,
+        });
+      }
       return response.json();
     }
     let id;
     try {
       let prediction = await call(version ? '/predictions' : `/models/${name}/predictions`, {
         method: 'POST',
-        headers: { ...headers, 'Cancel-After': `${Math.ceil(timeout / 1000)}s` },
+        headers: { ...headers, 'Cancel-After': `${Math.max(5, Math.ceil(timeout / 1000))}s` },
         body: JSON.stringify({ ...(version ? { version } : {}), input }),
       });
       if (!/^[a-z0-9]+$/.test(prediction.id ?? '')) throw new Error('Invalid prediction ID');
@@ -30,7 +43,10 @@ export function replicateClient(token, fetcher = fetch) {
         await delay(750, undefined, { signal });
         prediction = await call(`/predictions/${id}`);
       }
-      if (prediction.status !== 'succeeded') throw new Error('Prediction failed');
+      if (prediction.status !== 'succeeded') {
+        console.warn('Executive prediction ended', { model, id, status: prediction.status });
+        throw Object.assign(new Error('Replicate could not complete the prediction. Please try again.'), { status: 502 });
+      }
       return prediction;
     } catch (error) {
       if (id && signal.aborted) {

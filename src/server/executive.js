@@ -144,7 +144,7 @@ export function createExecutive(store, { env = process.env, run = replicateClien
         let result;
         if (path === 'transcribe') {
           recording = await audio(request, audioLimit);
-          prediction = await run(model, { audio: recording.uri, language: 'None' }, timeout, recordId);
+          prediction = await run(model, { audio: recording.uri }, timeout, recordId);
           const transcript = prediction.output?.text;
           if (typeof transcript !== 'string' || !transcript.trim()) fail(422, 'No speech was detected. Try another recording.');
           result = { text: transcript.trim().slice(0, 4000) };

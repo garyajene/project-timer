@@ -7,13 +7,18 @@ export function createExecutivePanel({ approve, today }) {
     <div class="executive-body">
       <div class="executive-history" role="log" aria-label="Conversation" tabindex="0"></div>
       <section class="executive-suggestions" aria-label="Suggested changes" hidden></section>
+      <meter data-level aria-label="Microphone input level" min="0" max="1" value="0" hidden></meter>
       <p class="executive-status helper-text" role="status"></p>
       <form class="executive-form">
-        <label>Message<textarea class="text-input" maxlength="4000" rows="3" placeholder="What would you like help planning?"></textarea></label>
+        <div class="executive-composer">
+          <textarea aria-label="Message" maxlength="4000" rows="2" placeholder="What would you like help planning?"></textarea>
+          <button type="button" data-record aria-label="Record voice" title="Record voice">
+            <svg aria-hidden="true" viewBox="0 0 24 24"><g class="mic-symbol" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 11a7 7 0 0 0 14 0m-7 7v4m-4 0h8"/></g><rect class="stop-symbol" x="5" y="5" width="14" height="14" rx="3"/></svg>
+          </button>
+          <button type="submit" aria-label="Send" title="Send"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M12 20V4m-7 7 7-7 7 7" fill="none" stroke="currentColor" stroke-width="2"/></svg></button>
+        </div>
         <label class="executive-context"><input type="checkbox"> Include project names and planning settings</label>
         <div class="executive-actions">
-          <button type="submit" class="primary">Send</button>
-          <button type="button" data-record>Record voice</button>
           <button type="button" data-cancel hidden>Cancel recording</button>
           <button type="button" data-clear>Clear conversation</button>
         </div>
@@ -33,17 +38,24 @@ export function createExecutivePanel({ approve, today }) {
   let capture;
   let approving = false;
   let limits;
+  function setRecording(active) {
+    const label = active ? 'Stop recording' : 'Record voice';
+    recordButton.setAttribute('aria-label', label);
+    recordButton.title = label;
+    recordButton.classList.toggle('recording', active);
+  }
   function controls() {
     send.disabled = Boolean(request || capture || approving);
     recordButton.disabled = Boolean(request || approving || (capture && capture.recorder?.state !== 'recording'));
     cancelButton.hidden = !capture;
+    clearButton.hidden = !history.childElementCount && !input.value && !request;
     clearButton.disabled = approving;
     suggestions.querySelectorAll('button').forEach((button) => { button.disabled = Boolean(request || capture || approving); });
   }
 
   async function api(path, options = {}) {
     const response = await fetch('/api/executive/' + path, options);
-    const payload = await response.json();
+    const payload = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(payload.error || 'Executive is unavailable.');
     return payload;
   }
@@ -146,17 +158,46 @@ export function createExecutivePanel({ approve, today }) {
     }, () => { if (!input.value) input.value = text; });
   });
 
+  const level = find('[data-level]');
+  function monitorInput(item) {
+    const Context = globalThis.AudioContext || globalThis.webkitAudioContext;
+    if (!Context) return;
+    try {
+      item.context = new Context();
+      const source = item.context.createMediaStreamSource(item.stream);
+      const analyser = item.context.createAnalyser();
+      source.connect(analyser);
+      const samples = new Uint8Array(analyser.fftSize);
+      item.measure = () => {
+        analyser.getByteTimeDomainData(samples);
+        let peak = 0;
+        for (const sample of samples) peak = Math.max(peak, Math.abs(sample - 128) / 128);
+        level.value = Math.min(1, peak * 3);
+        level.hidden = item.context.state !== 'running';
+      };
+      item.context.resume().catch(() => {});
+    } catch { /* Recording can continue without an input meter. */ }
+  }
+  function stopMeter(item) {
+    item.measure = undefined;
+    item.context?.close().catch(() => {});
+    item.context = undefined;
+    level.hidden = true;
+    level.value = 0;
+  }
+
   function stopCapture(discard) {
     const item = capture;
     if (!item) return;
     item.discard = discard;
+    stopMeter(item);
     clearInterval(item.clock);
     clearTimeout(item.timeout);
     if (item.onHide) document.removeEventListener('visibilitychange', item.onHide);
     if (discard || !item.recorder) capture = null;
     if (item.recorder?.state === 'recording') item.recorder.stop();
     if (discard) item.stream?.getTracks().forEach((track) => track.stop());
-    recordButton.textContent = 'Record voice';
+    setRecording(false);
     if (!discard) status.textContent = 'Preparing recording…';
     if (discard) status.textContent = '';
     controls();
@@ -194,11 +235,12 @@ export function createExecutivePanel({ approve, today }) {
       recorder.addEventListener('stop', () => {
         item.stream.getTracks().forEach((track) => track.stop());
         if (capture !== item || item.discard) return;
+        stopMeter(item);
         clearInterval(item.clock);
         clearTimeout(item.timeout);
         if (item.onHide) document.removeEventListener('visibilitychange', item.onHide);
         capture = null;
-        recordButton.textContent = 'Record voice';
+        setRecording(false);
         const blob = new Blob(chunks, { type: type.split(';')[0] });
         if (!blob.size) {
           status.textContent = 'No audio was recorded. Try again.';
@@ -213,13 +255,14 @@ export function createExecutivePanel({ approve, today }) {
       });
       if (document.hidden) return stopCapture(true);
       recorder.start();
+      monitorInput(item);
       item.onHide = () => { if (document.hidden) stopCapture(true); };
       document.addEventListener('visibilitychange', item.onHide);
       const start = performance.now();
-      const update = () => { status.textContent = `Recording · ${Math.floor((performance.now() - start) / 1000)}s / ${limits.audioLimit}s`; };
+      const update = () => { item.measure?.(); status.textContent = `Recording · Stop to transcribe · ${Math.floor((performance.now() - start) / 1000)}s / ${limits.audioLimit}s`; };
       item.clock = setInterval(update, 250);
       item.timeout = setTimeout(() => stopCapture(false), limits.audioLimit * 1000 - 250);
-      recordButton.textContent = 'Stop recording';
+      setRecording(true);
       update();
       controls();
     } catch (error) {
@@ -245,5 +288,6 @@ export function createExecutivePanel({ approve, today }) {
   }
   clearButton.addEventListener('click', clear);
   cancelButton.addEventListener('click', () => stopCapture(true));
+  controls();
   return { panel, suspend: () => stopCapture(true), clear };
 }
