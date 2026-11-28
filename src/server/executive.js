@@ -96,8 +96,9 @@ export function createExecutive(store, { env = process.env, run = replicateClien
     activeUsers.add(userId);
     try {
       if (path === 'approve') {
-        const { proposalId, revision } = (await json(request)) ?? {};
-        const proposal = proposals.get(userId);
+        const { proposalId, revision, page } = (await json(request)) ?? {};
+        const key = page === 'brain-dump' ? userId + ':brain-dump' : userId;
+        const proposal = proposals.get(key);
         if (!proposal || proposal.id !== proposalId || proposal.expires < Date.now()) fail(404, 'This suggestion expired. Ask Executive for a fresh suggestion.');
         const current = await store.loadUserState(userId);
         if (current.revision !== revision) fail(409, 'Your workspace changed. Reload it before approving.');
@@ -122,7 +123,7 @@ export function createExecutive(store, { env = process.env, run = replicateClien
         }
         state.projects.push(...additions);
         const saved = await store.saveUserState(userId, state, revision);
-        proposals.delete(userId);
+        proposals.delete(key);
         return { revision: saved.revision, changes: proposal.suggestions.map(({ name, action, priority, minutes, deadline }) => ({
           name, action, settings: action === 'add' ? saved.state.projectSettings[name] : {
             ...(priority !== undefined ? { priority } : {}),
@@ -151,7 +152,8 @@ export function createExecutive(store, { env = process.env, run = replicateClien
           if (typeof transcript !== 'string' || !transcript.trim()) fail(422, 'No speech was detected. Try another recording.');
           result = { text: transcript.trim() };
         } else {
-          const { messages, includeProjects, today } = (await json(request)) ?? {};
+          const { messages, includeProjects, today, page } = (await json(request)) ?? {};
+          const key = page === 'brain-dump' ? userId + ':brain-dump' : userId;
           if (!Array.isArray(messages) || !messages.length || messages.length > 24
             || messages.some((m) => !m || !['user', 'assistant'].includes(m.role) || typeof m.text !== 'string' || !m.text.trim() || m.text.length > 24000)
             || messages.at(-1).role !== 'user') fail(400, 'Enter a message up to 24,000 characters.');
@@ -176,10 +178,10 @@ export function createExecutive(store, { env = process.env, run = replicateClien
           const proposalId = reply.suggestions.length ? randomUUID() : null;
           if (proposalId) {
             if (proposals.size >= 2000) proposals.delete(proposals.keys().next().value);
-            proposals.set(userId, { id: proposalId, expires: Date.now() + 30 * 60 * 1000, suggestions: reply.suggestions.map((item) => ({
+            proposals.set(key, { id: proposalId, expires: Date.now() + 30 * 60 * 1000, suggestions: reply.suggestions.map((item) => ({
               ...item, original: JSON.stringify(state.projectSettings[item.name]),
             })) });
-          } else proposals.delete(userId);
+          } else proposals.delete(key);
           result = { ...reply, proposalId };
         }
         await store.updateExecutiveUsage(userId, requestId.toLowerCase(), 'succeeded', terminalMetrics(prediction, model, recording?.seconds));

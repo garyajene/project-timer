@@ -95,7 +95,7 @@ let noteSaveTimer;
 let authEnabled = false;
 let registrationEnabled = false;
 let currentUser = null;
-let executive;
+const chatPanels = new Map();
 let executiveApproval = false;
 let stateRevision = 0;
 let accountGeneration = 0;
@@ -300,14 +300,14 @@ function saveState() {
   return pendingSave;
 }
 
-async function approveExecutive(proposalId) {
+async function approveExecutive(proposalId, page) {
   const generation = accountGeneration;
   executiveApproval = true;
   const approval = pendingSave.catch(() => {}).then(async () => {
     if (generation !== accountGeneration) throw new Error('Your session changed.');
     const response = await fetch('/api/executive/approve', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ proposalId, revision: stateRevision }),
+      body: JSON.stringify({ proposalId, page, revision: stateRevision }),
     });
     const result = await response.json();
     if (!response.ok) throw new Error(result.error);
@@ -602,7 +602,7 @@ function getTimerStatus(current) {
 }
 
 function primaryNavigation(className = '') {
-  return `<nav class="top-nav ${className}" aria-label="Primary navigation">${['Today', 'Timer', 'Projects', 'Scheduler', 'Calendar', 'Notes'].map((item) => { const route = item.toLowerCase().replaceAll(' ', '-'); return `<a href="#${route}" ${getRoute() === route ? 'aria-current="page"' : ''}>${item}</a>`; }).join('')}</nav>`;
+  return `<nav class="top-nav ${className}" aria-label="Primary navigation">${['Today', 'Timer', 'Projects', 'Scheduler', 'Calendar', 'Notes', 'Brain Dump'].map((item) => { const route = item.toLowerCase().replaceAll(' ', '-'); return `<a href="#${route}" ${getRoute() === route ? 'aria-current="page"' : ''}>${item}</a>`; }).join('')}</nav>`;
 }
 
 function header() {
@@ -983,6 +983,7 @@ function mainContent() {
   const route = getRoute();
   if (route === 'projects') return masterProjectList();
   if (route === 'timer') return timerPage();
+  if (route === 'brain-dump') return currentUser ? '<div id="executive-mount"></div>' : '';
   if (route === 'scheduler') return (currentUser ? '<div id="executive-mount"></div>' : '') + schedulerPage();
   if (route === 'calendar') return calendarSection();
   if (route === 'notes') return notesAndReview();
@@ -1013,7 +1014,8 @@ function renderShell(content = '') {
   app.classList.toggle('today-app', getRoute() === 'today');
   app.classList.toggle('timer-app', getRoute() === 'timer');
   app.classList.toggle('projects-app', getRoute() === 'projects');
-  app.classList.toggle('scheduler-app', getRoute() === 'scheduler');
+  app.classList.toggle('scheduler-app', ['scheduler', 'brain-dump'].includes(getRoute()));
+  app.classList.toggle('brain-dump-app', getRoute() === 'brain-dump');
   app.classList.toggle('calendar-app', getRoute() === 'calendar');
   app.innerHTML = `${header()}<main class="${getRoute() === 'today' ? 'today-main' : (getRoute() === 'timer' ? 'timer-main' : (getRoute() === 'projects' ? 'projects-main' : (getRoute() === 'scheduler' ? 'scheduler-main' : (getRoute() === 'calendar' ? 'calendar-main' : ''))))}">${content}</main>`;
   return true;
@@ -1032,10 +1034,16 @@ function render() {
     }
     if (!renderShell(mainContent())) return;
     const mount = document.querySelector('#executive-mount');
+    const route = getRoute();
+    for (const [page, chat] of chatPanels) {
+      if (!mount || route !== page) chat.suspend();
+    }
     if (mount) {
-      executive ??= createExecutivePanel({ approve: approveExecutive, today: () => toDateKey(new Date()) });
-      mount.replaceWith(executive.panel);
-    } else executive?.suspend();
+      if (!chatPanels.has(route)) chatPanels.set(route, createExecutivePanel({
+        page: route, approve: approveExecutive, today: () => toDateKey(new Date()),
+      }));
+      mount.replaceWith(chatPanels.get(route).panel);
+    }
     bindEvents();
     setupPerspectiveController();
     setupPlannerCallout();
@@ -1568,8 +1576,8 @@ function bindGlobalEvents() {
     currentUser = null;
     stateRevision = 0;
     state = structuredClone(defaultState);
-    executive?.clear();
-    executive = undefined;
+    for (const chat of chatPanels.values()) chat.clear();
+    chatPanels.clear();
     todayDraft = [];
     calendarDraft = [];
     quickTask = null;
@@ -2300,8 +2308,8 @@ async function initializeApp() {
     console.error('DoAbl startup failed while loading saved state.', error);
     if (authEnabled) currentUser = null;
     state = structuredClone(defaultState);
-    executive?.clear();
-    executive = undefined;
+    for (const chat of chatPanels.values()) chat.clear();
+    chatPanels.clear();
     todayDraft = [];
     remainingSeconds = DEFAULT_BLOCK_MINUTES * 60;
   } finally {

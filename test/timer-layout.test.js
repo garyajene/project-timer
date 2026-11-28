@@ -124,7 +124,7 @@ test('Quick Task uses only a name and the shared timer duration controls', () =>
 
 test('Timer navigation keeps all existing destinations in the shared DoAbl header', () => {
   const timerPage = mainSource.slice(mainSource.indexOf('function timerPage()'), mainSource.indexOf('function timerSchedule()'));
-  assert.match(mainSource, /\['Today', 'Timer', 'Projects', 'Scheduler', 'Calendar', 'Notes'\]/);
+  assert.match(mainSource, /\['Today', 'Timer', 'Projects', 'Scheduler', 'Calendar', 'Notes', 'Brain Dump'\]/);
   assert.match(mainSource, /href="#\$\{route\}"/);
   assert.match(mainSource, /isTimer \? 'timer-navigation' : ''/);
   assert.doesNotMatch(timerPage, /primaryNavigation\(/);
