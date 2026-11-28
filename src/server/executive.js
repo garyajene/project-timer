@@ -76,7 +76,8 @@ export function createExecutive(store, { env = process.env, run = replicateClien
   const contextChars = positive(env, 'EXECUTIVE_CONTEXT_CHARS', 12000, 24000);
   const maxTokens = positive(env, 'EXECUTIVE_OUTPUT_TOKENS', 1150, 4096);
   const timeout = positive(env, 'EXECUTIVE_TIMEOUT_MS', 50000, 90000);
-  const audioLimit = positive(env, 'EXECUTIVE_RECORDING_SECONDS', 60, 120);
+  const speechTimeout = 120000;
+  const audioLimit = Math.max(300, positive(env, 'EXECUTIVE_RECORDING_SECONDS', 330, 360));
   const activeUsers = new Set();
   const proposals = new Map();
 
@@ -143,18 +144,19 @@ export function createExecutive(store, { env = process.env, run = replicateClien
         const recordId = (predictionId) => store.updateExecutiveUsage(userId, requestId.toLowerCase(), 'processing', { predictionId, audioSeconds: recording?.seconds });
         let result;
         if (path === 'transcribe') {
-          recording = await audio(request, audioLimit);
-          prediction = await run(model, { audio: recording.uri }, timeout, recordId);
+          // Allow encoder padding and timer jitter at the browser's stop boundary.
+          recording = await audio(request, audioLimit + 2);
+          prediction = await run(model, { audio: recording.uri }, speechTimeout, recordId);
           const transcript = prediction.output?.text;
           if (typeof transcript !== 'string' || !transcript.trim()) fail(422, 'No speech was detected. Try another recording.');
-          result = { text: transcript.trim().slice(0, 4000) };
+          result = { text: transcript.trim() };
         } else {
           const { messages, includeProjects, today } = (await json(request)) ?? {};
           if (!Array.isArray(messages) || !messages.length || messages.length > 24
-            || messages.some((m) => !m || !['user', 'assistant'].includes(m.role) || typeof m.text !== 'string' || !m.text.trim() || m.text.length > 6000)
-            || messages.at(-1).role !== 'user' || messages.at(-1).text.length > 4000) fail(400, 'Enter a message up to 4,000 characters.');
+            || messages.some((m) => !m || !['user', 'assistant'].includes(m.role) || typeof m.text !== 'string' || !m.text.trim() || m.text.length > 24000)
+            || messages.at(-1).role !== 'user') fail(400, 'Enter a message up to 24,000 characters.');
           const recent = [];
-          let remaining = contextChars;
+          let remaining = Math.max(contextChars, messages.at(-1).text.length);
           for (const message of messages.slice(-contextTurns).reverse()) {
             if (!remaining) break;
             recent.unshift({ role: message.role, content: message.text.slice(0, remaining) });

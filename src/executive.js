@@ -11,7 +11,7 @@ export function createExecutivePanel({ approve, today }) {
       <form class="executive-form">
         <div class="executive-composer">
           <canvas class="executive-waveform" role="img" aria-label="Live microphone waveform" hidden></canvas>
-          <textarea aria-label="Message" maxlength="4000" rows="2" placeholder="What would you like help planning?"></textarea>
+          <textarea aria-label="Message" maxlength="24000" rows="2" placeholder="What would you like help planning?"></textarea>
           <button type="button" data-record aria-label="Record voice" title="Record voice">
             <svg aria-hidden="true" viewBox="0 0 24 24"><g class="mic-symbol" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="13" rx="3"/><path d="M5 11a7 7 0 0 0 14 0m-7 7v4m-4 0h8"/></g><rect class="stop-symbol" x="5" y="5" width="14" height="14" rx="3"/></svg>
           </button>
@@ -157,8 +157,8 @@ export function createExecutivePanel({ approve, today }) {
   function sendDraft() {
     const text = input.value.trim();
     if (!text || capture || approving) return;
-    if (text.length > 4000) {
-      status.textContent = 'Shorten your message to 4,000 characters before sending.';
+    if (text.length > 24000) {
+      status.textContent = 'Shorten your message to 24,000 characters before sending.';
       return;
     }
     const message = { role: 'user', text };
@@ -296,18 +296,19 @@ export function createExecutivePanel({ approve, today }) {
             return;
           }
           status.textContent = 'Review your transcript, then send when ready.';
-          if (panel.isConnected) input.focus();
+          if (panel.isConnected && !document.hidden) input.focus();
         });
       });
       if (document.hidden) return stopCapture(true);
-      recorder.start();
+      recorder.start(1000);
       monitorInput(item);
-      item.onHide = () => { if (document.hidden) stopCapture(true); };
+      item.onHide = () => { if (document.hidden) stopCapture(false); };
       document.addEventListener('visibilitychange', item.onHide);
       const start = performance.now();
-      const update = () => { status.textContent = `Recording · Stop to review or tap Send · ${Math.floor((performance.now() - start) / 1000)}s / ${limits.audioLimit}s`; };
-      item.clock = setInterval(update, 250);
-      item.timeout = setTimeout(() => stopCapture(false), limits.audioLimit * 1000 - 250);
+      const clock = (seconds) => Math.floor(seconds / 60) + ':' + String(seconds % 60).padStart(2, '0');
+      const update = () => { status.textContent = `Recording · Stop to review or tap Send · ${clock(Math.floor((performance.now() - start) / 1000))} / ${clock(limits.audioLimit)}`; };
+      item.clock = setInterval(update, 1000);
+      item.timeout = setTimeout(() => stopCapture(false), limits.audioLimit * 1000);
       setRecording(true);
       update();
       controls();
