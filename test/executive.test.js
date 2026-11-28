@@ -109,27 +109,29 @@ test('Executive rejects duplicate requests, caps per-user provider usage and hid
 });
 
 test('Whisper validates actual audio and duration, then returns editable text without a recording file', async (t) => {
+  const longTranscript = 'A thought to review. '.repeat(300).trim();
   const { store, directory, account, request } = await setup(t, async (model, input, timeout, recordId) => {
     assert.equal(model, WHISPER);
+    assert.ok(input.audio.length < 1_000_000);
     assert.match(input.audio, /^data:audio\/mpeg;base64,/);
     await recordId('voice123');
-    return { id: 'voice123', output: { text: 'Start a checklist.' } };
+    return { id: 'voice123', output: { text: longTranscript } };
   }, { EXECUTIVE_RECORDING_SECONDS: '1' });
   const user = await account('alex');
   const files = await readdir(directory);
   const voice = (seconds, format, codec, flags = []) => execFileSync('ffmpeg', ['-v', 'error', '-f', 'lavfi', '-i',
-    `sine=frequency=440:duration=${seconds}`, '-c:a', codec, ...flags, '-f', format, 'pipe:1']);
+    `sine=frequency=440:duration=${seconds}`, '-c:a', codec, ...flags, '-f', format, 'pipe:1'], { maxBuffer: 16 * 1024 * 1024 });
   const send = (body, type) => request('transcribe', user, body, randomUUID(), type);
   assert.equal((await send(Buffer.from('invalid'), 'audio/webm')).status, 422);
   assert.equal((await send(Buffer.from('invalid'), 'audio/flac')).status, 415);
-  assert.equal((await send(voice(1.4, 'webm', 'libopus'), 'audio/webm')).status, 422);
-  for (const [format, codec, flags] of [['webm', 'libopus', []], ['mp4', 'aac', ['-movflags', 'frag_keyframe+empty_moov']]]) {
-    const response = await send(voice(0.3, format, codec, flags), 'audio/' + format);
+  assert.equal((await send(voice(305, 'webm', 'libopus'), 'audio/webm')).status, 422);
+  for (const [format, codec, flags] of [['webm', 'libopus', []], ['mp4', 'aac', ['-movflags', 'empty_moov+default_base_moof', '-frag_duration', '1000000']]]) {
+    const response = await send(voice(300, format, codec, flags), 'audio/' + format);
     assert.equal(response.status, 200);
-    assert.deepEqual(await response.json(), { text: 'Start a checklist.' });
+    assert.deepEqual(await response.json(), { text: longTranscript });
   }
   const metrics = JSON.parse(await store.query("SELECT metrics_json FROM executive_usage WHERE status='succeeded' LIMIT 1"));
-  assert.ok(metrics.audioSeconds >= 0.25 && metrics.audioSeconds <= 0.5);
+  assert.ok(metrics.audioSeconds >= 299 && metrics.audioSeconds <= 301);
   assert.deepEqual(await readdir(directory), files);
 });
 
@@ -176,4 +178,16 @@ test('Replicate validation identifies an invalid audio URI without echoing submi
   await assert.rejects(run(WHISPER, {}, 5000, () => {}), {
     message: 'Replicate rejected the file address supplied for the recording.',
   });
+});
+
+test('Executive sends the entire edited long recording to chat', async (t) => {
+  const draft = 'A longer thought. '.repeat(800) + 'This is the last sentence.';
+  const { account, request } = await setup(t, async (model, input) => {
+    assert.equal(model, LUNA);
+    const conversation = JSON.parse(input.prompt).conversation;
+    assert.equal(conversation.at(-1).content, draft);
+    return { id: 'longchat', output: [JSON.stringify({ reply: 'Got it.', suggestions: [] })] };
+  });
+  const user = await account('long-draft');
+  assert.equal((await request('chat', user, say(draft))).status, 200);
 });

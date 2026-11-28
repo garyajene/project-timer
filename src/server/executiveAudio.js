@@ -19,7 +19,7 @@ export async function readExecutiveBody(request, maxBytes) {
 function transcode(input, args, maxBytes) {
   return new Promise((resolve, reject) => {
     const child = spawn('ffmpeg', ['-nostdin', '-v', 'error', '-xerror', '-protocol_whitelist', 'pipe', ...args], {
-      stdio: ['pipe', 'pipe', 'ignore'], timeout: 8000, killSignal: 'SIGKILL', env: { PATH: process.env.PATH },
+      stdio: ['pipe', 'pipe', 'ignore'], timeout: 30000, killSignal: 'SIGKILL', env: { PATH: process.env.PATH },
     });
     const chunks = [];
     let size = 0;
@@ -41,7 +41,7 @@ function transcode(input, args, maxBytes) {
 export async function normalizeRecording(request, secondsLimit) {
   const format = formats.get(request.headers['content-type']?.split(';')[0].trim());
   if (!format) throw Object.assign(new Error('This recording format is unsupported.'), { status: 415 });
-  const audio = await readExecutiveBody(request, 2 * 1024 * 1024);
+  const audio = await readExecutiveBody(request, 16 * 1024 * 1024);
   const rate = 16000;
   const maxSamples = rate * secondsLimit;
   try {
@@ -49,7 +49,7 @@ export async function normalizeRecording(request, secondsLimit) {
       '-ac', '1', '-ar', String(rate), '-f', 's16le', 'pipe:1'], (maxSamples + rate) * 2);
     if (pcm.length / 2 > maxSamples) throw new Error('Duration limit');
     const mp3 = await transcode(pcm, ['-f', 's16le', '-ac', '1', '-ar', String(rate), '-i', 'pipe:0',
-      '-map_metadata', '-1', '-b:a', '32k', '-f', 'mp3', 'pipe:1'], 512000);
+      '-map_metadata', '-1', '-b:a', '16k', '-f', 'mp3', 'pipe:1'], 740000);
     return { uri: `data:audio/mpeg;base64,${mp3.toString('base64')}`, seconds: pcm.length / (rate * 2) };
   } catch {
     throw Object.assign(new Error(`Record valid audio up to ${secondsLimit} seconds and try again.`), { status: 422 });
