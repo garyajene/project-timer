@@ -135,10 +135,15 @@ test('Whisper validates actual audio and duration, then returns editable text wi
 
 test('Replicate uses bearer auth and creates a version-pinned Whisper prediction', async () => {
   const run = replicateClient('mock-token', async (url, options) => {
+    if (url === 'https://api.replicate.com/v1/models/' + WHISPER) {
+      assert.equal(options.method, 'GET');
+      assert.equal(options.headers.Authorization, 'Bearer mock-token');
+      return Response.json({ latest_version: { id: 'a'.repeat(64) } });
+    }
     assert.equal(url, 'https://api.replicate.com/v1/predictions');
     assert.equal(options.headers.Authorization, 'Bearer mock-token');
     assert.equal(options.headers['Cancel-After'], '5s');
-    assert.deepEqual(JSON.parse(options.body), { version: WHISPER.split(':')[1], input: { audio: 'mock' } });
+    assert.deepEqual(JSON.parse(options.body), { version: 'a'.repeat(64), input: { audio: 'mock' } });
     return Response.json({ status: 'succeeded', id: 'p123', output: { text: 'Hello' } });
   });
   assert.equal((await run(WHISPER, { audio: 'mock' }, 2500, (id) => assert.equal(id, 'p123'))).output.text, 'Hello');
