@@ -45,7 +45,10 @@ export function createExecutivePanel({ approve, today }) {
     recordButton.classList.toggle('recording', active);
   }
   function controls() {
-    send.disabled = Boolean(request || capture || approving);
+    const recording = capture?.recorder?.state === 'recording';
+    send.disabled = Boolean(request || approving || (capture && !recording));
+    send.title = recording ? 'Stop recording and send' : 'Send';
+    send.setAttribute('aria-label', send.title);
     recordButton.disabled = Boolean(request || approving || (capture && capture.recorder?.state !== 'recording'));
     cancelButton.hidden = !capture;
     clearButton.hidden = !history.childElementCount && !input.value && !request;
@@ -143,8 +146,21 @@ export function createExecutivePanel({ approve, today }) {
 
   find('form').addEventListener('submit', (event) => {
     event.preventDefault();
+    if (capture?.recorder?.state === 'recording') {
+      capture.sendAfterTranscription = true;
+      stopCapture(false);
+      return;
+    }
+    if (!request) sendDraft();
+  });
+
+  function sendDraft() {
     const text = input.value.trim();
-    if (!text || request || capture || approving) return;
+    if (!text || capture || approving) return;
+    if (text.length > 4000) {
+      status.textContent = 'Shorten your message to 4,000 characters before sending.';
+      return;
+    }
     const message = { role: 'user', text };
     input.value = '';
     process('chat', JSON.stringify({ messages: [...messages, message].slice(-(limits?.contextTurns ?? 24)),
@@ -156,7 +172,7 @@ export function createExecutivePanel({ approve, today }) {
       addMessage(reply.role, reply.text);
       showProposal(data.suggestions, data.proposalId);
     }, () => { if (!input.value) input.value = text; });
-  });
+  }
 
   const level = find('[data-level]');
   function monitorInput(item) {
@@ -248,7 +264,11 @@ export function createExecutivePanel({ approve, today }) {
           return;
         }
         process('transcribe', blob, blob.type, 'Transcribing recording…', ({ text }) => {
-          input.value = [input.value.trimEnd(), text].filter(Boolean).join(' ').slice(0, 4000);
+          input.value = [input.value.trimEnd(), text].filter(Boolean).join(' ');
+          if (item.sendAfterTranscription) {
+            sendDraft();
+            return;
+          }
           status.textContent = 'Review your transcript, then send when ready.';
           if (panel.isConnected) input.focus();
         });
@@ -259,7 +279,7 @@ export function createExecutivePanel({ approve, today }) {
       item.onHide = () => { if (document.hidden) stopCapture(true); };
       document.addEventListener('visibilitychange', item.onHide);
       const start = performance.now();
-      const update = () => { item.measure?.(); status.textContent = `Recording · Stop to transcribe · ${Math.floor((performance.now() - start) / 1000)}s / ${limits.audioLimit}s`; };
+      const update = () => { item.measure?.(); status.textContent = `Recording · Stop to review or tap Send · ${Math.floor((performance.now() - start) / 1000)}s / ${limits.audioLimit}s`; };
       item.clock = setInterval(update, 250);
       item.timeout = setTimeout(() => stopCapture(false), limits.audioLimit * 1000 - 250);
       setRecording(true);
