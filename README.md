@@ -37,7 +37,7 @@ Set `REPLICATE_API_TOKEN` on the server. No additional Railway variable is requi
 | Optional environment variable | Default |
 | --- | --- |
 | `EXECUTIVE_CHAT_MODEL` | `openai/gpt-5.6-luna` |
-| `EXECUTIVE_WHISPER_MODEL` | `vaibhavs10/incredibly-fast-whisper` with the version pinned in the adapter |
+| `EXECUTIVE_WHISPER_MODEL` | `vaibhavs10/incredibly-fast-whisper` using the latest version reported by Replicate |
 | `EXECUTIVE_REQUESTS_PER_HOUR` | 15 |
 | `EXECUTIVE_REQUESTS_PER_DAY` | 40 |
 | `EXECUTIVE_CONTEXT_MESSAGES` | 12 |

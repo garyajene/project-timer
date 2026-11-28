@@ -2,7 +2,7 @@ import { setTimeout as delay } from 'node:timers/promises';
 
 const api = 'https://api.replicate.com/v1';
 export const LUNA = 'openai/gpt-5.6-luna';
-export const WHISPER = 'vaibhavs10/incredibly-fast-whisper:3ab86df6c8f54c11309d4d1f930ac292bad43ace52d10c80d87eb258b3c9f79c';
+export const WHISPER = 'vaibhavs10/incredibly-fast-whisper';
 
 async function validationReason(response) {
   const problem = await response.json().catch(() => null);
@@ -26,7 +26,7 @@ export function replicateClient(token, fetcher = fetch) {
   return async (model, input, timeout, recordId) => {
     const match = /^([\w-]+\/[\w.-]+)(?::([a-f0-9]{64}))?$/.exec(model);
     if (!token || !match) throw new Error('Provider configuration unavailable');
-    const [, name, version] = match;
+    const [, name, configuredVersion] = match;
     const signal = AbortSignal.timeout(timeout);
     const headers = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
     async function call(path, options) {
@@ -50,6 +50,14 @@ export function replicateClient(token, fetcher = fetch) {
     }
     let id;
     try {
+      let version = configuredVersion;
+      if (!version && name === WHISPER) {
+        const metadata = await call(`/models/${name}`, { method: 'GET' });
+        version = metadata.latest_version?.id;
+        if (typeof version !== 'string' || !/^[a-f0-9]{64}$/.test(version)) {
+          throw Object.assign(new Error('Replicate did not list an available Whisper version for this account.'), { status: 502 });
+        }
+      }
       let prediction = await call(version ? '/predictions' : `/models/${name}/predictions`, {
         method: 'POST',
         headers: { ...headers, 'Cancel-After': `${Math.max(5, Math.ceil(timeout / 1000))}s` },
